@@ -4,9 +4,18 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { VendorStatus, DeviceStatus } from '@prisma/client';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { CreateVendorDto } from './dto/create-vendor.dto';
+import { UpdateVendorDto } from './dto/update-vendor.dto';
+import { ResetCredentialsDto } from './dto/reset-credentials.dto';
+import { VendorQueryDto } from './dto/vendor-query.dto';
+import { AssignDeviceDto } from './dto/assign-device.dto';
+import { BalanceAdjustmentDto } from './dto/balance-adjustment.dto';
+import { Role, VendorStatus, DeviceStatus, TransactionType, Prisma } from '@prisma/client';
 
 @Injectable()
 export class VendorsService {
@@ -15,11 +24,140 @@ export class VendorsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
-  async findAll(page = 1, limit = 20, status?: VendorStatus) {
+  /**
+   * Création d'un nouveau vendeur
+   */
+  async createVendor(dto: CreateVendorDto, adminId?: string) {
+    // 1. Vérification unicité username & phone
+    const existingUser = await this.prisma.user.findUnique({
+      where: { username: dto.username },
+    });
+    if (existingUser) {
+      throw new BadRequestException(`Le nom d'utilisateur '${dto.username}' est déjà utilisé.`);
+    }
+
+    const existingPhone = await this.prisma.vendor.findUnique({
+      where: { phone: dto.phone },
+    });
+    if (existingPhone) {
+      throw new BadRequestException(`Le numéro de téléphone '${dto.phone}' est déjà attribué à un autre vendeur.`);
+    }
+
+    // 2. Génération automatique du vendorCode si non fourni
+    let vendorCode = dto.vendorCode;
+    if (!vendorCode) {
+      const count = await this.prisma.vendor.count();
+      vendorCode = `VEND-${String(count + 1).padStart(3, '0')}`;
+    } else {
+      const existingCode = await this.prisma.vendor.findUnique({
+        where: { vendorCode },
+      });
+      if (existingCode) {
+        throw new BadRequestException(`Le code vendeur '${vendorCode}' est déjà utilisé.`);
+      }
+    }
+
+    // 3. Hash mot de passe et code PIN
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const pinHash = dto.pin ? await bcrypt.hash(dto.pin, 12) : null;
+
+    // 4. Transaction de création atomique
+    const vendor = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          username: dto.username,
+          passwordHash,
+          pinHash,
+          role: Role.VENDOR,
+          isActive: true,
+        },
+      });
+
+      const initialBalance = dto.initialBalance || 0;
+
+      const newVendor = await tx.vendor.create({
+        data: {
+          userId: user.id,
+          vendorCode,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          posAddress: dto.posAddress,
+          status: VendorStatus.ACTIVE,
+          currentBalance: initialBalance,
+          creditLimit: dto.creditLimit ?? 0,
+          dailySalesLimit: dto.dailySalesLimit ?? 5000,
+          maxTicketAmount: dto.maxTicketAmount ?? 500,
+          defaultCommissionRate: dto.defaultCommissionRate ?? 5.0,
+        },
+        include: {
+          user: {
+            select: { id: true, username: true, role: true, isActive: true },
+          },
+        },
+      });
+
+      // Si un solde initial a été crédité, créer l'écriture dans le Ledger
+      if (initialBalance > 0) {
+        await tx.transaction.create({
+          data: {
+            vendorId: newVendor.id,
+            operatorId: adminId || null,
+            type: TransactionType.DEPOSIT,
+            amount: initialBalance,
+            balanceBefore: 0,
+            balanceAfter: initialBalance,
+            reference: `INIT-DEP-${crypto.randomBytes(6).toString('hex').toUpperCase()}`,
+            description: `Dépôt initial d'ouverture de compte vendeur`,
+          },
+        });
+      }
+
+      return newVendor;
+    });
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'VENDOR_CREATED',
+      resource: `Vendor:${vendor.id}`,
+      newPayload: {
+        vendorCode: vendor.vendorCode,
+        fullName: vendor.fullName,
+        phone: vendor.phone,
+        initialBalance: dto.initialBalance,
+      },
+    });
+
+    this.logger.log(`Nouveau vendeur créé : ${vendor.vendorCode} (${vendor.fullName})`);
+
+    return vendor;
+  }
+
+  /**
+   * Recherche paginée avec filtres multiples
+   */
+  async findAll(query: VendorQueryDto) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
-    const where = status ? { status } : {};
+
+    const where: Prisma.VendorWhereInput = {};
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.search) {
+      where.OR = [
+        { vendorCode: { contains: query.search, mode: 'insensitive' } },
+        { fullName: { contains: query.search, mode: 'insensitive' } },
+        { phone: { contains: query.search } },
+        { posAddress: { contains: query.search, mode: 'insensitive' } },
+        { user: { username: { contains: query.search, mode: 'insensitive' } } },
+      ];
+    }
 
     const [total, items] = await Promise.all([
       this.prisma.vendor.count({ where }),
@@ -31,8 +169,219 @@ export class VendorsService {
           user: {
             select: { id: true, username: true, email: true, isActive: true },
           },
-          devices: true,
+          devices: {
+            select: {
+              id: true,
+              deviceUuid: true,
+              deviceModel: true,
+              status: true,
+              isOnline: true,
+              lastSeenAt: true,
+              appVersion: true,
+            },
+          },
+          _count: {
+            select: {
+              tickets: true,
+              transactions: true,
+            },
+          },
         },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      items: items.map((v) => ({
+        ...v,
+        currentBalance: Number(v.currentBalance),
+        creditLimit: Number(v.creditLimit),
+        dailySalesLimit: Number(v.dailySalesLimit),
+        maxTicketAmount: Number(v.maxTicketAmount),
+        defaultCommissionRate: Number(v.defaultCommissionRate),
+      })),
+    };
+  }
+
+  /**
+   * Consultation détaillée d'un vendeur avec statistiques financières
+   */
+  async findById(id: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: { id: true, username: true, email: true, isActive: true, createdAt: true },
+        },
+        devices: true,
+        commissions: {
+          include: { game: true },
+        },
+      },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    // Calcul métriques du jour
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [todaySales, monthSales, totalTickets] = await Promise.all([
+      this.prisma.ticket.aggregate({
+        where: {
+          vendorId: id,
+          createdAt: { gte: startOfToday },
+          status: 'CONFIRMED',
+        },
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.ticket.aggregate({
+        where: {
+          vendorId: id,
+          createdAt: {
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          },
+          status: 'CONFIRMED',
+        },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.ticket.count({
+        where: { vendorId: id },
+      }),
+    ]);
+
+    return {
+      ...vendor,
+      currentBalance: Number(vendor.currentBalance),
+      creditLimit: Number(vendor.creditLimit),
+      dailySalesLimit: Number(vendor.dailySalesLimit),
+      maxTicketAmount: Number(vendor.maxTicketAmount),
+      defaultCommissionRate: Number(vendor.defaultCommissionRate),
+      metrics: {
+        todaySalesAmount: Number(todaySales._sum.totalAmount || 0),
+        todayTicketsCount: todaySales._count.id || 0,
+        monthSalesAmount: Number(monthSales._sum.totalAmount || 0),
+        totalTicketsCount: totalTickets,
+      },
+    };
+  }
+
+  /**
+   * Mise à jour des coordonnées et des limites d'un vendeur
+   */
+  async updateVendor(id: string, dto: UpdateVendorDto, adminId?: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id } });
+    if (!vendor) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    // Si le statut passe à SUSPENDED, appliquer la procédure de suspension complète
+    if (dto.status === VendorStatus.SUSPENDED && vendor.status !== VendorStatus.SUSPENDED) {
+      return this.suspendVendor(id, adminId || 'SYSTEM', 'Mise à jour statut vers SUSPENDED');
+    }
+
+    const updated = await this.prisma.vendor.update({
+      where: { id },
+      data: {
+        fullName: dto.fullName,
+        phone: dto.phone,
+        posAddress: dto.posAddress,
+        creditLimit: dto.creditLimit !== undefined ? dto.creditLimit : undefined,
+        dailySalesLimit: dto.dailySalesLimit !== undefined ? dto.dailySalesLimit : undefined,
+        maxTicketAmount: dto.maxTicketAmount !== undefined ? dto.maxTicketAmount : undefined,
+        defaultCommissionRate: dto.defaultCommissionRate !== undefined ? dto.defaultCommissionRate : undefined,
+        status: dto.status,
+      },
+    });
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'VENDOR_UPDATED',
+      resource: `Vendor:${id}`,
+      oldPayload: vendor,
+      newPayload: updated,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Réinitialisation sécurisée du Mot de Passe ou du PIN
+   */
+  async resetCredentials(id: string, dto: ResetCredentialsDto, adminId?: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!vendor || !vendor.user) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    const dataToUpdate: Prisma.UserUpdateInput = {};
+
+    if (dto.newPassword) {
+      dataToUpdate.passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    }
+    if (dto.newPin) {
+      dataToUpdate.pinHash = await bcrypt.hash(dto.newPin, 12);
+    }
+
+    if (Object.keys(dataToUpdate).length === 0) {
+      throw new BadRequestException('Veuillez fournir un nouveau mot de passe ou un nouveau PIN.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: vendor.userId },
+      data: dataToUpdate,
+    });
+
+    // Révocation de toutes les sessions actives pour forcer la reconnexion avec les nouvelles clés
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: vendor.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    // Coupure WebSocket pour forcer la déconnexion
+    this.realtimeGateway.notifyVendorSuspension(id, 'Identifiants modifiés par la direction. Veuillez vous reconnecter.');
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'VENDOR_CREDENTIALS_RESET',
+      resource: `Vendor:${id}`,
+      newPayload: {
+        passwordReset: !!dto.newPassword,
+        pinReset: !!dto.newPin,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Identifiants du vendeur ${vendor.vendorCode} mis à jour avec succès. Toutes ses sessions ont été révoquées.`,
+    };
+  }
+
+  /**
+   * Consultation paginée des transactions Ledger du vendeur
+   */
+  async getVendorTransactions(id: string, page = 1, limit = 20, type?: TransactionType) {
+    const skip = (page - 1) * limit;
+    const where: Prisma.TransactionWhereInput = { vendorId: id };
+    if (type) where.type = type;
+
+    const [total, items] = await Promise.all([
+      this.prisma.transaction.count({ where }),
+      this.prisma.transaction.findMany({
+        where,
+        skip,
+        take: limit,
         orderBy: { createdAt: 'desc' },
       }),
     ]);
@@ -40,124 +389,144 @@ export class VendorsService {
     return { total, page, limit, items };
   }
 
-  async findById(id: string) {
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: { id: true, username: true, email: true, isActive: true },
+  /**
+   * Consultation paginée des tickets du vendeur
+   */
+  async getVendorTickets(id: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [total, items] = await Promise.all([
+      this.prisma.ticket.count({ where: { vendorId: id } }),
+      this.prisma.ticket.findMany({
+        where: { vendorId: id },
+        skip,
+        take: limit,
+        include: { game: { select: { name: true, code: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return { total, page, limit, items };
+  }
+
+  /**
+   * Régularisation manuelle du solde (ADJUSTMENT) avec grand livre immuable
+   */
+  async adjustBalance(vendorId: string, dto: BalanceAdjustmentDto, adminId: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      const vendor = await tx.vendor.findUnique({
+        where: { id: vendorId },
+      });
+
+      if (!vendor) {
+        throw new NotFoundException('Vendeur introuvable');
+      }
+
+      const balanceBefore = Number(vendor.currentBalance);
+      const balanceAfter = balanceBefore + dto.amount;
+
+      if (balanceAfter < 0 && Math.abs(balanceAfter) > Number(vendor.creditLimit)) {
+        throw new BadRequestException('Opération impossible : solde après ajustement inférieur au découvert autorisé.');
+      }
+
+      // Mise à jour solde
+      const updatedVendor = await tx.vendor.update({
+        where: { id: vendorId },
+        data: { currentBalance: balanceAfter },
+      });
+
+      // Écriture Ledger
+      const transaction = await tx.transaction.create({
+        data: {
+          vendorId,
+          operatorId: adminId,
+          type: TransactionType.ADJUSTMENT,
+          amount: dto.amount,
+          balanceBefore,
+          balanceAfter,
+          reference: `ADJ-${crypto.randomBytes(6).toString('hex').toUpperCase()}`,
+          description: dto.reason,
         },
-        devices: true,
+      });
+
+      await this.auditService.log({
+        userId: adminId,
+        action: 'VENDOR_BALANCE_ADJUSTED',
+        resource: `Vendor:${vendorId}`,
+        newPayload: {
+          amount: dto.amount,
+          balanceBefore,
+          balanceAfter,
+          reason: dto.reason,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Ajustement de solde enregistré dans le Grand Livre.',
+        vendor: updatedVendor,
+        transaction,
+      };
+    });
+  }
+
+  /**
+   * Attribution d'un terminal Android à un vendeur
+   */
+  async assignDevice(vendorId: string, dto: AssignDeviceDto, adminId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    const existingDevice = await this.prisma.device.findUnique({
+      where: { deviceUuid: dto.deviceUuid },
+    });
+
+    if (existingDevice && existingDevice.vendorId !== vendorId) {
+      throw new BadRequestException(`Cet appareil (${dto.deviceUuid}) est déjà assigné à un autre vendeur.`);
+    }
+
+    const device = await this.prisma.device.upsert({
+      where: { deviceUuid: dto.deviceUuid },
+      update: {
+        vendorId,
+        deviceModel: dto.deviceModel,
+        osVersion: dto.osVersion || 'Android',
+        appVersion: dto.appVersion || '1.0.0',
+        status: DeviceStatus.AUTHORIZED,
+      },
+      create: {
+        vendorId,
+        deviceUuid: dto.deviceUuid,
+        deviceModel: dto.deviceModel,
+        osVersion: dto.osVersion || 'Android',
+        appVersion: dto.appVersion || '1.0.0',
+        status: DeviceStatus.AUTHORIZED,
       },
     });
 
-    if (!vendor) {
-      throw new NotFoundException('Vendeur introuvable');
-    }
-
-    return vendor;
-  }
-
-  /**
-   * KILL SWITCH ADMINISTRATEUR : Suspension immédiate du vendeur
-   */
-  async suspendVendor(vendorId: string, adminId: string, reason?: string) {
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { id: vendorId },
-    });
-
-    if (!vendor) {
-      throw new NotFoundException('Vendeur introuvable');
-    }
-
-    const previousStatus = vendor.status;
-
-    // 1. Mise à jour statut en base
-    const updated = await this.prisma.vendor.update({
-      where: { id: vendorId },
-      data: { status: VendorStatus.SUSPENDED },
-    });
-
-    // 2. Révocation immédiate de toutes les sessions actives (Refresh Tokens)
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: vendor.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
-    // 3. Déconnexion forcée des terminaux associés
-    await this.prisma.device.updateMany({
-      where: { vendorId },
-      data: { isOnline: false },
-    });
-
-    // 4. Trace d'audit
     await this.auditService.log({
       userId: adminId,
-      action: 'VENDOR_SUSPENDED',
-      resource: `Vendor:${vendorId}`,
-      oldPayload: { status: previousStatus },
-      newPayload: { status: VendorStatus.SUSPENDED, reason },
+      action: 'DEVICE_ASSIGNED',
+      resource: `Device:${device.id}`,
+      newPayload: { vendorId, deviceUuid: device.deviceUuid },
     });
 
-    this.logger.warn(`Vendeur ${vendor.vendorCode} (${vendorId}) SUSPENDU avec succès par l'administrateur ${adminId}`);
-
-    return {
-      success: true,
-      message: `Le vendeur ${vendor.vendorCode} a été suspendu immédiatement. Toutes ses sessions ont été révoquées.`,
-      vendor: updated,
-    };
+    return device;
   }
 
   /**
-   * Réactivation d'un compte vendeur
-   */
-  async reactivateVendor(vendorId: string, adminId: string) {
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { id: vendorId },
-    });
-
-    if (!vendor) {
-      throw new NotFoundException('Vendeur introuvable');
-    }
-
-    const updated = await this.prisma.vendor.update({
-      where: { id: vendorId },
-      data: { status: VendorStatus.ACTIVE },
-    });
-
-    await this.auditService.log({
-      userId: adminId,
-      action: 'VENDOR_REACTIVATED',
-      resource: `Vendor:${vendorId}`,
-      oldPayload: { status: vendor.status },
-      newPayload: { status: VendorStatus.ACTIVE },
-    });
-
-    return {
-      success: true,
-      message: `Le vendeur ${vendor.vendorCode} a été réactivé.`,
-      vendor: updated,
-    };
-  }
-
-  /**
-   * Révocation à distance d'un terminal Android spécifique
+   * Révocation d'un appareil
    */
   async revokeDevice(deviceId: string, adminId: string) {
-    const device = await this.prisma.device.findUnique({
-      where: { id: deviceId },
-    });
-
+    const device = await this.prisma.device.findUnique({ where: { id: deviceId } });
     if (!device) {
       throw new NotFoundException('Appareil introuvable');
     }
 
     const updated = await this.prisma.device.update({
       where: { id: deviceId },
-      data: {
-        status: DeviceStatus.REVOKED,
-        isOnline: false,
-      },
+      data: { status: DeviceStatus.REVOKED, isOnline: false },
     });
 
     await this.auditService.log({
@@ -171,6 +540,81 @@ export class VendorsService {
       success: true,
       message: `Appareil ${device.deviceUuid} révoqué avec succès.`,
       device: updated,
+    };
+  }
+
+  /**
+   * KILL SWITCH ADMINISTRATEUR : Suspension immédiate et notification temps réel
+   */
+  async suspendVendor(vendorId: string, adminId: string, reason?: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    const previousStatus = vendor.status;
+
+    const updated = await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: { status: VendorStatus.SUSPENDED },
+    });
+
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: vendor.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.prisma.device.updateMany({
+      where: { vendorId },
+      data: { isOnline: false },
+    });
+
+    // Émission WebSocket instantanée vers le terminal Android
+    this.realtimeGateway.notifyVendorSuspension(vendorId, reason);
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'VENDOR_SUSPENDED',
+      resource: `Vendor:${vendorId}`,
+      oldPayload: { status: previousStatus },
+      newPayload: { status: VendorStatus.SUSPENDED, reason },
+    });
+
+    return {
+      success: true,
+      message: `Le vendeur ${vendor.vendorCode} a été suspendu immédiatement. Toutes ses sessions ont été révoquées.`,
+      vendor: updated,
+    };
+  }
+
+  /**
+   * Réactivation d'un compte vendeur
+   */
+  async reactivateVendor(vendorId: string, adminId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    const updated = await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: { status: VendorStatus.ACTIVE },
+    });
+
+    this.realtimeGateway.notifyVendorReactivation(vendorId);
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'VENDOR_REACTIVATED',
+      resource: `Vendor:${vendorId}`,
+      oldPayload: { status: vendor.status },
+      newPayload: { status: VendorStatus.ACTIVE },
+    });
+
+    return {
+      success: true,
+      message: `Le vendeur ${vendor.vendorCode} a été réactivé.`,
+      vendor: updated,
     };
   }
 }

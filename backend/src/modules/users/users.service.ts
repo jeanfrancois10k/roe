@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
@@ -51,5 +55,38 @@ export class UsersService {
       }),
     ]);
     return { total, page, limit, items };
+  }
+
+  async toggleActive(id: string, isActive: boolean, adminId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    if (user.id === adminId && !isActive) {
+      throw new BadRequestException('Un administrateur ne peut pas désactiver son propre compte');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { isActive },
+      select: { id: true, username: true, role: true, isActive: true },
+    });
+
+    if (!isActive) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+
+    await this.auditService.log({
+      userId: adminId,
+      action: isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+      resource: `User:${id}`,
+      newPayload: { isActive },
+    });
+
+    return updated;
   }
 }
