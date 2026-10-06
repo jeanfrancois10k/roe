@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: roe_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: roe_admin
+      POSTGRES_PASSWORD: roe_secure_password_2026
+      POSTGRES_DB: roe_bolet_db
+    ports:
+      - "5433:5432" # Utilise 5433 côté hôte pour éviter tout conflit avec un Postgres local sur 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roe_admin -d roe_bolet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: roe_redis
+    restart: always
+    command: redis-server --requirepass roe_redis_secret_2026
+    ports:
+      - "6380:6379" # Port 6380 pour éviter tout conflit local
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "roe_redis_secret_2026", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

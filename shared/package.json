@@ -1,0 +1,13 @@
+{
+  "name": "@roe/shared",
+  "version": "1.0.0",
+  "description": "Contrats et types partagés pour ROE BOLET (Backend, Admin, Android)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

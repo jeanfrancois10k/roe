@@ -1,0 +1,343 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  AUDITOR
+  VENDOR
+}
+
+enum VendorStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+  LOCKED
+}
+
+enum DeviceStatus {
+  AUTHORIZED
+  REVOKED
+  PENDING
+}
+
+enum GameStatus {
+  ACTIVE
+  PAUSED
+  INACTIVE
+}
+
+enum DrawStatus {
+  SCHEDULED
+  OPEN
+  CLOSED
+  DRAWN
+  PUBLISHED
+  CANCELLED
+}
+
+enum TicketStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  VOID
+}
+
+enum TicketPayoutStatus {
+  UNPAID
+  PAID
+  EXPIRED
+}
+
+enum TransactionType {
+  DEPOSIT        // Rechargement du compte vendeur
+  WITHDRAWAL     // Retrait d'argent par le vendeur
+  SALE           // Débit pour achat de ticket
+  SALE_CANCEL    // Remboursement suite annulation ticket
+  COMMISSION     // Crédit de la commission sur vente
+  PRIZE_PAYOUT   // Paiement d'un gain au client
+  REIMBURSEMENT  // Remboursement par la maison du lot payé
+  ADJUSTMENT     // Régularisation manuelle administrateur
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FIXED_PER_TICKET
+}
+
+// ----------------------------------------------------
+// MODÈLES UTILISATEURS & APPAREILS
+// ----------------------------------------------------
+
+model User {
+  id              String         @id @default(uuid()) @db.Uuid
+  username        String         @unique @db.VarChar(50)
+  email           String?        @unique @db.VarChar(120)
+  passwordHash    String         @db.VarChar(255)
+  pinHash         String?        @db.VarChar(255) // Pour déverrouillage rapide POS
+  role            Role           @default(VENDOR)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  vendorProfile   Vendor?
+  auditLogs       AuditLog[]
+  transactions    Transaction[]  @relation("OperatorTransactions")
+  refreshTokens   RefreshToken[]
+
+  @@index([role])
+}
+
+model Vendor {
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @unique @db.Uuid
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  vendorCode      String         @unique @db.VarChar(20) // Ex: VEND-00123
+  fullName        String         @db.VarChar(100)
+  phone           String         @unique @db.VarChar(25)
+  posAddress      String         @db.VarChar(255)
+  status          VendorStatus   @default(ACTIVE)
+
+  // Gestion des limites financières
+  currentBalance  Decimal        @default(0.00) @db.Decimal(15, 2)
+  creditLimit     Decimal        @default(0.00) @db.Decimal(15, 2) // Découvert toléré
+  dailySalesLimit Decimal        @default(5000.00) @db.Decimal(15, 2)
+  maxTicketAmount Decimal        @default(500.00) @db.Decimal(15, 2)
+
+  // Commissions
+  defaultCommissionRate Decimal   @default(5.00) @db.Decimal(5, 2) // 5.00% par défaut
+
+  // Métriques de connexion
+  lastLoginAt     DateTime?
+  lastActivityAt  DateTime?
+  lastSyncAt      DateTime?
+
+  devices         Device[]
+  tickets         Ticket[]
+  transactions    Transaction[]  @relation("VendorTransactions")
+  commissions     Commission[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([status])
+  @@index([vendorCode])
+}
+
+model Device {
+  id              String         @id @default(uuid()) @db.Uuid
+  vendorId        String         @db.Uuid
+  vendor          Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  deviceUuid      String         @unique @db.VarChar(100) // Identifiant unique matériel (Android ID / DRM Key)
+  deviceModel     String         @db.VarChar(100)
+  osVersion       String         @db.VarChar(50)
+  appVersion      String         @db.VarChar(30)
+  ipAddress       String?        @db.VarChar(45)
+  status          DeviceStatus   @default(AUTHORIZED)
+  isOnline        Boolean        @default(false)
+  lastSeenAt      DateTime?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([vendorId])
+  @@index([deviceUuid])
+}
+
+model RefreshToken {
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @db.Uuid
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash       String         @unique @db.VarChar(255)
+  deviceId        String?        @db.VarChar(100)
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@index([userId])
+}
+
+// ----------------------------------------------------
+// JEUX, TIRAGES & RÈGLES
+// ----------------------------------------------------
+
+model Game {
+  id              String         @id @default(uuid()) @db.Uuid
+  code            String         @unique @db.VarChar(20) // Ex: BOLET_NY, BOLET_FL, LOTTO_5_90
+  name            String         @db.VarChar(100)
+  description     String?        @db.Text
+  status          GameStatus     @default(ACTIVE)
+
+  minBetAmount    Decimal        @default(1.00) @db.Decimal(15, 2)
+  maxBetAmount    Decimal        @default(100.00) @db.Decimal(15, 2)
+
+  // Moteur de règles paramétrable stocké en JSON sécurisé
+  gameRules       Json           @db.JsonB
+
+  drawFrequency   String?        @db.VarChar(50)
+  defaultCommission Decimal      @default(5.00) @db.Decimal(5, 2)
+
+  draws           Draw[]
+  tickets         Ticket[]
+  commissions     Commission[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Draw {
+  id              String         @id @default(uuid()) @db.Uuid
+  drawNumber      Int            @default(autoincrement())
+  gameId          String         @db.Uuid
+  game            Game           @relation(fields: [gameId], references: [id])
+
+  scheduledAt     DateTime
+  salesClosingAt  DateTime       // Clôture stricte des ventes
+  drawnAt         DateTime?
+  publishedAt     DateTime?
+
+  status          DrawStatus     @default(SCHEDULED)
+
+  winningResults  Json?          @db.JsonB
+  validationHash  String?        @db.VarChar(255) // Signature SHA-256 scellée de validation
+
+  tickets         Ticket[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([gameId, drawNumber])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+// ----------------------------------------------------
+// TICKETS DE LOTERIE
+// ----------------------------------------------------
+
+model Ticket {
+  id              String              @id @default(uuid()) @db.Uuid
+  ticketNumber    String              @unique @db.VarChar(32) // Code unique chiffré imprimé
+  secureChecksum  String              @db.VarChar(64) // HMAC pour validation QR Code
+  
+  vendorId        String              @db.Uuid
+  vendor          Vendor              @relation(fields: [vendorId], references: [id])
+  
+  gameId          String              @db.Uuid
+  game            Game                @relation(fields: [gameId], references: [id])
+  
+  drawId          String              @db.Uuid
+  draw            Draw                @relation(fields: [drawId], references: [id])
+
+  status          TicketStatus        @default(CONFIRMED)
+  totalAmount     Decimal             @db.Decimal(15, 2)
+  
+  playedGrids     Json                @db.JsonB
+
+  isWinner        Boolean?            @default(false)
+  wonAmount       Decimal             @default(0.00) @db.Decimal(15, 2)
+  payoutStatus    TicketPayoutStatus  @default(UNPAID)
+  paidAt          DateTime?
+  paidByVendorId  String?             @db.Uuid
+  
+  expiresAt       DateTime
+  cancelledAt     DateTime?
+  cancellationReason String?          @db.VarChar(255)
+
+  transactions    Transaction[]       @relation("TicketTransactions")
+
+  createdAt       DateTime            @default(now())
+
+  @@index([vendorId])
+  @@index([drawId])
+  @@index([ticketNumber])
+  @@index([createdAt])
+  @@index([payoutStatus])
+}
+
+// ----------------------------------------------------
+// GRAND LIVRE FINANCIER IMMUABLE (TRANSACTION LEDGER)
+// ----------------------------------------------------
+
+model Transaction {
+  id              String          @id @default(uuid()) @db.Uuid
+  vendorId        String          @db.Uuid
+  vendor          Vendor          @relation("VendorTransactions", fields: [vendorId], references: [id])
+
+  operatorId      String?         @db.Uuid
+  operator        User?           @relation("OperatorTransactions", fields: [operatorId], references: [id])
+
+  ticketId        String?         @db.Uuid
+  ticket          Ticket?         @relation("TicketTransactions", fields: [ticketId], references: [id])
+
+  type            TransactionType
+  amount          Decimal         @db.Decimal(15, 2)
+
+  balanceBefore   Decimal         @db.Decimal(15, 2)
+  balanceAfter    Decimal         @db.Decimal(15, 2)
+
+  reference       String          @unique @db.VarChar(64) // Idempotency key
+  description     String          @db.VarChar(255)
+
+  createdAt       DateTime        @default(now())
+
+  @@index([vendorId])
+  @@index([ticketId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ----------------------------------------------------
+// COMMISSIONS
+// ----------------------------------------------------
+
+model Commission {
+  id              String          @id @default(uuid()) @db.Uuid
+  vendorId        String          @db.Uuid
+  vendor          Vendor          @relation(fields: [vendorId], references: [id])
+
+  gameId          String          @db.Uuid
+  game            Game            @relation(fields: [gameId], references: [id])
+
+  rateType        CommissionType  @default(PERCENTAGE)
+  rateValue       Decimal         @db.Decimal(10, 2)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([vendorId, gameId])
+}
+
+// ----------------------------------------------------
+// PISTE D'AUDIT SÉCURISÉE (IMMUTABLE AUDIT LOG)
+// ----------------------------------------------------
+
+model AuditLog {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String?         @db.Uuid
+  user            User?           @relation(fields: [userId], references: [id])
+
+  action          String          @db.VarChar(100)
+  resource        String          @db.VarChar(100)
+  ipAddress       String?         @db.VarChar(45)
+  userAgent       String?         @db.VarChar(255)
+  oldPayload      Json?           @db.JsonB
+  newPayload      Json?           @db.JsonB
+
+  createdAt       DateTime        @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}

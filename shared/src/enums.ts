@@ -1,0 +1,63 @@
+export enum Role {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
+  AUDITOR = 'AUDITOR',
+  VENDOR = 'VENDOR',
+}
+
+export enum VendorStatus {
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  INACTIVE = 'INACTIVE',
+  LOCKED = 'LOCKED',
+}
+
+export enum DeviceStatus {
+  AUTHORIZED = 'AUTHORIZED',
+  REVOKED = 'REVOKED',
+  PENDING = 'PENDING',
+}
+
+export enum GameStatus {
+  ACTIVE = 'ACTIVE',
+  PAUSED = 'PAUSED',
+  INACTIVE = 'INACTIVE',
+}
+
+export enum DrawStatus {
+  SCHEDULED = 'SCHEDULED',
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED',
+  DRAWN = 'DRAWN',
+  PUBLISHED = 'PUBLISHED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum TicketStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  CANCELLED = 'CANCELLED',
+  VOID = 'VOID',
+}
+
+export enum TicketPayoutStatus {
+  UNPAID = 'UNPAID',
+  PAID = 'PAID',
+  EXPIRED = 'EXPIRED',
+}
+
+export enum TransactionType {
+  DEPOSIT = 'DEPOSIT',
+  WITHDRAWAL = 'WITHDRAWAL',
+  SALE = 'SALE',
+  SALE_CANCEL = 'SALE_CANCEL',
+  COMMISSION = 'COMMISSION',
+  PRIZE_PAYOUT = 'PRIZE_PAYOUT',
+  REIMBURSEMENT = 'REIMBURSEMENT',
+  ADJUSTMENT = 'ADJUSTMENT',
+}
+
+export enum CommissionType {
+  PERCENTAGE = 'PERCENTAGE',
+  FIXED_PER_TICKET = 'FIXED_PER_TICKET',
+}

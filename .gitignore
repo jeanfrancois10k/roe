@@ -1,0 +1,38 @@
+# Dépendances
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+.next/
+out/
+
+# Environnement & Secrets
+.env
+.env.local
+*.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Android build outputs
+.gradle/
+captures/
+*.apk
+*.aab
+local.properties
