@@ -73,6 +73,90 @@ async function main() {
   });
   console.log(`✅ Terminal Android associé: ${device.deviceModel} (UUID: ${device.deviceUuid})`);
 
+  // 4. Création des Jeux Officiels ROE BOLET (New York & Florida)
+  const gameNY = await prisma.game.upsert({
+    where: { code: 'BOLET_NY' },
+    update: {},
+    create: {
+      code: 'BOLET_NY',
+      name: 'Bolet New York (Midi & Soir)',
+      description: 'Loterie traditionnelle New York - Borlette 1er/2e/3e lot, Mariage, Lòt 3, Lòt 4',
+      status: 'ACTIVE',
+      minBetAmount: 1.0,
+      maxBetAmount: 500.0,
+      drawFrequency: 'DAILY_14H_22H',
+      defaultCommission: 5.0,
+      gameRules: {
+        gameTypes: ['BORLETTE', 'MARIAGE', 'LOT_3', 'LOT_4'],
+        minPicks: 1,
+        maxPicks: 4,
+        multipliers: {
+          firstPrize: 50,
+          secondPrize: 20,
+          thirdPrize: 10,
+          mariage: 1000,
+          lot3: 500,
+        },
+      },
+    },
+  });
+  console.log(`✅ Jeu initialisé: ${gameNY.name} (${gameNY.code})`);
+
+  const gameFL = await prisma.game.upsert({
+    where: { code: 'BOLET_FL' },
+    update: {},
+    create: {
+      code: 'BOLET_FL',
+      name: 'Bolet Florida (Midi & Soir)',
+      description: 'Loterie officielle Florida State - Tirages réguliers',
+      status: 'ACTIVE',
+      minBetAmount: 1.0,
+      maxBetAmount: 500.0,
+      drawFrequency: 'DAILY_13H_21H',
+      defaultCommission: 5.0,
+      gameRules: {
+        gameTypes: ['BORLETTE', 'MARIAGE', 'LOT_3', 'LOT_4'],
+        multipliers: {
+          firstPrize: 50,
+          secondPrize: 20,
+          thirdPrize: 10,
+          mariage: 1000,
+          lot3: 500,
+        },
+      },
+    },
+  });
+  console.log(`✅ Jeu initialisé: ${gameFL.name} (${gameFL.code})`);
+
+  // 5. Création d'un Tirage Ouvert pour aujourd'hui
+  const drawScheduledTime = new Date();
+  drawScheduledTime.setHours(drawScheduledTime.getHours() + 4); // Dans 4 heures
+
+  const drawClosingTime = new Date();
+  drawClosingTime.setHours(drawClosingTime.getHours() + 3); // Clôture dans 3 heures
+
+  const drawNY = await prisma.draw.upsert({
+    where: {
+      gameId_drawNumber: {
+        gameId: gameNY.id,
+        drawNumber: 101,
+      },
+    },
+    update: {
+      salesClosingAt: drawClosingTime,
+      scheduledAt: drawScheduledTime,
+      status: 'OPEN',
+    },
+    create: {
+      gameId: gameNY.id,
+      drawNumber: 101,
+      scheduledAt: drawScheduledTime,
+      salesClosingAt: drawClosingTime,
+      status: 'OPEN',
+    },
+  });
+  console.log(`✅ Tirage Ouvert planifié: N°${drawNY.drawNumber} pour ${gameNY.code} (Clôture: ${drawClosingTime.toLocaleTimeString()})`);
+
   console.log('🎉 Seed ROE BOLET terminé avec succès !');
 }
 

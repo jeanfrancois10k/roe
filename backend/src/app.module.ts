@@ -8,6 +8,9 @@ import { UsersModule } from './modules/users/users.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { GamesModule } from './modules/games/games.module';
+import { DrawsModule } from './modules/draws/draws.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 @Module({
@@ -23,6 +26,9 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     UsersModule,
     VendorsModule,
     DashboardModule,
+    GamesModule,
+    DrawsModule,
+    TicketsModule,
   ],
   providers: [
     {
