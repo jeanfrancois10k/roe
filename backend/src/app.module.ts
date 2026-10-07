@@ -11,6 +11,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { GamesModule } from './modules/games/games.module';
 import { DrawsModule } from './modules/draws/draws.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
+import { CommissionsModule } from './modules/commissions/commissions.module';
+import { TransactionsModule } from './modules/transactions/transactions.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 @Module({
@@ -29,6 +31,8 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     GamesModule,
     DrawsModule,
     TicketsModule,
+    CommissionsModule,
+    TransactionsModule,
   ],
   providers: [
     {

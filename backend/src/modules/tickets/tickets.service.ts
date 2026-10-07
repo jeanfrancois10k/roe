@@ -5,11 +5,13 @@ import {
   ForbiddenException,
   ConflictException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { CommissionsService } from '../commissions/commissions.service';
 import { SellTicketDto } from './dto/sell-ticket.dto';
 import { CancelTicketDto } from './dto/cancel-ticket.dto';
 import { TicketQueryDto } from './dto/ticket-query.dto';
@@ -32,6 +34,7 @@ export class TicketsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
+    @Optional() private readonly commissionsService?: CommissionsService,
   ) {
     this.hmacSecret =
       this.configService.get<string>('HMAC_TICKET_SECRET') ||
@@ -159,9 +162,24 @@ export class TicketsService {
     const ticketNumber = `ROE-${dateStr}-${randomSuffix}`;
     const secureChecksum = this.generateChecksum(ticketNumber, totalAmount, draw.id);
 
-    // Calcul de la commission
-    const commissionRate = Number(vendor.defaultCommissionRate);
-    const commissionAmount = Number(((totalAmount * commissionRate) / 100).toFixed(2));
+    // Calcul dynamique de la commission (moteur multi-règles)
+    let commissionAmount = 0;
+    let commissionDescription = '';
+
+    if (this.commissionsService) {
+      const calc = await this.commissionsService.calculateCommission(
+        vendorId,
+        game.id,
+        totalAmount,
+        dto.grids.length,
+      );
+      commissionAmount = calc.commissionAmount;
+      commissionDescription = `Commission ${calc.rateValue}${calc.rateType === 'PERCENTAGE' ? '%' : ' (fixe)'} sur Vente ${ticketNumber}`;
+    } else {
+      const commissionRate = Number(vendor.defaultCommissionRate || 5.0);
+      commissionAmount = Number(((totalAmount * commissionRate) / 100).toFixed(2));
+      commissionDescription = `Commission ${commissionRate}% sur Vente ${ticketNumber}`;
+    }
 
     // RÈGLE 9 & 10 : TRANSACTION ATOMIQUE AVEC LOCK PESSIMISTE POSTGRESQL
     return await this.prisma.$transaction(async (tx) => {
@@ -176,14 +194,14 @@ export class TicketsService {
       const currentBal = Number(lockedVendor.currentBalance);
       const creditLim = Number(lockedVendor.creditLimit);
 
-      // V鑽ification stricte des fonds disponibles
+      // Vérification stricte des fonds disponibles
       if (currentBal - totalAmount < -creditLim) {
         throw new BadRequestException(
           `Solde insuffisant pour émettre ce ticket (Solde disponible : $${(currentBal + creditLim).toFixed(2)}).`,
         );
       }
 
-      // 1. D閎it de la vente
+      // 1. Débit de la vente
       const balanceAfterSale = currentBal - totalAmount;
       const netBalanceAfter = balanceAfterSale + commissionAmount;
 
@@ -195,7 +213,7 @@ export class TicketsService {
         },
       });
 
-      // 2. 蒀riture Ledger : D閎it de la Vente
+      // 2. Écriture Ledger : Débit de la Vente
       await tx.transaction.create({
         data: {
           vendorId,
@@ -209,7 +227,7 @@ export class TicketsService {
         },
       });
 
-      // 3. 蒀riture Ledger : Cr閡it de la Commission imm閡iate
+      // 3. Écriture Ledger : Crédit de la Commission immédiate
       if (commissionAmount > 0) {
         await tx.transaction.create({
           data: {
@@ -220,7 +238,7 @@ export class TicketsService {
             balanceBefore: balanceAfterSale,
             balanceAfter: netBalanceAfter,
             reference: `COM-${dto.idempotencyKey}`,
-            description: `Commission ${commissionRate}% sur Vente ${ticketNumber}`,
+            description: commissionDescription,
           },
         });
       }
