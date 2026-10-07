@@ -19,16 +19,23 @@ interface SidebarProps {
   onClose: () => void;
 }
 
+interface NavItem {
+  name: string;
+  href: string;
+  icon: any;
+  badge?: string;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const router = useRouter();
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { name: 'Tableau de bord', href: '/', icon: LayoutDashboard },
     { name: 'Vendeurs & POS', href: '/vendors', icon: Users },
-    { name: 'Jeux & Tirages', href: '/#draws', icon: Dices, badge: 'Phase 5' },
-    { name: 'Transactions Ledger', href: '/#ledger', icon: ReceiptText, badge: 'Phase 6' },
-    { name: 'Piste d’Audit', href: '/#audit', icon: ShieldAlert, badge: 'Phase 10' },
+    { name: 'Piste d’Audit', href: '/audit', icon: ShieldAlert },
+    { name: 'Transactions Ledger', href: '/#ledger', icon: ReceiptText },
+    { name: 'Jeux & Tirages', href: '/#draws', icon: Dices },
   ];
 
   const handleLogout = () => {

@@ -14,6 +14,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
 import { CommissionsModule } from './modules/commissions/commissions.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 @Module({
@@ -35,6 +36,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     CommissionsModule,
     TransactionsModule,
     SyncModule,
+    HealthModule,
   ],
   providers: [
     {
