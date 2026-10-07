@@ -14,6 +14,8 @@ import { TicketsService } from './tickets.service';
 import { SellTicketDto } from './dto/sell-ticket.dto';
 import { CancelTicketDto } from './dto/cancel-ticket.dto';
 import { TicketQueryDto } from './dto/ticket-query.dto';
+import { VerifyTicketDto } from './dto/verify-ticket.dto';
+import { PayTicketDto } from './dto/pay-ticket.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -22,6 +24,29 @@ import { Role } from '@prisma/client';
 @Controller('api/v1/tickets')
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
+
+  @Post('verify')
+  @UseGuards(RolesGuard)
+  @Roles(Role.VENDOR, Role.ADMIN, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async verifyTicket(@Body() dto: VerifyTicketDto) {
+    return this.ticketsService.verifyTicket(dto);
+  }
+
+  @Post('pay')
+  @UseGuards(RolesGuard)
+  @Roles(Role.VENDOR, Role.ADMIN, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async payTicketPrize(
+    @Body() dto: PayTicketDto,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('vendorId') vendorId: string,
+  ) {
+    if (!vendorId) {
+      throw new ForbiddenException('Seul un profil vendeur actif peut effectuer le paiement d’un lot.');
+    }
+    return this.ticketsService.payTicketPrize(dto, vendorId, userId);
+  }
 
   @Post('sell')
   @UseGuards(RolesGuard)

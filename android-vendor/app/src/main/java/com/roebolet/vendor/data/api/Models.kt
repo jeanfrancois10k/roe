@@ -43,3 +43,39 @@ data class HeartbeatEvent(
     val batteryLevel: Int,
     val appVersion: String
 )
+
+data class VerifyTicketRequest(
+    @SerializedName("query") val query: String,
+    @SerializedName("checksum") val checksum: String? = null
+)
+
+data class VerifyTicketResponse(
+    @SerializedName("ticketId") val ticketId: String,
+    @SerializedName("ticketNumber") val ticketNumber: String,
+    @SerializedName("isAuthentic") val isAuthentic: Boolean,
+    @SerializedName("gameName") val gameName: String,
+    @SerializedName("drawNumber") val drawNumber: Int,
+    @SerializedName("wonAmount") val wonAmount: Double,
+    @SerializedName("isWinner") val isWinner: Boolean,
+    @SerializedName("payoutStatus") val payoutStatus: String,
+    @SerializedName("statusKey") val statusKey: String,
+    @SerializedName("statusLabel") val statusLabel: String,
+    @SerializedName("canBePaid") val canBePaid: Boolean
+)
+
+data class PayTicketRequest(
+    @SerializedName("ticketId") val ticketId: String,
+    @SerializedName("deviceUuid") val deviceUuid: String,
+    @SerializedName("idempotencyKey") val idempotencyKey: String? = null
+)
+
+data class PayTicketResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("message") val message: String,
+    @SerializedName("vendor") val vendor: PayVendorResult?
+)
+
+data class PayVendorResult(
+    @SerializedName("id") val id: String,
+    @SerializedName("newBalance") val newBalance: Double
+)

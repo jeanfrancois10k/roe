@@ -9,10 +9,14 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
 import com.roebolet.vendor.data.api.PinLoginRequest
 import com.roebolet.vendor.data.api.RoeApiService
+import com.roebolet.vendor.data.api.VerifyTicketRequest
+import com.roebolet.vendor.data.api.VerifyTicketResponse
+import com.roebolet.vendor.data.api.PayTicketRequest
 import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.data.socket.SocketManager
 import com.roebolet.vendor.ui.dashboard.DashboardScreen
 import com.roebolet.vendor.ui.login.LoginScreen
+import com.roebolet.vendor.ui.verify.VerifyTicketScreen
 import com.roebolet.vendor.ui.theme.RoeBoletTheme
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -63,12 +67,18 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun AppNavigator() {
         var isAuthenticated by remember { mutableStateOf(prefs.getAccessToken() != null) }
+        var currentScreen by remember { mutableStateOf("DASHBOARD") }
         var vendorCode by remember { mutableStateOf(prefs.getVendorCode()) }
         var vendorName by remember { mutableStateOf(prefs.getVendorName()) }
         var balance by remember { mutableStateOf(prefs.getBalance()) }
         var isOnline by remember { mutableStateOf(socketManager.isConnected()) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var isLoading by remember { mutableStateOf(false) }
+
+        // État spécifique pour l'écran de vérification de tickets
+        var verifyResult by remember { mutableStateOf<VerifyTicketResponse?>(null) }
+        var verifyLoading by remember { mutableStateOf(false) }
+        var verifyError by remember { mutableStateOf<String?>(null) }
 
         val deviceUuid = remember { prefs.getOrCreateDeviceUuid() }
 
@@ -77,6 +87,7 @@ class MainActivity : ComponentActivity() {
             socketManager.setOnForceLogoutListener { reason ->
                 prefs.clearSession()
                 isAuthenticated = false
+                currentScreen = "DASHBOARD"
                 errorMessage = "🚨 VERROUILLAGE SÉCURITÉ : $reason"
                 Toast.makeText(this@MainActivity, reason, Toast.LENGTH_LONG).show()
             }
@@ -95,20 +106,104 @@ class MainActivity : ComponentActivity() {
         }
 
         if (isAuthenticated) {
-            DashboardScreen(
-                vendorCode = vendorCode,
-                vendorName = vendorName,
-                balance = balance,
-                isOnline = isOnline,
-                onMenuClick = { action ->
-                    Toast.makeText(this, "Module $action sélectionné (Phase Suivante)", Toast.LENGTH_SHORT).show()
-                },
-                onLogoutClick = {
-                    prefs.clearSession()
-                    isAuthenticated = false
-                    socketManager.disconnect()
+            when (currentScreen) {
+                "VERIFY_TICKET" -> {
+                    VerifyTicketScreen(
+                        isLoading = verifyLoading,
+                        verificationResult = verifyResult,
+                        errorMessage = verifyError,
+                        onVerifyClick = { query ->
+                            verifyLoading = true
+                            verifyError = null
+                            lifecycleScope.launch {
+                                try {
+                                    val token = "Bearer ${prefs.getAccessToken()}"
+                                    val response = apiService.verifyTicket(token, VerifyTicketRequest(query = query))
+                                    if (response.isSuccessful && response.body() != null) {
+                                        verifyResult = response.body()
+                                    } else {
+                                        val err = response.errorBody()?.string() ?: "Ticket introuvable"
+                                        verifyError = "Ticket introuvable ou numéro invalide"
+                                        verifyResult = null
+                                    }
+                                } catch (e: Exception) {
+                                    verifyError = "Erreur de communication : ${e.localizedMessage ?: "Vérifiez la connexion"}"
+                                    verifyResult = null
+                                } finally {
+                                    verifyLoading = false
+                                }
+                            }
+                        },
+                        onPayClick = { ticketId ->
+                            verifyLoading = true
+                            verifyError = null
+                            lifecycleScope.launch {
+                                try {
+                                    val token = "Bearer ${prefs.getAccessToken()}"
+                                    val response = apiService.payTicket(
+                                        token,
+                                        PayTicketRequest(ticketId = ticketId, deviceUuid = deviceUuid)
+                                    )
+                                    if (response.isSuccessful && response.body() != null) {
+                                        val body = response.body()!!
+                                        Toast.makeText(this@MainActivity, body.message, Toast.LENGTH_LONG).show()
+                                        if (body.vendor != null) {
+                                            balance = body.vendor.newBalance
+                                            prefs.saveAuthData(
+                                                token = prefs.getAccessToken() ?: "",
+                                                refreshToken = prefs.getRefreshToken() ?: "",
+                                                vendorId = prefs.getVendorId(),
+                                                vendorCode = vendorCode,
+                                                fullName = vendorName,
+                                                balance = body.vendor.newBalance
+                                            )
+                                        }
+                                        // Mise à jour de l'affichage en DÉJÀ PAYÉ
+                                        verifyResult = verifyResult?.copy(
+                                            canBePaid = false,
+                                            statusKey = "ALREADY_PAID",
+                                            statusLabel = "TICKET DÉJÀ PAYÉ"
+                                        )
+                                    } else {
+                                        verifyError = "Erreur de paiement : ce ticket a peut-être déjà été payé."
+                                    }
+                                } catch (e: Exception) {
+                                    verifyError = "Erreur : ${e.localizedMessage ?: "Impossible de finaliser le paiement"}"
+                                } finally {
+                                    verifyLoading = false
+                                }
+                            }
+                        },
+                        onBackClick = {
+                            currentScreen = "DASHBOARD"
+                            verifyResult = null
+                            verifyError = null
+                        }
+                    )
                 }
-            )
+                else -> {
+                    DashboardScreen(
+                        vendorCode = vendorCode,
+                        vendorName = vendorName,
+                        balance = balance,
+                        isOnline = isOnline,
+                        onMenuClick = { action ->
+                            if (action == "VÉRIFIER TICKET") {
+                                currentScreen = "VERIFY_TICKET"
+                                verifyResult = null
+                                verifyError = null
+                            } else {
+                                Toast.makeText(this, "Module $action sélectionné (Phase Suivante)", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onLogoutClick = {
+                            prefs.clearSession()
+                            isAuthenticated = false
+                            socketManager.disconnect()
+                        }
+                    )
+                }
+            }
         } else {
             LoginScreen(
                 initialVendorCode = vendorCode,

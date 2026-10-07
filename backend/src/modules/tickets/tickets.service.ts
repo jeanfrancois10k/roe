@@ -12,11 +12,15 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommissionsService } from '../commissions/commissions.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { SellTicketDto } from './dto/sell-ticket.dto';
 import { CancelTicketDto } from './dto/cancel-ticket.dto';
 import { TicketQueryDto } from './dto/ticket-query.dto';
+import { VerifyTicketDto } from './dto/verify-ticket.dto';
+import { PayTicketDto } from './dto/pay-ticket.dto';
 import {
   TicketStatus,
+  TicketPayoutStatus,
   TransactionType,
   DeviceStatus,
   VendorStatus,
@@ -35,6 +39,7 @@ export class TicketsService {
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     @Optional() private readonly commissionsService?: CommissionsService,
+    @Optional() private readonly realtimeGateway?: RealtimeGateway,
   ) {
     this.hmacSecret =
       this.configService.get<string>('HMAC_TICKET_SECRET') ||
@@ -474,5 +479,272 @@ export class TicketsService {
       totalAmount: Number(ticket.totalAmount),
       wonAmount: Number(ticket.wonAmount),
     };
+  }
+
+  /**
+   * Vérification approfondie d'un ticket (par numéro ou scan QR code)
+   */
+  async verifyTicket(dto: VerifyTicketDto) {
+    let cleanNumber = dto.query.trim();
+    let providedChecksum = dto.checksum?.trim();
+
+    // Si le scan QR code contient le format "NUMERO|CHECKSUM"
+    if (cleanNumber.includes('|')) {
+      const parts = cleanNumber.split('|');
+      cleanNumber = parts[0];
+      if (!providedChecksum && parts.length > 1) {
+        providedChecksum = parts[1];
+      }
+    }
+
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { ticketNumber: cleanNumber },
+      include: {
+        game: { select: { id: true, code: true, name: true, gameRules: true } },
+        draw: {
+          select: {
+            id: true,
+            drawNumber: true,
+            status: true,
+            scheduledAt: true,
+            publishedAt: true,
+            winningResults: true,
+          },
+        },
+        vendor: { select: { id: true, vendorCode: true, fullName: true, posAddress: true } },
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket introuvable pour la référence '${cleanNumber}'.`);
+    }
+
+    // Vérification de la signature d'authenticité HMAC
+    const expectedChecksum = this.generateChecksum(
+      ticket.ticketNumber,
+      Number(ticket.totalAmount),
+      ticket.drawId,
+    );
+    const isAuthentic = providedChecksum ? providedChecksum === expectedChecksum : true;
+
+    if (providedChecksum && !isAuthentic) {
+      throw new BadRequestException('Alerte de sécurité : signature cryptographique du QR code non conforme !');
+    }
+
+    const now = new Date();
+    const isExpired = now > new Date(ticket.expiresAt);
+    const wonAmount = Number(ticket.wonAmount || 0);
+
+    let statusKey: 'CANCELLED' | 'VOID' | 'EXPIRED' | 'PENDING_DRAW' | 'ALREADY_PAID' | 'WINNER' | 'NOT_A_WINNER';
+    let statusLabel: string;
+    let canBePaid = false;
+
+    if (ticket.status === TicketStatus.CANCELLED) {
+      statusKey = 'CANCELLED';
+      statusLabel = 'TICKET ANNULÉ';
+    } else if (ticket.status === TicketStatus.VOID) {
+      statusKey = 'VOID';
+      statusLabel = 'TICKET INVALIDÉ';
+    } else if (isExpired) {
+      statusKey = 'EXPIRED';
+      statusLabel = 'TICKET EXPIRÉ (Délai de 90 jours dépassé)';
+    } else if (ticket.draw.status !== DrawStatus.PUBLISHED) {
+      statusKey = 'PENDING_DRAW';
+      statusLabel = 'TIRAGE EN COURS (Résultats non encore publiés)';
+    } else if (ticket.isWinner && wonAmount > 0) {
+      if (ticket.payoutStatus === TicketPayoutStatus.PAID) {
+        statusKey = 'ALREADY_PAID';
+        statusLabel = 'TICKET DÉJÀ PAYÉ';
+      } else {
+        statusKey = 'WINNER';
+        statusLabel = 'TICKET GAGNANT !';
+        canBePaid = true;
+      }
+    } else {
+      statusKey = 'NOT_A_WINNER';
+      statusLabel = 'TICKET NON GAGNANT';
+    }
+
+    return {
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      isAuthentic,
+      gameName: ticket.game.name,
+      gameCode: ticket.game.code,
+      drawNumber: ticket.draw.drawNumber,
+      drawStatus: ticket.draw.status,
+      scheduledAt: ticket.draw.scheduledAt,
+      winningResults: ticket.draw.winningResults,
+      playedGrids: ticket.playedGrids,
+      totalAmount: Number(ticket.totalAmount),
+      wonAmount,
+      isWinner: Boolean(ticket.isWinner),
+      payoutStatus: ticket.payoutStatus,
+      paidAt: ticket.paidAt,
+      paidByVendorId: ticket.paidByVendorId,
+      expiresAt: ticket.expiresAt,
+      statusKey,
+      statusLabel,
+      canBePaid,
+    };
+  }
+
+  /**
+   * Paiement sécurisé d'un lot gagnant avec verrouillage pessimiste anti-double paiement
+   */
+  async payTicketPrize(dto: PayTicketDto, vendorId: string, operatorUserId: string) {
+    const now = new Date();
+
+    // 1. Vérification du Vendeur payeur
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+    if (!vendor || vendor.status !== VendorStatus.ACTIVE) {
+      throw new ForbiddenException('Vendeur inactif ou non autorisé à effectuer des paiements.');
+    }
+
+    // 2. Vérification de l'appareil Android
+    const device = await this.prisma.device.findUnique({
+      where: { deviceUuid: dto.deviceUuid },
+    });
+    if (!device || device.status !== DeviceStatus.AUTHORIZED || device.vendorId !== vendorId) {
+      throw new ForbiddenException('Appareil non autorisé pour cette opération financière.');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 3. Verrouillage pessimiste PostgreSQL sur le TICKET
+      const [lockedTicket] = await tx.$queryRaw<Array<{
+        id: string;
+        ticketNumber: string;
+        status: TicketStatus;
+        isWinner: boolean;
+        wonAmount: any;
+        payoutStatus: TicketPayoutStatus;
+        expiresAt: Date;
+        drawId: string;
+      }>>`
+        SELECT "id", "ticketNumber", "status", "isWinner", "wonAmount", "payoutStatus", "expiresAt", "drawId"
+        FROM "Ticket"
+        WHERE "id" = ${dto.ticketId}::uuid
+        FOR UPDATE
+      `;
+
+      if (!lockedTicket) {
+        throw new NotFoundException('Ticket introuvable');
+      }
+
+      // CONTRÔLE ABSOLU ANTI-DOUBLE PAIEMENT
+      if (lockedTicket.payoutStatus === TicketPayoutStatus.PAID) {
+        throw new BadRequestException('Alerte Fraude : Ce ticket a DÉJÀ ÉTÉ PAYÉ.');
+      }
+
+      if (lockedTicket.status !== TicketStatus.CONFIRMED) {
+        throw new BadRequestException(`Ce ticket ne peut être payé (Statut : ${lockedTicket.status}).`);
+      }
+
+      const wonAmount = Number(lockedTicket.wonAmount);
+      if (!lockedTicket.isWinner || wonAmount <= 0) {
+        throw new BadRequestException('Ce ticket n’est pas gagnant.');
+      }
+
+      if (now > new Date(lockedTicket.expiresAt)) {
+        throw new BadRequestException('Ce ticket a expiré et ne peut plus être payé.');
+      }
+
+      // 4. Verrouillage pessimiste sur le compte VENDEUR pour remboursement du gain avancé
+      const [lockedVendor] = await tx.$queryRaw<Array<{ id: string; currentBalance: any; vendorCode: string }>>`
+        SELECT "id", "currentBalance", "vendorCode"
+        FROM "Vendor"
+        WHERE "id" = ${vendorId}::uuid
+        FOR UPDATE
+      `;
+
+      const balanceBefore = Number(lockedVendor.currentBalance);
+      const balanceAfter = Number((balanceBefore + wonAmount).toFixed(2));
+
+      // 5. Crédit du solde vendeur (la maison lui rembourse le cash remis au gagnant)
+      await tx.vendor.update({
+        where: { id: vendorId },
+        data: {
+          currentBalance: balanceAfter,
+          lastActivityAt: now,
+        },
+      });
+
+      // 6. Écriture Grand Livre : PRIZE_PAYOUT
+      const reference = dto.idempotencyKey || `PAY-${lockedTicket.ticketNumber}`;
+      await tx.transaction.create({
+        data: {
+          vendorId,
+          operatorId: operatorUserId,
+          ticketId: lockedTicket.id,
+          type: TransactionType.PRIZE_PAYOUT,
+          amount: wonAmount,
+          balanceBefore,
+          balanceAfter,
+          reference,
+          description: `Paiement Gain Ticket ${lockedTicket.ticketNumber} ($${wonAmount.toFixed(2)})`,
+        },
+      });
+
+      // 7. Scellement définitif du Ticket en PAID
+      const updatedTicket = await tx.ticket.update({
+        where: { id: lockedTicket.id },
+        data: {
+          payoutStatus: TicketPayoutStatus.PAID,
+          paidAt: now,
+          paidByVendorId: vendorId,
+        },
+        include: {
+          game: { select: { name: true, code: true } },
+          draw: { select: { drawNumber: true } },
+        },
+      });
+
+      // 8. Audit Log
+      await this.auditService.log({
+        userId: operatorUserId,
+        action: 'TICKET_PRIZE_PAID',
+        resource: `Ticket:${lockedTicket.id}`,
+        newPayload: {
+          ticketNumber: lockedTicket.ticketNumber,
+          wonAmount,
+          paidByVendorCode: lockedVendor.vendorCode,
+          balanceBefore,
+          balanceAfter,
+        },
+      });
+
+      // 9. Émission WebSocket
+      if (this.realtimeGateway?.server) {
+        this.realtimeGateway.server.emit('ticket:paid', {
+          ticketId: lockedTicket.id,
+          ticketNumber: lockedTicket.ticketNumber,
+          wonAmount,
+          paidByVendorId: vendorId,
+          paidAt: now.toISOString(),
+        });
+      }
+
+      this.logger.log(
+        `Gain payé avec succès : Ticket ${lockedTicket.ticketNumber} ($${wonAmount.toFixed(2)}) par ${lockedVendor.vendorCode}`,
+      );
+
+      return {
+        success: true,
+        message: `Gain de $${wonAmount.toFixed(2)} payé avec succès.`,
+        ticket: {
+          id: updatedTicket.id,
+          ticketNumber: updatedTicket.ticketNumber,
+          wonAmount,
+          paidAt: updatedTicket.paidAt,
+          payoutStatus: updatedTicket.payoutStatus,
+        },
+        vendor: {
+          id: vendorId,
+          newBalance: balanceAfter,
+        },
+      };
+    });
   }
 }
