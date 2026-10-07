@@ -26,4 +26,10 @@ interface RoeApiService {
         @retrofit2.http.Header("Authorization") authHeader: String,
         @Body request: PayTicketRequest
     ): Response<PayTicketResponse>
+
+    @POST("api/v1/sync/batch")
+    suspend fun syncBatch(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Body request: BatchSyncRequest
+    ): Response<BatchSyncResponse>
 }

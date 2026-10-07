@@ -13,6 +13,7 @@ import { DrawsModule } from './modules/draws/draws.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { CommissionsModule } from './modules/commissions/commissions.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
+import { SyncModule } from './modules/sync/sync.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 @Module({
@@ -33,6 +34,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     TicketsModule,
     CommissionsModule,
     TransactionsModule,
+    SyncModule,
   ],
   providers: [
     {

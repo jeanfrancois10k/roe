@@ -79,3 +79,53 @@ data class PayVendorResult(
     @SerializedName("id") val id: String,
     @SerializedName("newBalance") val newBalance: Double
 )
+
+data class BetGrid(
+    @SerializedName("numbers") val numbers: List<String>,
+    @SerializedName("betAmount") val betAmount: Double,
+    @SerializedName("multiplier") val multiplier: Int? = 1
+)
+
+data class SellTicketRequest(
+    @SerializedName("gameId") val gameId: String,
+    @SerializedName("drawId") val drawId: String,
+    @SerializedName("deviceUuid") val deviceUuid: String,
+    @SerializedName("idempotencyKey") val idempotencyKey: String,
+    @SerializedName("grids") val grids: List<BetGrid>
+)
+
+data class BatchSyncRequest(
+    @SerializedName("deviceUuid") val deviceUuid: String,
+    @SerializedName("lastSyncTimestamp") val lastSyncTimestamp: String? = null,
+    @SerializedName("pendingTickets") val pendingTickets: List<SellTicketRequest>
+)
+
+data class BatchSyncResponse(
+    @SerializedName("serverTime") val serverTime: String,
+    @SerializedName("summary") val summary: SyncSummary,
+    @SerializedName("processedTickets") val processedTickets: List<ProcessedSyncTicket>,
+    @SerializedName("delta") val delta: SyncDelta
+)
+
+data class SyncSummary(
+    @SerializedName("total") val total: Int,
+    @SerializedName("success") val success: Int,
+    @SerializedName("duplicates") val duplicates: Int,
+    @SerializedName("rejected") val rejected: Int
+)
+
+data class ProcessedSyncTicket(
+    @SerializedName("idempotencyKey") val idempotencyKey: String,
+    @SerializedName("status") val status: String,
+    @SerializedName("ticketNumber") val ticketNumber: String?,
+    @SerializedName("secureChecksum") val secureChecksum: String?,
+    @SerializedName("totalAmount") val totalAmount: Double?,
+    @SerializedName("reason") val reason: String?
+)
+
+data class SyncDelta(
+    @SerializedName("vendorBalance") val vendorBalance: Double,
+    @SerializedName("creditLimit") val creditLimit: Double,
+    @SerializedName("openDraws") val openDraws: List<Map<String, Any>>,
+    @SerializedName("activeGames") val activeGames: List<Map<String, Any>>
+)

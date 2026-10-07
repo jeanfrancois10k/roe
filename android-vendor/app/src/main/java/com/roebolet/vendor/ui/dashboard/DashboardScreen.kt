@@ -27,6 +27,7 @@ fun DashboardScreen(
     vendorName: String,
     balance: Double,
     isOnline: Boolean,
+    pendingSyncCount: Int = 0,
     onMenuClick: (String) -> Unit,
     onLogoutClick: () -> Unit
 ) {
@@ -62,6 +63,21 @@ fun DashboardScreen(
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace
                     )
+                    if (pendingSyncCount > 0) {
+                        Surface(
+                            color = RoeWarning.copy(alpha = 0.2f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, RoeWarning),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "$pendingSyncCount en attente",
+                                color = RoeWarning,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
                 Text(
                     text = vendorName,

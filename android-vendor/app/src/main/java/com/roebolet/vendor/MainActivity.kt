@@ -29,12 +29,15 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var prefs: PreferencesManager
     private lateinit var apiService: RoeApiService
+    private lateinit var networkMonitor: NetworkMonitor
     private val socketManager = SocketManager.instance
+    private val syncManager = com.roebolet.vendor.data.sync.SyncManager.instance
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         prefs = (application as RoeBoletApp).preferencesManager
+        networkMonitor = com.roebolet.vendor.data.network.NetworkMonitor(applicationContext)
         initRetrofit()
 
         setContent {
@@ -71,7 +74,8 @@ class MainActivity : ComponentActivity() {
         var vendorCode by remember { mutableStateOf(prefs.getVendorCode()) }
         var vendorName by remember { mutableStateOf(prefs.getVendorName()) }
         var balance by remember { mutableStateOf(prefs.getBalance()) }
-        var isOnline by remember { mutableStateOf(socketManager.isConnected()) }
+        val isNetworkAvailable by networkMonitor.isOnline.collectAsState()
+        val pendingSyncCount by syncManager.pendingCount.collectAsState()
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var isLoading by remember { mutableStateOf(false) }
 
@@ -81,6 +85,24 @@ class MainActivity : ComponentActivity() {
         var verifyError by remember { mutableStateOf<String?>(null) }
 
         val deviceUuid = remember { prefs.getOrCreateDeviceUuid() }
+
+        // Auto-synchronisation dès la reconnexion Internet
+        LaunchedEffect(isNetworkAvailable, isAuthenticated) {
+            if (isNetworkAvailable && isAuthenticated && pendingSyncCount > 0) {
+                lifecycleScope.launch {
+                    val token = prefs.getAccessToken() ?: return@launch
+                    val syncRes = syncManager.syncPendingBatch(apiService, token, deviceUuid)
+                    if (syncRes != null) {
+                        balance = syncRes.delta.vendorBalance
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Auto-synchronisation terminée : ${syncRes.summary.success} tickets validés",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        }
 
         // Configuration de l'écouteur de KILL SWITCH
         LaunchedEffect(Unit) {
@@ -186,14 +208,35 @@ class MainActivity : ComponentActivity() {
                         vendorCode = vendorCode,
                         vendorName = vendorName,
                         balance = balance,
-                        isOnline = isOnline,
+                        isOnline = isNetworkAvailable,
+                        pendingSyncCount = pendingSyncCount,
                         onMenuClick = { action ->
-                            if (action == "VÉRIFIER TICKET") {
-                                currentScreen = "VERIFY_TICKET"
-                                verifyResult = null
-                                verifyError = null
-                            } else {
-                                Toast.makeText(this, "Module $action sélectionné (Phase Suivante)", Toast.LENGTH_SHORT).show()
+                            when (action) {
+                                "VÉRIFIER TICKET" -> {
+                                    currentScreen = "VERIFY_TICKET"
+                                    verifyResult = null
+                                    verifyError = null
+                                }
+                                "SYNCHRO" -> {
+                                    lifecycleScope.launch {
+                                        Toast.makeText(this@MainActivity, "Synchronisation manuelle en cours...", Toast.LENGTH_SHORT).show()
+                                        val token = prefs.getAccessToken() ?: return@launch
+                                        val syncRes = syncManager.syncPendingBatch(apiService, token, deviceUuid)
+                                        if (syncRes != null) {
+                                            balance = syncRes.delta.vendorBalance
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "✅ Synchronisé : ${syncRes.summary.success} validés, ${syncRes.summary.duplicates} doublons",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(this@MainActivity, "❌ Échec de la synchronisation", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    Toast.makeText(this, "Module $action sélectionné (Phase Suivante)", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         onLogoutClick = {
