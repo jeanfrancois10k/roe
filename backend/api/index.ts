@@ -2,11 +2,22 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import express, { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { AppModule } from '../src/app.module';
 
+const express = require('express');
 const server = express();
 let isAppInitialized = false;
+
+server.get('/', (req: any, res: any) => {
+  res.status(200).json({
+    platform: 'ROE BOLET - Transactional API',
+    status: 'ONLINE',
+    version: '1.0.0',
+    documentation: '/api/docs',
+    health: '/api/v1/health',
+  });
+});
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
@@ -47,9 +58,18 @@ async function bootstrap() {
 }
 
 export default async function handler(req: Request, res: Response) {
-  if (!isAppInitialized) {
-    await bootstrap();
-    isAppInitialized = true;
+  try {
+    if (!isAppInitialized) {
+      await bootstrap();
+      isAppInitialized = true;
+    }
+    server(req, res);
+  } catch (error: any) {
+    console.error('Fatal Serverless bootstrap error:', error);
+    res.status(500).json({
+      statusCode: 500,
+      message: 'Erreur d’initialisation du serveur d’API Serverless.',
+      error: error?.message || String(error),
+    });
   }
-  server(req, res);
 }
