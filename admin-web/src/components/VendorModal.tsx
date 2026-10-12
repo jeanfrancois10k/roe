@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { X, Check, AlertCircle } from 'lucide-react';
 import { api } from '../lib/api';
+import { getCurrencySymbol } from '../lib/currency';
 
 interface VendorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   vendorToEdit?: any;
+  currency?: string;
 }
 
 export const VendorModal: React.FC<VendorModalProps> = ({
@@ -16,6 +18,7 @@ export const VendorModal: React.FC<VendorModalProps> = ({
   onClose,
   onSuccess,
   vendorToEdit,
+  currency = 'HTG',
 }) => {
   const isEditing = !!vendorToEdit;
 
@@ -191,7 +194,7 @@ export const VendorModal: React.FC<VendorModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-roe-textMuted uppercase mb-1.5">
-                  Solde Initial Alloué ($)
+                  Solde Initial Alloué ({getCurrencySymbol(currency)})
                 </label>
                 <input
                   type="number"
@@ -207,12 +210,12 @@ export const VendorModal: React.FC<VendorModalProps> = ({
           {/* Plafonds financiers */}
           <div className="pt-2 border-t border-roe-border/60">
             <h4 className="text-xs font-bold text-roe-gold uppercase tracking-wider mb-3">
-              Limites & Plafonds Financiers
+              Limites & Plafonds Financiers ({getCurrencySymbol(currency)})
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-roe-textMuted mb-1">
-                  Découvert ($)
+                  Découvert ({getCurrencySymbol(currency)})
                 </label>
                 <input
                   type="number"
@@ -225,7 +228,7 @@ export const VendorModal: React.FC<VendorModalProps> = ({
 
               <div>
                 <label className="block text-[11px] font-semibold text-roe-textMuted mb-1">
-                  Plafond Jour ($)
+                  Plafond Jour ({getCurrencySymbol(currency)})
                 </label>
                 <input
                   type="number"
@@ -238,7 +241,7 @@ export const VendorModal: React.FC<VendorModalProps> = ({
 
               <div>
                 <label className="block text-[11px] font-semibold text-roe-textMuted mb-1">
-                  Max / Ticket ($)
+                  Max / Ticket ({getCurrencySymbol(currency)})
                 </label>
                 <input
                   type="number"

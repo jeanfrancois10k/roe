@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Menu, Bell, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Menu, Wifi, WifiOff, RefreshCw, Coins } from 'lucide-react';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -9,6 +9,8 @@ interface HeaderProps {
   isLive?: boolean;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  currency?: string;
+  onCurrencyChange?: (newCurrency: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   isLive = true,
   onRefresh,
   isRefreshing = false,
+  currency = 'HTG',
+  onCurrencyChange,
 }) => {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 bg-roe-bg/85 backdrop-blur-md border-b border-roe-border/60">
@@ -31,6 +35,34 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Sélecteur de Devise Officielle (HTG / USD - Priorité Gourde) */}
+        <div className="flex items-center rounded-xl bg-roe-card border border-roe-border p-1 text-xs font-semibold shadow-inner">
+          <button
+            onClick={() => onCurrencyChange && onCurrencyChange('HTG')}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+              currency === 'HTG'
+                ? 'bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg font-extrabold shadow-md'
+                : 'text-roe-textMuted hover:text-white'
+            }`}
+            title="Gourde Haïtienne (HTG) - Devise Prioritaire"
+          >
+            <span>🇭🇹</span>
+            <span>HTG (G)</span>
+          </button>
+          <button
+            onClick={() => onCurrencyChange && onCurrencyChange('USD')}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+              currency === 'USD'
+                ? 'bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg font-extrabold shadow-md'
+                : 'text-roe-textMuted hover:text-white'
+            }`}
+            title="Dollar Américain (USD)"
+          >
+            <span>🇺🇸</span>
+            <span>USD ($)</span>
+          </button>
+        </div>
+
         {/* Live Indicator */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-roe-card border border-roe-border text-xs">
           {isLive ? (

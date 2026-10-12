@@ -21,12 +21,14 @@ import { VendorModal } from '../../components/VendorModal';
 import { AdjustBalanceModal } from '../../components/AdjustBalanceModal';
 import { api } from '../../lib/api';
 import { getAdminSocket } from '../../lib/socket';
+import { formatCurrency } from '../../lib/currency';
 
 export default function VendorsPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [vendors, setVendors] = useState<any[]>([]);
+  const [currency, setCurrency] = useState<string>('HTG');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -59,6 +61,12 @@ export default function VendorsPage() {
 
     fetchVendors();
 
+    api.get('/api/v1/settings')
+      .then((res) => {
+        if (res.defaultCurrency) setCurrency(res.defaultCurrency);
+      })
+      .catch(() => {});
+
     const socket = getAdminSocket();
     socket.on('vendor:status-change', () => fetchVendors());
     socket.on('vendor:suspended', () => fetchVendors());
@@ -74,6 +82,16 @@ export default function VendorsPage() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchVendors();
+  };
+
+  const handleCurrencyChange = async (newCurr: string) => {
+    setCurrency(newCurr);
+    try {
+      await api.patch('/api/v1/settings/currency', { currency: newCurr });
+      fetchVendors();
+    } catch (err) {
+      console.error('Erreur changement devise:', err);
+    }
   };
 
   // KILL SWITCH ACTION
@@ -110,6 +128,8 @@ export default function VendorsPage() {
           title="Gestion des Vendeurs & Points de Vente"
           onRefresh={fetchVendors}
           isRefreshing={loading}
+          currency={currency}
+          onCurrencyChange={handleCurrencyChange}
         />
 
         <main className="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
@@ -224,17 +244,17 @@ export default function VendorsPage() {
                           {/* Solde */}
                           <td className="p-4">
                             <p className="font-mono font-bold text-roe-gold text-sm">
-                              ${Number(v.currentBalance).toFixed(2)}
+                              {formatCurrency(v.currentBalance, currency)}
                             </p>
                             <p className="text-[10px] text-roe-textMuted font-mono">
-                              Découvert: ${Number(v.creditLimit).toFixed(2)}
+                              Découvert: {formatCurrency(v.creditLimit, currency)}
                             </p>
                           </td>
 
                           {/* Plafonds */}
                           <td className="p-4 text-xs font-mono text-roe-textMuted">
-                            <p>Jour: ${Number(v.dailySalesLimit).toFixed(0)}</p>
-                            <p>Ticket: ${Number(v.maxTicketAmount).toFixed(0)}</p>
+                            <p>Jour: {formatCurrency(v.dailySalesLimit, currency)}</p>
+                            <p>Ticket: {formatCurrency(v.maxTicketAmount, currency)}</p>
                             <p className="text-roe-gold">Com: {Number(v.defaultCommissionRate)}%</p>
                           </td>
 
@@ -319,6 +339,7 @@ export default function VendorsPage() {
         onClose={() => setIsVendorModalOpen(false)}
         onSuccess={fetchVendors}
         vendorToEdit={vendorToEdit}
+        currency={currency}
       />
 
       <AdjustBalanceModal
@@ -326,6 +347,7 @@ export default function VendorsPage() {
         onClose={() => setIsAdjustModalOpen(false)}
         onSuccess={fetchVendors}
         vendor={vendorToAdjust}
+        currency={currency}
       />
     </div>
   );

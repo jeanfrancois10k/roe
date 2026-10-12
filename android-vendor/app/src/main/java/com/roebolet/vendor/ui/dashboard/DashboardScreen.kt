@@ -98,7 +98,7 @@ fun DashboardScreen(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = "$${String.format("%.2f", balance)}",
+                        text = "${String.format("%.2f", balance)} G",
                         color = RoeGold,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Black,

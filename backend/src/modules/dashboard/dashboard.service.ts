@@ -115,6 +115,8 @@ export class DashboardService {
         commissionsAmount,
         grossRevenue,
         netRevenue,
+        currency: (await this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } }))?.value || 'HTG',
+        currencySymbol: (await this.prisma.systemSetting.findUnique({ where: { key: 'CURRENCY_SYMBOL' } }))?.value || 'G',
       },
       recentTransactions: recentTransactions.map((tx) => ({
         ...tx,

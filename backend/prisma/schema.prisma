@@ -12,6 +12,12 @@ generator client {
 // ENUMS
 // ----------------------------------------------------
 
+enum Currency {
+  HTG // Gourde Haïtienne (par défaut et prioritaire)
+  USD // Dollar Américain
+  DOP // Peso Dominicain
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN
@@ -188,6 +194,7 @@ model Game {
   gameRules       Json           @db.JsonB
 
   drawFrequency   String?        @db.VarChar(50)
+  currency        Currency       @default(HTG)
   defaultCommission Decimal      @default(5.00) @db.Decimal(5, 2)
 
   draws           Draw[]
@@ -243,6 +250,7 @@ model Ticket {
 
   status          TicketStatus        @default(CONFIRMED)
   totalAmount     Decimal             @db.Decimal(15, 2)
+  currency        Currency            @default(HTG)
   
   playedGrids     Json                @db.JsonB
 
@@ -284,6 +292,7 @@ model Transaction {
 
   type            TransactionType
   amount          Decimal         @db.Decimal(15, 2)
+  currency        Currency        @default(HTG)
 
   balanceBefore   Decimal         @db.Decimal(15, 2)
   balanceAfter    Decimal         @db.Decimal(15, 2)
@@ -341,4 +350,17 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ----------------------------------------------------
+// PARAMÈTRES SYSTÈME & CONFIGURATION GLOBALE
+// ----------------------------------------------------
+
+model SystemSetting {
+  id              String          @id @default(uuid()) @db.Uuid
+  key             String          @unique @db.VarChar(100)
+  value           String          @db.Text
+  description     String?         @db.VarChar(255)
+  updatedAt       DateTime        @updatedAt
+  createdAt       DateTime        @default(now())
 }

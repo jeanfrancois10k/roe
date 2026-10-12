@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { X, Check, AlertCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { api } from '../lib/api';
+import { formatCurrency, getCurrencySymbol } from '../lib/currency';
 
 interface AdjustBalanceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   vendor: any;
+  currency?: string;
 }
 
 export const AdjustBalanceModal: React.FC<AdjustBalanceModalProps> = ({
@@ -16,6 +18,7 @@ export const AdjustBalanceModal: React.FC<AdjustBalanceModalProps> = ({
   onClose,
   onSuccess,
   vendor,
+  currency = 'HTG',
 }) => {
   const [direction, setDirection] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
   const [amount, setAmount] = useState<number | ''>('');
@@ -82,7 +85,7 @@ export const AdjustBalanceModal: React.FC<AdjustBalanceModalProps> = ({
           <div className="p-3.5 rounded-xl bg-roe-card border border-roe-border/60 flex items-center justify-between">
             <span className="text-xs text-roe-textMuted font-semibold">Solde Actuel</span>
             <span className="text-lg font-bold text-roe-gold font-mono">
-              ${Number(vendor.currentBalance).toFixed(2)}
+              {formatCurrency(vendor.currentBalance, currency)}
             </span>
           </div>
 
@@ -117,7 +120,7 @@ export const AdjustBalanceModal: React.FC<AdjustBalanceModalProps> = ({
           {/* Montant */}
           <div>
             <label className="block text-xs font-semibold text-roe-textMuted uppercase mb-1.5">
-              Montant ($) *
+              Montant ({getCurrencySymbol(currency)}) *
             </label>
             <input
               type="number"

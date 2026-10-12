@@ -244,7 +244,7 @@ fun VerifyTicketScreen(
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = "$${String.format("%.2f", res.wonAmount)}",
+                            text = "${String.format("%.2f", res.wonAmount)} G",
                             color = if (isWinner) RoeGold else Color.White,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Black,
@@ -267,7 +267,7 @@ fun VerifyTicketScreen(
                             Icon(Icons.Default.AttachMoney, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "PAYER CE TICKET ($${String.format("%.2f", res.wonAmount)})",
+                                text = "PAYER CE TICKET (${String.format("%.2f", res.wonAmount)} G)",
                                 color = Color.White,
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp
@@ -292,7 +292,7 @@ fun VerifyTicketScreen(
             },
             text = {
                 Text(
-                    text = "Confirmez-vous le versement en espèces de $${String.format("%.2f", verificationResult.wonAmount)} au client ?\n\nCe ticket sera scellé et votre compte vendeur sera immédiatement crédité.",
+                    text = "Confirmez-vous le versement en espèces de ${String.format("%.2f", verificationResult.wonAmount)} G au client ?\n\nCe ticket sera scellé et votre compte vendeur sera immédiatement crédité.",
                     color = Color.White.copy(alpha = 0.85f)
                 )
             },

@@ -8,7 +8,7 @@ import {
   TrendingUp,
   Receipt,
   Trophy,
-  DollarSign,
+  Coins,
   Percent,
   Wallet,
   AlertTriangle,
@@ -23,6 +23,7 @@ import { Header } from '../components/Header';
 import { StatCard } from '../components/StatCard';
 import { api } from '../lib/api';
 import { getAdminSocket } from '../lib/socket';
+import { formatCurrency, getCurrencySymbol } from '../lib/currency';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -30,11 +31,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [currency, setCurrency] = useState<string>('HTG');
 
   const fetchStats = async () => {
     try {
       const stats = await api.get('/api/v1/admin/dashboard/stats');
       setData(stats);
+      if (stats.overview?.currency) {
+        setCurrency(stats.overview.currency);
+      }
     } catch (err: any) {
       console.error('Erreur chargement dashboard:', err);
     } finally {
@@ -72,6 +77,16 @@ export default function DashboardPage() {
     fetchStats();
   };
 
+  const handleCurrencyChange = async (newCurrency: string) => {
+    setCurrency(newCurrency);
+    try {
+      await api.patch('/api/v1/settings/currency', { currency: newCurrency });
+      await fetchStats();
+    } catch (err) {
+      console.error('Erreur lors du changement de devise:', err);
+    }
+  };
+
   const overview = data?.overview || {
     activeVendorsCount: 0,
     onlineDevicesCount: 0,
@@ -82,7 +97,10 @@ export default function DashboardPage() {
     paidPrizesAmount: 0,
     commissionsAmount: 0,
     netRevenue: 0,
+    currency: 'HTG',
   };
+
+  const activeCurrency = overview.currency || currency;
 
   return (
     <div className="min-h-screen bg-roe-bg flex">
@@ -94,6 +112,8 @@ export default function DashboardPage() {
           title="Tableau de Bord & Supervision"
           onRefresh={handleRefresh}
           isRefreshing={refreshing}
+          currency={activeCurrency}
+          onCurrencyChange={handleCurrencyChange}
         />
 
         <main className="flex-1 p-4 md:p-8 space-y-8 max-w-7xl w-full mx-auto">
@@ -102,11 +122,11 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2 text-roe-gold text-xs font-bold uppercase tracking-wider mb-1">
                 <ShieldCheck size={16} />
-                <span>Système Transactionnel Certifié</span>
+                <span>Système Transactionnel Certifié — Devise Active : {activeCurrency === 'HTG' ? '🇭🇹 Gourde Haïtienne (HTG)' : '🇺🇸 Dollar Américain (USD)'}</span>
               </div>
               <h2 className="text-2xl font-black text-white">Plateforme ROE BOLET</h2>
               <p className="text-xs md:text-sm text-roe-textMuted mt-1">
-                Contrôle centralisé en direct des points de vente et des terminaux physiques.
+                Contrôle centralisé en direct des points de vente, grand livre immuable et tirages certifiés.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -148,7 +168,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Grille des 9 Indicateurs Clés Exigés */}
+          {/* Grille des 9 Indicateurs Clés Formatés en Devise Dynamique (Priorité HTG) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
             <StatCard
               title="Vendeurs Actifs"
@@ -167,16 +187,16 @@ export default function DashboardPage() {
             />
             <StatCard
               title="Ventes du Jour"
-              value={`$${overview.todaySalesAmount.toFixed(2)}`}
+              value={formatCurrency(overview.todaySalesAmount, activeCurrency)}
               subtitle={`${overview.todayTicketsCount || 0} ticket(s) émis aujourd'hui`}
               icon={TrendingUp}
               variant="gold"
             />
             <StatCard
               title="Ventes du Mois"
-              value={`$${overview.monthSalesAmount.toFixed(2)}`}
+              value={formatCurrency(overview.monthSalesAmount, activeCurrency)}
               subtitle="Chiffre d’affaires brut"
-              icon={DollarSign}
+              icon={Coins}
               variant="purple"
             />
             <StatCard
@@ -195,47 +215,51 @@ export default function DashboardPage() {
             />
             <StatCard
               title="Gains Payés"
-              value={`$${overview.paidPrizesAmount.toFixed(2)}`}
+              value={formatCurrency(overview.paidPrizesAmount, activeCurrency)}
               subtitle="Distribués aux joueurs"
               icon={Wallet}
               variant="rose"
             />
             <StatCard
               title="Commissions"
-              value={`$${overview.commissionsAmount.toFixed(2)}`}
+              value={formatCurrency(overview.commissionsAmount, activeCurrency)}
               subtitle="Attribuées aux vendeurs"
               icon={Percent}
               variant="purple"
             />
             <StatCard
               title="Chiffre d'Affaires Net"
-              value={`$${overview.netRevenue.toFixed(2)}`}
+              value={formatCurrency(overview.netRevenue, activeCurrency)}
               subtitle="Ventes - Gains - Commissions"
-              icon={DollarSign}
+              icon={Coins}
               variant="emerald"
             />
           </div>
 
           {/* Deux Colonnes : Dernières Transactions & Piste d'Audit */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Colonne 1 : Grand Livre (Transactions) */}
+            {/* Colonne 1 : Flux Financier Récent */}
             <div className="p-6 rounded-3xl bg-roe-surface border border-roe-border/70 shadow-xl flex flex-col">
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-roe-border/60">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <Receipt size={18} className="text-roe-gold" />
-                  <h3 className="text-base font-bold text-white">Dernières Transactions (Ledger)</h3>
+                  <div className="p-2 rounded-xl bg-roe-card text-roe-gold">
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Grand Livre Récent</h3>
+                    <p className="text-xs text-roe-textMuted">Flux de trésorerie en temps réel ({activeCurrency})</p>
+                  </div>
                 </div>
-                <span className="text-[11px] font-mono text-roe-textMuted uppercase">Immuable</span>
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto max-h-[360px]">
-                {data?.recentTransactions?.length > 0 ? (
+              <div className="space-y-3 flex-1">
+                {data?.recentTransactions && data.recentTransactions.length > 0 ? (
                   data.recentTransactions.map((tx: any) => {
-                    const isPositive = Number(tx.amount) >= 0;
+                    const isPositive = ['DEPOSIT', 'COMMISSION', 'REIMBURSEMENT'].includes(tx.type);
                     return (
                       <div
                         key={tx.id}
-                        className="flex items-center justify-between p-3.5 rounded-xl bg-roe-card/50 border border-roe-border/40 hover:border-roe-gold/20 transition-all text-xs"
+                        className="flex items-center justify-between p-3.5 rounded-2xl bg-roe-card/50 border border-roe-border/40 hover:border-roe-border text-xs transition-all"
                       >
                         <div className="flex items-center gap-3">
                           <div
@@ -264,10 +288,10 @@ export default function DashboardPage() {
                               isPositive ? 'text-emerald-400' : 'text-rose-400'
                             }`}
                           >
-                            {isPositive ? '+' : ''}${Number(tx.amount).toFixed(2)}
+                            {isPositive ? '+' : '-'}{formatCurrency(Math.abs(Number(tx.amount)), activeCurrency)}
                           </p>
                           <p className="text-[10px] text-roe-textMuted font-mono">
-                            Solde: ${Number(tx.balanceAfter).toFixed(2)}
+                            Solde: {formatCurrency(Number(tx.balanceAfter), activeCurrency)}
                           </p>
                         </div>
                       </div>
@@ -283,47 +307,45 @@ export default function DashboardPage() {
 
             {/* Colonne 2 : Activités Récentes (Audit Log) */}
             <div className="p-6 rounded-3xl bg-roe-surface border border-roe-border/70 shadow-xl flex flex-col">
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-roe-border/60">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <Clock size={18} className="text-purple-400" />
-                  <h3 className="text-base font-bold text-white">Activités Récentes (Audit)</h3>
+                  <div className="p-2 rounded-xl bg-roe-card text-roe-purpleLight">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Journal de Sécurité</h3>
+                    <p className="text-xs text-roe-textMuted">Piste d'audit des actions administratives</p>
+                  </div>
                 </div>
-                <span className="text-[11px] font-mono text-roe-textMuted uppercase">Sécurité</span>
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto max-h-[360px]">
-                {data?.recentAuditLogs?.length > 0 ? (
+              <div className="space-y-3 flex-1">
+                {data?.recentAuditLogs && data.recentAuditLogs.length > 0 ? (
                   data.recentAuditLogs.map((log: any) => (
                     <div
                       key={log.id}
-                      className="p-3.5 rounded-xl bg-roe-card/50 border border-roe-border/40 hover:border-purple-500/20 transition-all text-xs flex items-center justify-between"
+                      className="p-3.5 rounded-2xl bg-roe-card/50 border border-roe-border/40 hover:border-roe-border text-xs transition-all flex items-center justify-between"
                     >
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-roe-gold">
-                            {log.action}
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-roe-border text-roe-textMuted">
-                            {log.resource}
+                          <span className="font-bold text-white font-mono">{log.action}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-roe-card text-roe-textMuted border border-roe-border/50">
+                            {log.user?.username || 'Système'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-roe-textMuted mt-1">
-                          Par: {log.user?.username || 'Système'}
-                        </p>
+                        <p className="text-[11px] text-roe-textMuted mt-1">Cible : {log.resource}</p>
                       </div>
-
-                      <div className="text-right text-[10px] text-roe-textMuted font-mono">
+                      <span className="text-[10px] text-roe-textMuted">
                         {new Date(log.createdAt).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit',
-                          second: '2-digit',
                         })}
-                      </div>
+                      </span>
                     </div>
                   ))
                 ) : (
                   <div className="text-center py-8 text-xs text-roe-textMuted">
-                    Aucun log d'activité récent.
+                    Aucun log d'audit récent.
                   </div>
                 )}
               </div>
