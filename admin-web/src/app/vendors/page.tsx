@@ -14,6 +14,7 @@ import {
   AlertCircle,
   MoreVertical,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
@@ -115,6 +116,18 @@ export default function VendorsPage() {
       fetchVendors();
     } catch (err: any) {
       alert(`Erreur : ${err.message}`);
+    }
+  };
+  // SUPPRESSION COMPLÈTE DU VENDEUR
+  const handleDeleteVendor = async (vendor: any) => {
+    const confirmMsg = `⚠️ DANGER : Êtes-vous certain de vouloir supprimer DÉFINITIVEMENT le vendeur ${vendor.vendorCode} (${vendor.fullName}) ?\nCette action effacera ses accès, ses terminaux et ses historiques de façon irréversible.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await api.delete(`/api/v1/admin/vendors/${vendor.id}`);
+      fetchVendors();
+    } catch (err: any) {
+      alert(`Erreur lors de la suppression : ${err.response?.data?.message || err.message}`);
     }
   };
 
@@ -308,11 +321,20 @@ export default function VendorsPage() {
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                                   isSuspended
                                     ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
-                                    : 'bg-rose-500/10 border-rose-500/40 text-rose-400 hover:bg-rose-500/20 shadow-sm'
+                                    : 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 shadow-sm'
                                 }`}
                               >
                                 <ShieldAlert size={14} />
                                 <span>{isSuspended ? 'Réactiver' : 'SUSPENDRE'}</span>
+                              </button>
+
+                              {/* BOUTON SUPPRIMER VENDEUR */}
+                              <button
+                                onClick={() => handleDeleteVendor(v)}
+                                title="Supprimer définitivement ce vendeur"
+                                className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 transition-colors"
+                              >
+                                <Trash2 size={15} />
                               </button>
                             </div>
                           </td>

@@ -617,4 +617,51 @@ export class VendorsService {
       vendor: updated,
     };
   }
+
+  /**
+   * Suppression définitive d'un compte vendeur et de ses terminaux
+   */
+  async deleteVendor(vendorId: string, adminId: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: { user: true, devices: true },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    // Déconnexion forcée WebSocket si connecté
+    try {
+      this.realtimeGateway.notifyVendorSuspension(vendorId, 'Compte vendeur supprimé par la direction.');
+    } catch {}
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Supprimer les terminaux
+      await tx.device.deleteMany({ where: { vendorId } });
+      // 2. Supprimer les règles de commission
+      await tx.commission.deleteMany({ where: { vendorId } });
+      // 3. Supprimer les transactions et tickets résiduels
+      await tx.transaction.deleteMany({ where: { vendorId } });
+      await tx.ticket.deleteMany({ where: { vendorId } });
+      // 4. Supprimer le profil vendeur
+      await tx.vendor.delete({ where: { id: vendorId } });
+      // 5. Supprimer le compte utilisateur
+      if (vendor.userId) {
+        await tx.user.delete({ where: { id: vendor.userId } });
+      }
+    });
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'VENDOR_DELETED',
+      resource: `Vendor:${vendor.vendorCode}`,
+      oldPayload: { vendorCode: vendor.vendorCode, fullName: vendor.fullName },
+    });
+
+    return {
+      success: true,
+      message: `Le vendeur ${vendor.vendorCode} (${vendor.fullName}) a été définitivement supprimé.`,
+    };
+  }
 }

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -131,5 +132,14 @@ export class VendorsController {
     @CurrentUser('id') adminId: string,
   ) {
     return this.vendorsService.revokeDevice(deviceId, adminId);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.vendorsService.deleteVendor(id, adminId);
   }
 }
