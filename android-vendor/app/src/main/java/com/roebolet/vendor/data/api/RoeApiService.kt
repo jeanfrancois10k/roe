@@ -50,4 +50,7 @@ interface RoeApiService {
         @retrofit2.http.Header("Authorization") authHeader: String,
         @retrofit2.http.Query("limit") limit: Int = 30
     ): Response<TicketsListResponse>
+
+    @GET("api/v1/settings/app/update")
+    suspend fun checkAppUpdate(): Response<AppUpdateInfo>
 }

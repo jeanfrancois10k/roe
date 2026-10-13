@@ -19,7 +19,18 @@ import com.roebolet.vendor.ui.sell.SellTicketScreen
 import com.roebolet.vendor.ui.settings.SettingsScreen
 import com.roebolet.vendor.ui.tickets.TicketsListScreen
 import com.roebolet.vendor.ui.verify.VerifyTicketScreen
-import com.roebolet.vendor.ui.theme.RoeBoletTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.roebolet.vendor.ui.theme.*
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -101,6 +112,10 @@ class MainActivity : ComponentActivity() {
         // État Résultats des Tirages
         var drawResults by remember { mutableStateOf<List<DrawResultItem>>(emptyList()) }
         var isLoadingResults by remember { mutableStateOf(false) }
+
+        // État Mise à jour de l'application (OTA)
+        var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+        var showUpdateDialog by remember { mutableStateOf(false) }
 
         val deviceUuid = remember { prefs.getOrCreateDeviceUuid() }
 
@@ -191,6 +206,28 @@ class MainActivity : ComponentActivity() {
                 }
             } else {
                 socketManager.disconnect()
+            }
+        }
+
+        // Vérification automatique des mises à jour Over-The-Air (OTA)
+        LaunchedEffect(isNetworkAvailable) {
+            if (isNetworkAvailable) {
+                lifecycleScope.launch {
+                    try {
+                        val updateRes = apiService.checkAppUpdate()
+                        if (updateRes.isSuccessful && updateRes.body() != null) {
+                            val info = updateRes.body()!!
+                            // Version actuelle du code du terminal (versionCode = 1)
+                            val currentVersionCode = 1
+                            if (info.latestVersionCode > currentVersionCode) {
+                                updateInfo = info
+                                showUpdateDialog = true
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Ignorer silencieusement si hors-ligne
+                    }
+                }
             }
         }
 
@@ -482,6 +519,70 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            )
+        }
+
+        // Dialogue modal de mise à jour Over-The-Air (OTA)
+        if (showUpdateDialog && updateInfo != null) {
+            val info = updateInfo!!
+            AlertDialog(
+                onDismissRequest = { if (!info.isMandatory) showUpdateDialog = false },
+                containerColor = RoeSurface,
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = RoeGold)
+                        Text(
+                            text = "Mise à jour disponible (${info.latestVersionName})",
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 16.sp
+                        )
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(text = info.changelog, color = Color.White, fontSize = 13.sp)
+                        Text(
+                            text = "Une nouvelle version officielle est disponible. Cliquez sur le bouton ci-dessous pour l'installer directement sur ce terminal.",
+                            color = RoeTextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(info.apkUrl)
+                                )
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(this@MainActivity, "Erreur : ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = RoeGold),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "METTRE À JOUR MAINTENANT",
+                            color = RoeBackground,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp
+                        )
+                    }
+                },
+                dismissButton = if (!info.isMandatory) {
+                    {
+                        TextButton(onClick = { showUpdateDialog = false }) {
+                            Text("Plus tard", color = RoeTextMuted)
+                        }
+                    }
+                } else null
             )
         }
     }

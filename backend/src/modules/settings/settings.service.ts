@@ -84,4 +84,24 @@ export class SettingsService {
 
     return this.getSettings();
   }
+
+  /**
+   * Consultation de la dernière version Android POS et lien de mise à jour directe
+   */
+  async getAppUpdateInfo() {
+    const settings = await this.prisma.systemSetting.findMany({
+      where: {
+        key: { in: ['ANDROID_LATEST_VERSION', 'ANDROID_LATEST_CODE', 'ANDROID_APK_URL', 'ANDROID_CHANGELOG', 'ANDROID_FORCE_UPDATE'] },
+      },
+    });
+    const map = new Map(settings.map((s) => [s.key, s.value]));
+
+    return {
+      latestVersionName: map.get('ANDROID_LATEST_VERSION') || '1.0.1',
+      latestVersionCode: Number(map.get('ANDROID_LATEST_CODE') || '2'),
+      apkUrl: map.get('ANDROID_APK_URL') || 'https://frontendroe.vercel.app/download/roe-bolet-vendor.apk',
+      changelog: map.get('ANDROID_CHANGELOG') || 'Mise à jour majeure : Logo officiel, modules interactifs (Vente, Résultats, Solde, Historique).',
+      isMandatory: map.get('ANDROID_FORCE_UPDATE') === 'true',
+    };
+  }
 }

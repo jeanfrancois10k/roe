@@ -38,5 +38,6 @@ Thumbs.db
 .gradle/
 captures/
 *.apk
+!admin-web/public/download/*.apk
 *.aab
 local.properties

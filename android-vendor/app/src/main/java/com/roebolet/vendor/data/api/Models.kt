@@ -185,3 +185,11 @@ data class TicketsListResponse(
     @SerializedName("limit") val limit: Int,
     @SerializedName("items") val items: List<VendorTicketItem>
 )
+
+data class AppUpdateInfo(
+    @SerializedName("latestVersionName") val latestVersionName: String,
+    @SerializedName("latestVersionCode") val latestVersionCode: Int,
+    @SerializedName("apkUrl") val apkUrl: String,
+    @SerializedName("changelog") val changelog: String,
+    @SerializedName("isMandatory") val isMandatory: Boolean = false
+)

@@ -30,4 +30,12 @@ export class SettingsController {
     const userId = req.user?.id || req.user?.userId;
     return this.settingsService.updateCurrency(dto, userId);
   }
+
+  @Public()
+  @Get('app/update')
+  @ApiOperation({ summary: 'Vérifie la disponibilité d\'une nouvelle version de l\'application Android' })
+  @ApiResponse({ status: 200, description: 'Informations de mise à jour de l\'APK' })
+  async checkAppUpdate() {
+    return this.settingsService.getAppUpdateInfo();
+  }
 }
