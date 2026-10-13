@@ -33,9 +33,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const navItems: NavItem[] = [
     { name: 'Tableau de bord', href: '/', icon: LayoutDashboard },
     { name: 'Vendeurs & POS', href: '/vendors', icon: Users },
+    { name: 'Jeux & Tirages', href: '/draws', icon: Dices },
     { name: 'Piste d’Audit', href: '/audit', icon: ShieldAlert },
     { name: 'Transactions Ledger', href: '/#ledger', icon: ReceiptText },
-    { name: 'Jeux & Tirages', href: '/#draws', icon: Dices },
   ];
 
   const handleLogout = () => {

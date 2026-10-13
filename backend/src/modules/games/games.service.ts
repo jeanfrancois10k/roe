@@ -123,4 +123,94 @@ export class GamesService {
 
     return updated;
   }
+
+  // ----------------------------------------------------
+  // GESTION DES NUMÉROS BLOQUÉS & PLAFONDS
+  // ----------------------------------------------------
+
+  async getBlockedNumbers(gameId?: string, drawId?: string) {
+    const where: any = {};
+    if (gameId) where.gameId = gameId;
+    if (drawId) where.drawId = drawId;
+
+    const items = await this.prisma.blockedNumber.findMany({
+      where,
+      include: {
+        game: { select: { id: true, name: true, code: true } },
+        draw: { select: { id: true, drawNumber: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return items.map((item) => ({
+      ...item,
+      maxAmount: item.maxAmount ? Number(item.maxAmount) : null,
+    }));
+  }
+
+  async blockNumber(
+    dto: {
+      number: string;
+      gameId?: string;
+      drawId?: string;
+      isBlocked?: boolean;
+      maxAmount?: number;
+      note?: string;
+    },
+    adminId?: string,
+  ) {
+    const cleanNumber = dto.number.trim();
+    if (!cleanNumber) {
+      throw new BadRequestException('Le numéro est obligatoire');
+    }
+
+    const created = await this.prisma.blockedNumber.create({
+      data: {
+        number: cleanNumber,
+        gameId: dto.gameId || null,
+        drawId: dto.drawId || null,
+        isBlocked: dto.isBlocked !== undefined ? dto.isBlocked : true,
+        maxAmount: dto.maxAmount !== undefined ? dto.maxAmount : null,
+        note: dto.note || null,
+      },
+      include: {
+        game: true,
+        draw: true,
+      },
+    });
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'NUMBER_RESTRICTION_SET',
+      resource: `BlockedNumber:${created.id}`,
+      newPayload: {
+        number: cleanNumber,
+        isBlocked: created.isBlocked,
+        maxAmount: created.maxAmount,
+      },
+    });
+
+    return {
+      ...created,
+      maxAmount: created.maxAmount ? Number(created.maxAmount) : null,
+    };
+  }
+
+  async unblockNumber(id: string, adminId?: string) {
+    const existing = await this.prisma.blockedNumber.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Règle de numéro introuvable');
+    }
+
+    await this.prisma.blockedNumber.delete({ where: { id } });
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'NUMBER_RESTRICTION_REMOVED',
+      resource: `BlockedNumber:${id}`,
+      oldPayload: existing,
+    });
+
+    return { success: true, message: `Restriction supprimée pour le numéro ${existing.number}` };
+  }
 }

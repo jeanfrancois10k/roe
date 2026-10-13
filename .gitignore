@@ -7,11 +7,15 @@ dist/
 build/
 .next/
 out/
+*.tsbuildinfo
 
 # Environnement & Secrets
 .env
 .env.local
 *.env.*.local
+.github/
+backend/scripts/sync-vendor*
+backend/scripts/migrate-blocked-numbers.ts
 
 # Logs
 npm-debug.log*

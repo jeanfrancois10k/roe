@@ -137,6 +137,50 @@ export class TicketsService {
       );
     }
 
+    // RÈGLE CRITIQUE : VÉRIFICATION DES NUMÉROS BLOQUÉS & PLAFONDS PAR NUMÉRO
+    const restrictedNumbers = this.prisma.blockedNumber
+      ? await this.prisma.blockedNumber.findMany({
+          where: {
+            OR: [
+              { gameId: null, drawId: null },
+              { gameId: game.id, drawId: null },
+              { drawId: draw.id },
+            ],
+          },
+        })
+      : [];
+
+    if (restrictedNumbers.length > 0) {
+      for (const grid of dto.grids) {
+        // Obtenir tous les numéros joués dans la grille (grid.numbers)
+        const numbersPlayed = Array.isArray(grid.numbers)
+          ? grid.numbers.map(String)
+          : [String(grid.numbers)];
+
+        for (const num of numbersPlayed) {
+          const restriction = restrictedNumbers.find((r) => r.number === num);
+          if (restriction) {
+            // 1. Bloqué totalement
+            if (restriction.isBlocked || restriction.maxAmount === null || Number(restriction.maxAmount) <= 0) {
+              throw new BadRequestException(
+                `Vente rejetée : Le numéro [${num}] est actuellement BLOQUÉ par l'administration.`,
+              );
+            }
+
+            // 2. Plafond max par numéro pour ce tirage
+            if (restriction.maxAmount !== null && Number(restriction.maxAmount) > 0) {
+              const maxAllowed = Number(restriction.maxAmount);
+              if (grid.betAmount > maxAllowed) {
+                throw new BadRequestException(
+                  `Vente rejetée : La mise sur le numéro [${num}] (${grid.betAmount} G) dépasse le plafond autorisé de ${maxAllowed} G.`,
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
     // RÈGLE 6 : Plafonds vendeur (Max par ticket & Plafond journalier)
     if (totalAmount > Number(vendor.maxTicketAmount)) {
       throw new BadRequestException(

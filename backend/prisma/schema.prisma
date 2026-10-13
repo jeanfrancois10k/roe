@@ -200,6 +200,7 @@ model Game {
   draws           Draw[]
   tickets         Ticket[]
   commissions     Commission[]
+  blockedNumbers  BlockedNumber[]
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -222,12 +223,37 @@ model Draw {
   validationHash  String?        @db.VarChar(255) // Signature SHA-256 scellée de validation
 
   tickets         Ticket[]
+  blockedNumbers  BlockedNumber[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   @@unique([gameId, drawNumber])
   @@index([status])
   @@index([scheduledAt])
+}
+
+// ----------------------------------------------------
+// NUMÉROS BLOQUÉS & PLAFONDS PAR NUMÉRO
+// ----------------------------------------------------
+
+model BlockedNumber {
+  id              String         @id @default(uuid()) @db.Uuid
+  gameId          String?        @db.Uuid
+  game            Game?          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  drawId          String?        @db.Uuid
+  draw            Draw?          @relation(fields: [drawId], references: [id], onDelete: Cascade)
+
+  number          String         @db.VarChar(20) // Ex: "45", "88", "123"
+  isBlocked       Boolean        @default(true)  // Bloqué totalement
+  maxAmount       Decimal?       @db.Decimal(15, 2) // Plafond max autorisé (si null ou 0, 100% bloqué)
+  note            String?        @db.VarChar(255)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([number])
+  @@index([gameId])
+  @@index([drawId])
 }
 
 // ----------------------------------------------------

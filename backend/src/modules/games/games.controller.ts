@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -55,5 +56,48 @@ export class GamesController {
     @CurrentUser('id') adminId: string,
   ) {
     return this.gamesService.update(id, dto, adminId);
+  }
+
+  // ----------------------------------------------------
+  // GESTION DES NUMÉROS BLOQUÉS & PLAFONDS
+  // ----------------------------------------------------
+
+  @Get('rules/blocked-numbers')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  async getBlockedNumbers(
+    @Query('gameId') gameId?: string,
+    @Query('drawId') drawId?: string,
+  ) {
+    return this.gamesService.getBlockedNumbers(gameId, drawId);
+  }
+
+  @Post('rules/blocked-numbers')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  async blockNumber(
+    @Body()
+    dto: {
+      number: string;
+      gameId?: string;
+      drawId?: string;
+      isBlocked?: boolean;
+      maxAmount?: number;
+      note?: string;
+    },
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.gamesService.blockNumber(dto, adminId);
+  }
+
+  @Delete('rules/blocked-numbers/:id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  async unblockNumber(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.gamesService.unblockNumber(id, adminId);
   }
 }
