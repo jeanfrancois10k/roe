@@ -39,6 +39,8 @@ class PreferencesManager(context: Context) {
 
     fun getAccessToken(): String? = prefs.getString(KEY_ACCESS_TOKEN, null)
 
+    fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
+
     fun getVendorCode(): String = prefs.getString(KEY_VENDOR_CODE, "") ?: ""
 
     fun getVendorName(): String = prefs.getString(KEY_VENDOR_NAME, "") ?: ""
@@ -71,7 +73,7 @@ class PreferencesManager(context: Context) {
     }
 
     fun getServerUrl(): String =
-        prefs.getString(KEY_SERVER_URL, "http://10.0.2.2:4000/") ?: "http://10.0.2.2:4000/"
+        prefs.getString(KEY_SERVER_URL, "https://roe-chi.vercel.app/") ?: "https://roe-chi.vercel.app/"
 
     fun setServerUrl(url: String) {
         prefs.edit().putString(KEY_SERVER_URL, url).apply()

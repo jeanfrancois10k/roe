@@ -7,15 +7,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
-import com.roebolet.vendor.data.api.PinLoginRequest
-import com.roebolet.vendor.data.api.RoeApiService
-import com.roebolet.vendor.data.api.VerifyTicketRequest
-import com.roebolet.vendor.data.api.VerifyTicketResponse
-import com.roebolet.vendor.data.api.PayTicketRequest
+import com.roebolet.vendor.data.api.*
 import com.roebolet.vendor.data.local.PreferencesManager
+import com.roebolet.vendor.data.network.NetworkMonitor
 import com.roebolet.vendor.data.socket.SocketManager
+import com.roebolet.vendor.ui.balance.BalanceScreen
 import com.roebolet.vendor.ui.dashboard.DashboardScreen
 import com.roebolet.vendor.ui.login.LoginScreen
+import com.roebolet.vendor.ui.results.ResultsScreen
+import com.roebolet.vendor.ui.sell.SellTicketScreen
+import com.roebolet.vendor.ui.settings.SettingsScreen
+import com.roebolet.vendor.ui.tickets.TicketsListScreen
 import com.roebolet.vendor.ui.verify.VerifyTicketScreen
 import com.roebolet.vendor.ui.theme.RoeBoletTheme
 import kotlinx.coroutines.launch
@@ -23,6 +25,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -37,7 +40,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         prefs = (application as RoeBoletApp).preferencesManager
-        networkMonitor = com.roebolet.vendor.data.network.NetworkMonitor(applicationContext)
+        networkMonitor = NetworkMonitor(applicationContext)
         initRetrofit()
 
         setContent {
@@ -79,12 +82,76 @@ class MainActivity : ComponentActivity() {
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var isLoading by remember { mutableStateOf(false) }
 
-        // État spécifique pour l'écran de vérification de tickets
+        // État Vérification de Tickets
         var verifyResult by remember { mutableStateOf<VerifyTicketResponse?>(null) }
         var verifyLoading by remember { mutableStateOf(false) }
         var verifyError by remember { mutableStateOf<String?>(null) }
 
+        // État Vente de Tickets
+        var openDraws by remember { mutableStateOf<List<OpenDrawItem>>(emptyList()) }
+        var isLoadingDraws by remember { mutableStateOf(false) }
+        var isSubmittingTicket by remember { mutableStateOf(false) }
+        var sellTicketError by remember { mutableStateOf<String?>(null) }
+        var soldTicketResult by remember { mutableStateOf<SellTicketResponse?>(null) }
+
+        // État Historique & Tickets
+        var vendorTickets by remember { mutableStateOf<List<VendorTicketItem>>(emptyList()) }
+        var isLoadingTickets by remember { mutableStateOf(false) }
+
+        // État Résultats des Tirages
+        var drawResults by remember { mutableStateOf<List<DrawResultItem>>(emptyList()) }
+        var isLoadingResults by remember { mutableStateOf(false) }
+
         val deviceUuid = remember { prefs.getOrCreateDeviceUuid() }
+
+        fun fetchOpenDraws() {
+            lifecycleScope.launch {
+                isLoadingDraws = true
+                try {
+                    val res = apiService.getOpenDraws()
+                    if (res.isSuccessful && res.body() != null) {
+                        openDraws = res.body()!!
+                    }
+                } catch (e: Exception) {
+                    // Erreur silencieuse
+                } finally {
+                    isLoadingDraws = false
+                }
+            }
+        }
+
+        fun fetchVendorTickets() {
+            lifecycleScope.launch {
+                isLoadingTickets = true
+                try {
+                    val token = prefs.getAccessToken() ?: return@launch
+                    val res = apiService.getVendorTickets("Bearer $token", 40)
+                    if (res.isSuccessful && res.body() != null) {
+                        vendorTickets = res.body()!!.items
+                    }
+                } catch (e: Exception) {
+                    // Erreur silencieuse
+                } finally {
+                    isLoadingTickets = false
+                }
+            }
+        }
+
+        fun fetchDrawResults() {
+            lifecycleScope.launch {
+                isLoadingResults = true
+                try {
+                    val res = apiService.getTodayResults()
+                    if (res.isSuccessful && res.body() != null) {
+                        drawResults = res.body()!!
+                    }
+                } catch (e: Exception) {
+                    // Erreur silencieuse
+                } finally {
+                    isLoadingResults = false
+                }
+            }
+        }
 
         // Auto-synchronisation dès la reconnexion Internet
         LaunchedEffect(isNetworkAvailable, isAuthenticated) {
@@ -104,7 +171,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Configuration de l'écouteur de KILL SWITCH
+        // Configuration du KILL SWITCH
         LaunchedEffect(Unit) {
             socketManager.setOnForceLogoutListener { reason ->
                 prefs.clearSession()
@@ -115,7 +182,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Connexion WebSocket si déjà authentifié
+        // Connexion WebSocket si authentifié
         LaunchedEffect(isAuthenticated) {
             if (isAuthenticated) {
                 val vendorId = prefs.getVendorId()
@@ -129,6 +196,62 @@ class MainActivity : ComponentActivity() {
 
         if (isAuthenticated) {
             when (currentScreen) {
+                "SELL_TICKET" -> {
+                    SellTicketScreen(
+                        openDraws = openDraws,
+                        isLoadingDraws = isLoadingDraws,
+                        isSubmitting = isSubmittingTicket,
+                        errorMessage = sellTicketError,
+                        soldTicketResult = soldTicketResult,
+                        onBackClick = {
+                            currentScreen = "DASHBOARD"
+                            sellTicketError = null
+                        },
+                        onSubmitTicket = { drawId, gameId, grids ->
+                            lifecycleScope.launch {
+                                isSubmittingTicket = true
+                                sellTicketError = null
+                                try {
+                                    val token = prefs.getAccessToken() ?: return@launch
+                                    val idempotencyKey = UUID.randomUUID().toString()
+                                    val request = SellTicketRequest(
+                                        gameId = gameId,
+                                        drawId = drawId,
+                                        deviceUuid = deviceUuid,
+                                        idempotencyKey = idempotencyKey,
+                                        grids = grids
+                                    )
+                                    val response = apiService.sellTicket("Bearer $token", request)
+                                    if (response.isSuccessful && response.body() != null) {
+                                        val sold = response.body()!!
+                                        soldTicketResult = sold
+                                        balance -= sold.totalAmount
+                                        prefs.updateBalance(balance)
+                                    } else {
+                                        val errBody = response.errorBody()?.string() ?: ""
+                                        sellTicketError = if (errBody.isNotEmpty()) {
+                                            try {
+                                                org.json.JSONObject(errBody).optString("message", errBody)
+                                            } catch (e: Exception) {
+                                                errBody
+                                            }
+                                        } else {
+                                            "Erreur de vente (HTTP ${response.code()})"
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    sellTicketError = "Erreur réseau : ${e.localizedMessage ?: "Vente impossible"}"
+                                } finally {
+                                    isSubmittingTicket = false
+                                }
+                            }
+                        },
+                        onDismissReceipt = {
+                            soldTicketResult = null
+                        }
+                    )
+                }
+
                 "VERIFY_TICKET" -> {
                     VerifyTicketScreen(
                         isLoading = verifyLoading,
@@ -139,18 +262,18 @@ class MainActivity : ComponentActivity() {
                             verifyError = null
                             lifecycleScope.launch {
                                 try {
-                                    val token = "Bearer ${prefs.getAccessToken()}"
-                                    val response = apiService.verifyTicket(token, VerifyTicketRequest(query = query))
+                                    val token = prefs.getAccessToken() ?: ""
+                                    val response = apiService.verifyTicket(
+                                        "Bearer $token",
+                                        VerifyTicketRequest(query = query.trim())
+                                    )
                                     if (response.isSuccessful && response.body() != null) {
                                         verifyResult = response.body()
                                     } else {
-                                        val err = response.errorBody()?.string() ?: "Ticket introuvable"
-                                        verifyError = "Ticket introuvable ou numéro invalide"
-                                        verifyResult = null
+                                        verifyError = "Ticket introuvable ou invalide"
                                     }
                                 } catch (e: Exception) {
-                                    verifyError = "Erreur de communication : ${e.localizedMessage ?: "Vérifiez la connexion"}"
-                                    verifyResult = null
+                                    verifyError = "Erreur de connexion : ${e.localizedMessage ?: "Vérification impossible"}"
                                 } finally {
                                     verifyLoading = false
                                 }
@@ -158,12 +281,11 @@ class MainActivity : ComponentActivity() {
                         },
                         onPayClick = { ticketId ->
                             verifyLoading = true
-                            verifyError = null
                             lifecycleScope.launch {
                                 try {
-                                    val token = "Bearer ${prefs.getAccessToken()}"
+                                    val token = prefs.getAccessToken() ?: ""
                                     val response = apiService.payTicket(
-                                        token,
+                                        "Bearer $token",
                                         PayTicketRequest(ticketId = ticketId, deviceUuid = deviceUuid)
                                     )
                                     if (response.isSuccessful && response.body() != null) {
@@ -171,16 +293,8 @@ class MainActivity : ComponentActivity() {
                                         Toast.makeText(this@MainActivity, body.message, Toast.LENGTH_LONG).show()
                                         if (body.vendor != null) {
                                             balance = body.vendor.newBalance
-                                            prefs.saveAuthData(
-                                                token = prefs.getAccessToken() ?: "",
-                                                refreshToken = prefs.getRefreshToken() ?: "",
-                                                vendorId = prefs.getVendorId(),
-                                                vendorCode = vendorCode,
-                                                fullName = vendorName,
-                                                balance = body.vendor.newBalance
-                                            )
+                                            prefs.updateBalance(body.vendor.newBalance)
                                         }
-                                        // Mise à jour de l'affichage en DÉJÀ PAYÉ
                                         verifyResult = verifyResult?.copy(
                                             canBePaid = false,
                                             statusKey = "ALREADY_PAID",
@@ -203,6 +317,48 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+
+                "TICKETS_LIST" -> {
+                    TicketsListScreen(
+                        title = "MES TICKETS VENDUS",
+                        tickets = vendorTickets,
+                        isLoading = isLoadingTickets,
+                        onBackClick = { currentScreen = "DASHBOARD" },
+                        onRefreshClick = { fetchVendorTickets() }
+                    )
+                }
+
+                "DRAWS_RESULTS" -> {
+                    ResultsScreen(
+                        results = drawResults,
+                        isLoading = isLoadingResults,
+                        onBackClick = { currentScreen = "DASHBOARD" },
+                        onRefreshClick = { fetchDrawResults() }
+                    )
+                }
+
+                "BALANCE_DETAILS" -> {
+                    BalanceScreen(
+                        vendorCode = vendorCode,
+                        vendorName = vendorName,
+                        balance = balance,
+                        onBackClick = { currentScreen = "DASHBOARD" }
+                    )
+                }
+
+                "SETTINGS" -> {
+                    SettingsScreen(
+                        currentServerUrl = prefs.getServerUrl(),
+                        deviceUuid = deviceUuid,
+                        isOnline = isNetworkAvailable,
+                        onBackClick = { currentScreen = "DASHBOARD" },
+                        onSaveServerUrl = { newUrl ->
+                            prefs.setServerUrl(newUrl)
+                            initRetrofit()
+                        }
+                    )
+                }
+
                 else -> {
                     DashboardScreen(
                         vendorCode = vendorCode,
@@ -212,30 +368,53 @@ class MainActivity : ComponentActivity() {
                         pendingSyncCount = pendingSyncCount,
                         onMenuClick = { action ->
                             when (action) {
+                                "VENTE" -> {
+                                    currentScreen = "SELL_TICKET"
+                                    fetchOpenDraws()
+                                }
                                 "VÉRIFIER TICKET" -> {
                                     currentScreen = "VERIFY_TICKET"
                                     verifyResult = null
                                     verifyError = null
                                 }
+                                "TICKETS" -> {
+                                    currentScreen = "TICKETS_LIST"
+                                    fetchVendorTickets()
+                                }
+                                "HISTORIQUE" -> {
+                                    currentScreen = "TICKETS_LIST"
+                                    fetchVendorTickets()
+                                }
+                                "RÉSULTATS" -> {
+                                    currentScreen = "DRAWS_RESULTS"
+                                    fetchDrawResults()
+                                }
+                                "SOLDE" -> {
+                                    currentScreen = "BALANCE_DETAILS"
+                                }
+                                "PARAMÈTRES" -> {
+                                    currentScreen = "SETTINGS"
+                                }
                                 "SYNCHRO" -> {
                                     lifecycleScope.launch {
-                                        Toast.makeText(this@MainActivity, "Synchronisation manuelle en cours...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, "Synchronisation en cours...", Toast.LENGTH_SHORT).show()
                                         val token = prefs.getAccessToken() ?: return@launch
                                         val syncRes = syncManager.syncPendingBatch(apiService, token, deviceUuid)
                                         if (syncRes != null) {
                                             balance = syncRes.delta.vendorBalance
+                                            prefs.updateBalance(balance)
                                             Toast.makeText(
                                                 this@MainActivity,
-                                                "✅ Synchronisé : ${syncRes.summary.success} validés, ${syncRes.summary.duplicates} doublons",
+                                                "✅ Synchronisé : ${syncRes.summary.success} validés",
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         } else {
-                                            Toast.makeText(this@MainActivity, "❌ Échec de la synchronisation", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(this@MainActivity, "Terminé (Rien à synchroniser)", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
                                 else -> {
-                                    Toast.makeText(this, "Module $action sélectionné (Phase Suivante)", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "Module $action ouvert", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -272,7 +451,12 @@ class MainActivity : ComponentActivity() {
                             if (response.isSuccessful && response.body() != null) {
                                 val body = response.body()!!
                                 val vendor = body.user.vendor
+
                                 if (vendor != null) {
+                                    vendorCode = vendor.vendorCode
+                                    vendorName = vendor.fullName
+                                    balance = vendor.currentBalance
+
                                     prefs.saveAuthData(
                                         token = body.accessToken,
                                         refreshToken = body.refreshToken,
@@ -281,24 +465,18 @@ class MainActivity : ComponentActivity() {
                                         fullName = vendor.fullName,
                                         balance = vendor.currentBalance
                                     )
-                                    vendorCode = vendor.vendorCode
-                                    vendorName = vendor.fullName
-                                    balance = vendor.currentBalance
+
                                     isAuthenticated = true
-                                    Toast.makeText(this@MainActivity, "Connexion réussie", Toast.LENGTH_SHORT).show()
+                                    currentScreen = "DASHBOARD"
+                                    errorMessage = null
                                 } else {
-                                    errorMessage = "Profil vendeur manquant"
+                                    errorMessage = "Le compte connecté n'est pas un profil Vendeur."
                                 }
                             } else {
-                                val errorBody = response.errorBody()?.string()
-                                errorMessage = if (errorBody?.contains("suspendu") == true) {
-                                    "Ce compte vendeur est SUSPENDU par l’administrateur."
-                                } else {
-                                    "Code vendeur ou PIN incorrect."
-                                }
+                                errorMessage = "Code Vendeur ou Code PIN incorrect."
                             }
                         } catch (e: Exception) {
-                            errorMessage = "Erreur de connexion au serveur : ${e.localizedMessage ?: "Vérifiez le réseau"}"
+                            errorMessage = "Impossible de joindre le serveur. Vérifiez votre connexion Internet."
                         } finally {
                             isLoading = false
                         }
@@ -306,10 +484,5 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        socketManager.disconnect()
     }
 }

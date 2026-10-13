@@ -129,3 +129,59 @@ data class SyncDelta(
     @SerializedName("openDraws") val openDraws: List<Map<String, Any>>,
     @SerializedName("activeGames") val activeGames: List<Map<String, Any>>
 )
+
+data class SellTicketResponse(
+    @SerializedName("id") val id: String,
+    @SerializedName("ticketNumber") val ticketNumber: String,
+    @SerializedName("secureChecksum") val secureChecksum: String,
+    @SerializedName("totalAmount") val totalAmount: Double,
+    @SerializedName("status") val status: String,
+    @SerializedName("createdAt") val createdAt: String? = null
+)
+
+data class OpenDrawGame(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("minBetAmount") val minBetAmount: Double? = 5.0,
+    @SerializedName("maxBetAmount") val maxBetAmount: Double? = 1000.0
+)
+
+data class OpenDrawItem(
+    @SerializedName("id") val id: String,
+    @SerializedName("drawNumber") val drawNumber: Int,
+    @SerializedName("status") val status: String,
+    @SerializedName("salesClosingAt") val salesClosingAt: String,
+    @SerializedName("scheduledAt") val scheduledAt: String,
+    @SerializedName("game") val game: OpenDrawGame
+)
+
+data class DrawResultItem(
+    @SerializedName("id") val id: String,
+    @SerializedName("drawNumber") val drawNumber: Int,
+    @SerializedName("gameCode") val gameCode: String,
+    @SerializedName("gameName") val gameName: String,
+    @SerializedName("publishedAt") val publishedAt: String?,
+    @SerializedName("winningResults") val winningResults: Map<String, Any>?,
+    @SerializedName("validationHash") val validationHash: String?
+)
+
+data class VendorTicketItem(
+    @SerializedName("id") val id: String,
+    @SerializedName("ticketNumber") val ticketNumber: String,
+    @SerializedName("totalAmount") val totalAmount: Double,
+    @SerializedName("status") val status: String,
+    @SerializedName("isWinner") val isWinner: Boolean = false,
+    @SerializedName("wonAmount") val wonAmount: Double = 0.0,
+    @SerializedName("payoutStatus") val payoutStatus: String? = "UNPAID",
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("game") val game: Map<String, Any>? = null,
+    @SerializedName("draw") val draw: Map<String, Any>? = null
+)
+
+data class TicketsListResponse(
+    @SerializedName("total") val total: Int,
+    @SerializedName("page") val page: Int,
+    @SerializedName("limit") val limit: Int,
+    @SerializedName("items") val items: List<VendorTicketItem>
+)

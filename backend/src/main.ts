@@ -55,7 +55,7 @@ async function bootstrap() {
 
   // Configuration CORS pour Admin Web et Terminaux POS
   app.enableCors({
-    origin: '*', // Configurable en prod via env
+    origin: (origin, callback) => callback(null, true),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });

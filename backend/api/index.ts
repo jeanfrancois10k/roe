@@ -40,7 +40,7 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: '*',
+    origin: (origin: any, callback: any) => callback(null, true),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });

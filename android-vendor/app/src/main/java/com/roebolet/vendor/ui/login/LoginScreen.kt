@@ -1,5 +1,6 @@
 package com.roebolet.vendor.ui.login
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,15 +39,24 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // En-tête de Marque
+        // En-tête de Marque avec Logo Officiel
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 12.dp)
+            modifier = Modifier.padding(top = 10.dp)
         ) {
+            Image(
+                painter = painterResource(id = com.roebolet.vendor.R.drawable.app_logo),
+                contentDescription = "Logo ROE",
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, RoeGold.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "ROE BOLET",
                 color = RoeGold,
-                fontSize = 28.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 2.sp
             )

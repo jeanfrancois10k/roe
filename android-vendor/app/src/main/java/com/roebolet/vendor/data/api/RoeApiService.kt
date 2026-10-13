@@ -32,4 +32,22 @@ interface RoeApiService {
         @retrofit2.http.Header("Authorization") authHeader: String,
         @Body request: BatchSyncRequest
     ): Response<BatchSyncResponse>
+
+    @POST("api/v1/tickets/sell")
+    suspend fun sellTicket(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Body request: SellTicketRequest
+    ): Response<SellTicketResponse>
+
+    @GET("api/v1/draws/open")
+    suspend fun getOpenDraws(): Response<List<OpenDrawItem>>
+
+    @GET("api/v1/draws/today/results")
+    suspend fun getTodayResults(): Response<List<DrawResultItem>>
+
+    @GET("api/v1/tickets")
+    suspend fun getVendorTickets(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Query("limit") limit: Int = 30
+    ): Response<TicketsListResponse>
 }
