@@ -33,16 +33,17 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu size={20} />
         </button>
         <h2 className="text-sm sm:text-base md:text-xl font-bold text-white tracking-tight truncate">
-          {title}
+          <span className="sm:hidden">ROE BOLET</span>
+          <span className="hidden sm:inline">{title}</span>
         </h2>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         {/* Sélecteur de Devise Officielle (HTG / USD - Priorité Gourde) */}
-        <div className="flex items-center rounded-xl bg-roe-card border border-roe-border p-1 text-xs font-semibold shadow-inner">
+        <div className="flex items-center rounded-xl bg-roe-card border border-roe-border p-0.5 sm:p-1 text-[11px] sm:text-xs font-semibold shadow-inner">
           <button
             onClick={() => onCurrencyChange && onCurrencyChange('HTG')}
-            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+            className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
               currency === 'HTG'
                 ? 'bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg font-extrabold shadow-md'
                 : 'text-roe-textMuted hover:text-white'
@@ -50,11 +51,11 @@ export const Header: React.FC<HeaderProps> = ({
             title="Gourde Haïtienne (HTG) - Devise Prioritaire"
           >
             <span>🇭🇹</span>
-            <span>HTG (G)</span>
+            <span className="font-bold">HTG</span>
           </button>
           <button
             onClick={() => onCurrencyChange && onCurrencyChange('USD')}
-            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+            className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
               currency === 'USD'
                 ? 'bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg font-extrabold shadow-md'
                 : 'text-roe-textMuted hover:text-white'
@@ -62,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Dollar Américain (USD)"
           >
             <span>🇺🇸</span>
-            <span>USD ($)</span>
+            <span className="font-bold">USD</span>
           </button>
         </div>
 

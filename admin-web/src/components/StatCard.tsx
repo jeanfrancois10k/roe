@@ -50,21 +50,21 @@ export const StatCard: React.FC<StatCardProps> = ({
 
   return (
     <div
-      className={`p-5 rounded-2xl bg-gradient-to-b from-roe-card to-roe-surface border ${currentVariant.border} ${currentVariant.glow} transition-all duration-300 shadow-lg`}
+      className={`p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-roe-card to-roe-surface border ${currentVariant.border} ${currentVariant.glow} transition-all duration-300 shadow-lg`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-roe-textMuted">
+        <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-roe-textMuted">
           {title}
         </span>
-        <div className={`p-2.5 rounded-xl ${currentVariant.iconBg}`}>
-          <Icon size={20} />
+        <div className={`p-2 sm:p-2.5 rounded-xl ${currentVariant.iconBg}`}>
+          <Icon size={18} className="sm:w-5 sm:h-5" />
         </div>
       </div>
 
-      <div className="mt-3">
-        <div className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">{value}</div>
+      <div className="mt-2.5 sm:mt-3">
+        <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">{value}</div>
         {(subtitle || trend) && (
-          <div className="flex items-center gap-2 mt-1.5 text-xs text-roe-textMuted font-medium">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5 text-[11px] sm:text-xs text-roe-textMuted font-medium">
             {trend && <span className="text-emerald-400 font-semibold">{trend}</span>}
             {subtitle && <span>{subtitle}</span>}
           </div>
