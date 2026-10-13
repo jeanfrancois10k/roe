@@ -187,8 +187,124 @@ export default function VendorsPage() {
             </div>
           </div>
 
-          {/* Tableau des Vendeurs */}
-          <div className="rounded-3xl bg-roe-surface border border-roe-border/70 shadow-xl overflow-hidden">
+          {/* Vue Mobile : Cartes Vendeurs (Écrans < md) */}
+          <div className="grid grid-cols-1 gap-4 md:hidden">
+            {vendors.length > 0 ? (
+              vendors.map((v) => {
+                const isSuspended = v.status === 'SUSPENDED';
+                const device = v.devices?.[0];
+                const isOnline = device?.isOnline || false;
+
+                return (
+                  <div
+                    key={v.id}
+                    className="p-5 rounded-2xl bg-roe-surface border border-roe-border/80 shadow-lg space-y-4"
+                  >
+                    {/* Header Carte : Code, Nom, Statut */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-roe-card border border-roe-border flex items-center justify-center font-bold text-roe-gold font-mono text-xs">
+                          {v.vendorCode?.replace('VEND-', '') || 'V'}
+                        </div>
+                        <div>
+                          <p className="font-bold text-white text-sm">{v.fullName}</p>
+                          <p className="text-xs text-roe-textMuted font-mono">{v.vendorCode} • {v.phone}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${
+                            isSuspended
+                              ? 'bg-rose-500/10 border-rose-500/40 text-rose-400'
+                              : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                          }`}
+                        >
+                          {v.status}
+                        </span>
+                        <span className={`text-[10px] font-medium ${isOnline ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          ● {isOnline ? 'En ligne' : 'Hors ligne'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Point de vente & POS */}
+                    <div className="text-xs text-roe-textMuted bg-roe-card/40 p-2.5 rounded-xl border border-roe-border/30 space-y-1">
+                      <p className="truncate"><span className="text-white font-medium">POS :</span> {v.posAddress || 'Non spécifié'}</p>
+                      <p className="truncate"><span className="text-white font-medium">Terminal :</span> {device ? device.deviceModel : 'Non lié'}</p>
+                    </div>
+
+                    {/* Finances : Solde & Plafonds */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-roe-card/60 border border-roe-border/40">
+                        <p className="text-[10px] text-roe-textMuted uppercase font-bold">Solde Actuel</p>
+                        <p className="font-mono font-bold text-roe-gold text-sm mt-0.5">
+                          {formatCurrency(v.currentBalance, currency)}
+                        </p>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-roe-card/60 border border-roe-border/40">
+                        <p className="text-[10px] text-roe-textMuted uppercase font-bold">Plafond Jour</p>
+                        <p className="font-mono font-bold text-white text-sm mt-0.5">
+                          {formatCurrency(v.dailySalesLimit, currency)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Barre d'Actions Mobile */}
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-roe-border/50">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setVendorToAdjust(v);
+                            setIsAdjustModalOpen(true);
+                          }}
+                          className="p-2 rounded-xl bg-roe-card hover:bg-roe-cardHover text-roe-textMuted hover:text-white border border-roe-border"
+                          title="Régulariser Solde"
+                        >
+                          <DollarSign size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setVendorToEdit(v);
+                            setIsVendorModalOpen(true);
+                          }}
+                          className="p-2 rounded-xl bg-roe-card hover:bg-roe-cardHover text-roe-textMuted hover:text-white border border-roe-border"
+                          title="Modifier"
+                        >
+                          <Sliders size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteVendor(v)}
+                          className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                          title="Supprimer"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleToggleSuspend(v)}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+                          isSuspended
+                            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                            : 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                        }`}
+                      >
+                        <ShieldAlert size={14} />
+                        <span>{isSuspended ? 'Réactiver' : 'Suspendre'}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-12 text-sm text-roe-textMuted bg-roe-surface rounded-2xl border border-roe-border/60">
+                {loading ? 'Chargement des vendeurs...' : 'Aucun vendeur trouvé.'}
+              </div>
+            )}
+          </div>
+
+          {/* Tableau des Vendeurs (Écrans >= md) */}
+          <div className="hidden md:block rounded-3xl bg-roe-surface border border-roe-border/70 shadow-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs md:text-sm">
                 <thead>

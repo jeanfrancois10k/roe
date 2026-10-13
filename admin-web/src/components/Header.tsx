@@ -23,18 +23,21 @@ export const Header: React.FC<HeaderProps> = ({
   onCurrencyChange,
 }) => {
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 bg-roe-bg/85 backdrop-blur-md border-b border-roe-border/60">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-3 sm:px-6 md:px-8 bg-roe-bg/90 backdrop-blur-md border-b border-roe-border/60">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           onClick={onToggleSidebar}
-          className="p-2 text-roe-textMuted hover:text-white rounded-lg lg:hidden"
+          aria-label="Ouvrir le menu"
+          className="p-2 -ml-1 text-roe-textMuted hover:text-white rounded-xl bg-roe-card/60 border border-roe-border/50 lg:hidden flex-shrink-0"
         >
-          <Menu size={22} />
+          <Menu size={20} />
         </button>
-        <h2 className="text-xl font-bold text-white tracking-tight">{title}</h2>
+        <h2 className="text-sm sm:text-base md:text-xl font-bold text-white tracking-tight truncate">
+          {title}
+        </h2>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         {/* Sélecteur de Devise Officielle (HTG / USD - Priorité Gourde) */}
         <div className="flex items-center rounded-xl bg-roe-card border border-roe-border p-1 text-xs font-semibold shadow-inner">
           <button

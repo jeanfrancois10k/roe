@@ -116,23 +116,23 @@ export default function DashboardPage() {
           onCurrencyChange={handleCurrencyChange}
         />
 
-        <main className="flex-1 p-4 md:p-8 space-y-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 space-y-6 md:space-y-8 max-w-7xl w-full mx-auto">
           {/* Bannière de Bienvenue & Titre */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-roe-surface via-roe-card to-roe-surface border border-roe-border/60 shadow-xl">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-roe-surface via-roe-card to-roe-surface border border-roe-border/60 shadow-xl">
             <div>
-              <div className="flex items-center gap-2 text-roe-gold text-xs font-bold uppercase tracking-wider mb-1">
-                <ShieldCheck size={16} />
-                <span>Système Transactionnel Certifié — Devise Active : {activeCurrency === 'HTG' ? '🇭🇹 Gourde Haïtienne (HTG)' : '🇺🇸 Dollar Américain (USD)'}</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-roe-gold text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+                <ShieldCheck size={14} className="flex-shrink-0" />
+                <span className="truncate">Système Certifié — {activeCurrency === 'HTG' ? '🇭🇹 Gourde (HTG)' : '🇺🇸 Dollar (USD)'}</span>
               </div>
-              <h2 className="text-2xl font-black text-white">Plateforme ROE BOLET</h2>
-              <p className="text-xs md:text-sm text-roe-textMuted mt-1">
-                Contrôle centralisé en direct des points de vente, grand livre immuable et tirages certifiés.
+              <h2 className="text-xl sm:text-2xl font-black text-white">Plateforme ROE BOLET</h2>
+              <p className="text-xs sm:text-sm text-roe-textMuted mt-1">
+                Contrôle centralisé des points de vente et tirages certifiés.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/vendors')}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-roe-gold to-roe-goldDark text-roe-bg text-xs md:text-sm font-bold shadow-lg hover:scale-105 transition-all"
+                className="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-gradient-to-r from-roe-gold to-roe-goldDark text-roe-bg text-xs md:text-sm font-bold shadow-lg hover:scale-105 transition-all"
               >
                 Gérer les Vendeurs
               </button>
