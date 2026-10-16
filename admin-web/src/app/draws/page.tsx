@@ -536,7 +536,7 @@ export default function DrawsPage() {
                         </span>
                       </h4>
                       <p className="text-xs text-roe-textMuted mt-0.5">
-                        Les tirages (NY, FL, GA, TX, TN) s'ouvrent et se ferment automatiquement selon les horaires officiels. L'administrateur peut à tout instant forcer l'ouverture ou la clôture d'un tirage.
+                        Règle stricte des sessions : Entre 07h00 et 13h00, c'est la session Midi (les ventes Soir sont verrouillées). À partir de 13h00, la session Soir s'ouvre automatiquement.
                       </p>
                     </div>
                   </div>
@@ -605,17 +605,23 @@ export default function DrawsPage() {
                           </div>
                         </div>
 
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                            isOpen
-                              ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                              : isClosed
-                              ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
-                              : 'bg-purple-500/10 border-purple-500/40 text-purple-300'
-                          }`}
-                        >
-                          {isOpen ? 'En Vente' : isClosed ? 'Clôturé' : 'Publié'}
-                        </span>
+                        {(() => {
+                          const isMidi = new Date(d.salesClosingAt).getHours() < 16;
+                          return (
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border flex items-center gap-1 ${
+                                isOpen
+                                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                                  : isClosed
+                                  ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                                  : 'bg-purple-500/10 border-purple-500/40 text-purple-300'
+                              }`}
+                            >
+                              <span className="font-mono text-roe-gold">[{isMidi ? 'Midi' : 'Soir'}]</span>
+                              <span>{isOpen ? 'En Vente' : isClosed ? 'Clôturé' : 'Publié'}</span>
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {/* Numéros gagnants s'ils existent */}
@@ -721,17 +727,23 @@ export default function DrawsPage() {
                             </td>
 
                             <td className="p-4">
-                              <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                                  isOpen
-                                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                                    : isClosed
-                                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
-                                    : 'bg-purple-500/10 border-purple-500/40 text-purple-300'
-                                }`}
-                              >
-                                {isOpen ? 'En Vente' : isClosed ? 'Clôturé' : 'Publié'}
-                              </span>
+                              {(() => {
+                                const isMidi = new Date(d.salesClosingAt).getHours() < 16;
+                                return (
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border inline-flex items-center gap-1 ${
+                                      isOpen
+                                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                                        : isClosed
+                                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                                        : 'bg-purple-500/10 border-purple-500/40 text-purple-300'
+                                    }`}
+                                  >
+                                    <span className="font-mono text-roe-gold">[{isMidi ? 'Midi' : 'Soir'}]</span>
+                                    <span>{isOpen ? 'En Vente' : isClosed ? 'Clôturé' : 'Publié'}</span>
+                                  </span>
+                                );
+                              })()}
                             </td>
 
                             <td className="p-4 text-center">

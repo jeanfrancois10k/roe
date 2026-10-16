@@ -128,6 +128,38 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  isMidiDraw(salesClosingAt: Date | string): boolean {
+    const d = new Date(salesClosingAt);
+    const hourStr = d.toLocaleTimeString('en-US', {
+      timeZone: 'America/Port-au-Prince',
+      hour12: false,
+      hour: '2-digit',
+    });
+    const hour = parseInt(hourStr, 10);
+    return hour >= 10 && hour <= 15;
+  }
+
+  isSoirDraw(salesClosingAt: Date | string): boolean {
+    const d = new Date(salesClosingAt);
+    const hourStr = d.toLocaleTimeString('en-US', {
+      timeZone: 'America/Port-au-Prince',
+      hour12: false,
+      hour: '2-digit',
+    });
+    const hour = parseInt(hourStr, 10);
+    return hour >= 16 || hour < 4;
+  }
+
+  getHaitiHour(date: Date = new Date()): number {
+    const str = date.toLocaleTimeString('en-US', {
+      timeZone: 'America/Port-au-Prince',
+      hour12: false,
+      hour: '2-digit',
+    });
+    const h = parseInt(str, 10);
+    return isNaN(h) ? date.getHours() : h;
+  }
+
   /**
    * Assure que les 5 loteries officielles (NY, FL, GA, TX, TN) existent en base
    */
@@ -223,6 +255,8 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`⏰ Clôture automatique des ventes : Tirage N°${draw.drawNumber} (${draw.game.name})`);
     }
 
+    const haitiHour = this.getHaitiHour(now);
+
     // 2. Vérification et création / ouverture automatique pour les jeux actifs
     for (const lotto of OFFICIAL_LOTTERIES) {
       const game = await this.prisma.game.findUnique({ where: { code: lotto.code } });
@@ -235,6 +269,28 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           salesClosingAt: { gt: now },
         },
       });
+
+      // Règle stricte des sessions :
+      // - Entre 07h00 et 13h00 : tirage Midi actif (OPEN), tirage Soir verrouillé (SCHEDULED)
+      // - À partir de 13h00 : tirage Soir actif (OPEN)
+      for (const d of activeDraws) {
+        const isEvening = this.isSoirDraw(d.salesClosingAt);
+        if (d.status === DrawStatus.SCHEDULED) {
+          if (!isEvening && haitiHour >= 7 && haitiHour < 13) {
+            await this.prisma.draw.update({
+              where: { id: d.id },
+              data: { status: DrawStatus.OPEN },
+            });
+            this.logger.log(`🌅 07h00 : Activation session Midi N°${d.drawNumber} (${game.name})`);
+          } else if (isEvening && haitiHour >= 13) {
+            await this.prisma.draw.update({
+              where: { id: d.id },
+              data: { status: DrawStatus.OPEN },
+            });
+            this.logger.log(`🌆 13h00 : Activation session Soir N°${d.drawNumber} (${game.name})`);
+          }
+        }
+      }
 
       // Si aucun tirage n'est actuellement ouvert pour ce jeu, planifier la prochaine session
       if (activeDraws.length === 0) {
@@ -257,7 +313,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           }
         }
 
-        // Si toutes les sessions du jour sont terminées, planifier la 1ère session de demain
+        // Si toutes les sessions du jour sont terminées, planifier la 1ère session de demain (Midi)
         if (!targetClose) {
           const firstSched = effectiveSchedules[0];
           targetClose = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, firstSched.closeHour, firstSched.closeMinute, 0);
@@ -270,18 +326,26 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         });
         const nextDrawNum = (maxDraw._max.drawNumber || 100) + 1;
 
+        const isEvening = this.isSoirDraw(targetClose);
+        // Si c'est avant 7h00 du matin, ou si c'est un tirage du Soir alors qu'il est moins de 13h00 :
+        // Le tirage reste en SCHEDULED (en attente), jamais OPEN pour le Soir le matin !
+        let initialStatus: DrawStatus = DrawStatus.OPEN;
+        if (haitiHour < 7 || (haitiHour < 13 && isEvening)) {
+          initialStatus = DrawStatus.SCHEDULED;
+        }
+
         const newDraw = await this.prisma.draw.create({
           data: {
             gameId: game.id,
             drawNumber: nextDrawNum,
             scheduledAt: targetDraw,
             salesClosingAt: targetClose,
-            status: DrawStatus.OPEN,
+            status: initialStatus,
           },
           include: { game: { select: { code: true, name: true } } },
         });
 
-        if (this.realtimeGateway?.server) {
+        if (initialStatus === DrawStatus.OPEN && this.realtimeGateway?.server) {
           this.realtimeGateway.server.emit('draw:opened', {
             drawId: newDraw.id,
             drawNumber: newDraw.drawNumber,
@@ -292,7 +356,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           });
         }
 
-        this.logger.log(`✨ Tirage N°${newDraw.drawNumber} pour ${game.name} ouvert automatiquement jusqu'à ${targetClose.toLocaleTimeString()}`);
+        this.logger.log(`✨ Tirage N°${newDraw.drawNumber} pour ${game.name} planifié (${initialStatus}) jusqu'à ${targetClose.toLocaleTimeString()}`);
       }
     }
   }
@@ -357,19 +421,36 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     await this.autoProcessDraws().catch(() => {});
 
     const now = new Date();
+    const haitiHour = this.getHaitiHour(now);
+
     const where: any = {
       status: DrawStatus.OPEN,
       salesClosingAt: { gt: now },
     };
     if (gameId) where.gameId = gameId;
 
-    return this.prisma.draw.findMany({
+    const openDraws = await this.prisma.draw.findMany({
       where,
       include: {
         game: { select: { id: true, code: true, name: true, minBetAmount: true, maxBetAmount: true } },
       },
       orderBy: { salesClosingAt: 'asc' },
     });
+
+    // RÈGLE MÉTIER STRICTE :
+    // Entre 07h00 et 13h00, c'est la session du tirage Midi :
+    // Les vendeurs ne voient et ne peuvent vendre QUE pour les tirages Midi !
+    if (haitiHour >= 7 && haitiHour < 13) {
+      return openDraws.filter((d) => this.isMidiDraw(d.salesClosingAt));
+    }
+
+    // Après 13h00 : seuls les tirages du Soir sont proposés aux vendeurs
+    if (haitiHour >= 13) {
+      return openDraws.filter((d) => this.isSoirDraw(d.salesClosingAt));
+    }
+
+    // Avant 07h00 du matin : les ventes sont fermées pour la nuit
+    return [];
   }
 
   async findAll(gameId?: string, status?: DrawStatus, page = 1, limit = 20) {

@@ -141,6 +141,34 @@ export class TicketsService {
       );
     }
 
+    // RÈGLE 5.1 : Contrôle strict des sessions Midi (07h00 - 13h00) vs Soir
+    const haitiHourStr = now.toLocaleTimeString('en-US', {
+      timeZone: 'America/Port-au-Prince',
+      hour12: false,
+      hour: '2-digit',
+    });
+    const haitiHour = parseInt(haitiHourStr, 10);
+
+    const drawClosingHaitiHourStr = new Date(draw.salesClosingAt).toLocaleTimeString('en-US', {
+      timeZone: 'America/Port-au-Prince',
+      hour12: false,
+      hour: '2-digit',
+    });
+    const drawClosingHaitiHour = parseInt(drawClosingHaitiHourStr, 10);
+    const isSoirDraw = drawClosingHaitiHour >= 16 || drawClosingHaitiHour < 4;
+
+    if (haitiHour < 7) {
+      throw new BadRequestException(
+        'Vente rejetée : Les ventes de la journée débutent à 07h00 du matin.',
+      );
+    }
+
+    if (haitiHour >= 7 && haitiHour < 13 && isSoirDraw) {
+      throw new BadRequestException(
+        'Vente rejetée : Entre 07h00 et 13h00, c’est le tirage Midi. Vous ne pouvez pas vendre pour le tirage du Soir pendant la session Midi.',
+      );
+    }
+
     // RÈGLE CRITIQUE : VÉRIFICATION DES NUMÉROS BLOQUÉS & PLAFONDS PAR NUMÉRO
     const restrictedNumbers = this.prisma.blockedNumber
       ? await this.prisma.blockedNumber.findMany({
