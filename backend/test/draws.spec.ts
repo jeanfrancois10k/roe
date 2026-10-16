@@ -59,6 +59,46 @@ describe('Phase 7: Tirages, Résultats & Évaluation des Gains', () => {
       expect(res.gridEvaluations[0].winningDescription).toContain('Mariage Gagnant');
     });
 
+    it('doit évaluer les options de Mariage (Op 1, Op 2, Op 3) et Maryaj Gratis', () => {
+      // 1er lot = 12, 2e lot = 34, 3e lot = 78
+      const grids = [
+        { numbers: ['12', '34'], betAmount: 5, option: 'OP1' }, // Gagnant Op 1 (1e-2e)
+        { numbers: ['12', '78'], betAmount: 5, option: 'OP2' }, // Gagnant Op 2 (1e-3e)
+        { numbers: ['34', '78'], betAmount: 5, option: 'OP3' }, // Gagnant Op 3 (2e-3e)
+        { numbers: ['12x34'], betAmount: 0, isGratis: true, gameType: 'MARIAGE' }, // Maryaj Gratis
+      ];
+      const res = evaluator.evaluateTicket(grids, winningResults);
+
+      expect(res.isWinner).toBe(true);
+      expect(res.gridEvaluations[0].isWinningGrid).toBe(true);
+      expect(res.gridEvaluations[0].winningDescription).toContain('Op 1');
+      expect(res.gridEvaluations[1].isWinningGrid).toBe(true);
+      expect(res.gridEvaluations[1].winningDescription).toContain('Op 2');
+      expect(res.gridEvaluations[2].isWinningGrid).toBe(true);
+      expect(res.gridEvaluations[2].winningDescription).toContain('Op 3');
+      expect(res.gridEvaluations[3].isWinningGrid).toBe(true);
+      expect(res.gridEvaluations[3].winningDescription).toContain('Gratis');
+    });
+
+    it('doit évaluer les options de Lòt 4 (Op 1, Op 2, Op 3, Tout)', () => {
+      // 1er lot = 12, 2e lot = 34, 3e lot = 78
+      // Op 1 = 1234, Op 2 = 1278, Op 3 = 3478
+      const grids = [
+        { numbers: ['1234'], betAmount: 2, option: 'OP1' },
+        { numbers: ['1278'], betAmount: 2, option: 'OP2' },
+        { numbers: ['3478'], betAmount: 2, option: 'OP3' },
+        { numbers: ['1234'], betAmount: 2, option: 'TOUT' },
+      ];
+      const res = evaluator.evaluateTicket(grids, winningResults);
+
+      expect(res.isWinner).toBe(true);
+      expect(res.gridEvaluations[0].isWinningGrid).toBe(true);
+      expect(res.gridEvaluations[0].wonAmount).toBe(10000); // 2 * 5000
+      expect(res.gridEvaluations[1].isWinningGrid).toBe(true);
+      expect(res.gridEvaluations[2].isWinningGrid).toBe(true);
+      expect(res.gridEvaluations[3].isWinningGrid).toBe(true);
+    });
+
     it('doit identifier un Lòt 3 Gagnant (500x)', () => {
       const grids = [{ numbers: ['512'], betAmount: 5 }];
       const res = evaluator.evaluateTicket(grids, winningResults);

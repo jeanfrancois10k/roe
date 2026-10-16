@@ -60,8 +60,26 @@ export class DrawEvaluatorService {
       let gridWon = 0;
       let description: string | null = null;
 
+      const gridAny = grid as any;
+      const option = gridAny.option ? String(gridAny.option).trim().toUpperCase().replace(/\s+/g, '') : 'TOUT';
+      const gameType = gridAny.gameType ? String(gridAny.gameType).trim().toUpperCase() : null;
+      const isGratis = gridAny.isGratis === true || option === 'GRATIS' || (gameType === 'MARIAGE' && betAmount === 0);
+
+      // Détection des paires Maryaj (soit 2 numéros, soit 1 chaîne avec séparateur ex: "12x34" ou 4 chiffres si gameType MARIAGE)
+      let maryajPair: [string, string] | null = null;
+      if (cleanNumbers.length === 2) {
+        maryajPair = [cleanNumbers[0].padStart(2, '0'), cleanNumbers[1].padStart(2, '0')];
+      } else if (cleanNumbers.length === 1) {
+        const parts = cleanNumbers[0].split(/[x\-\*\s\/]+/).filter(Boolean);
+        if (parts.length === 2) {
+          maryajPair = [parts[0].padStart(2, '0'), parts[1].padStart(2, '0')];
+        } else if (cleanNumbers[0].length === 4 && (gameType === 'MARIAGE' || gameType === 'MARYAJ')) {
+          maryajPair = [cleanNumbers[0].slice(0, 2).padStart(2, '0'), cleanNumbers[0].slice(2, 4).padStart(2, '0')];
+        }
+      }
+
       // 1. Borlette simple (1 numéro de 1 ou 2 chiffres, ex: ["12"] ou ["7"])
-      if (cleanNumbers.length === 1 && cleanNumbers[0].length <= 2) {
+      if (cleanNumbers.length === 1 && cleanNumbers[0].length <= 2 && !maryajPair) {
         const playedNum = cleanNumbers[0].padStart(2, '0');
 
         if (playedNum === firstLot2) {
@@ -79,7 +97,7 @@ export class DrawEvaluatorService {
         }
       }
       // 2. Lòt 3 / Pick 3 (1 numéro de 3 chiffres, ex: ["512"])
-      else if (cleanNumbers.length === 1 && cleanNumbers[0].length === 3) {
+      else if (cleanNumbers.length === 1 && cleanNumbers[0].length === 3 && !maryajPair) {
         const playedNum3 = cleanNumbers[0];
         if (firstLot3 && playedNum3 === firstLot3) {
           const mult = multipliers.lot3 ?? 500;
@@ -87,30 +105,99 @@ export class DrawEvaluatorService {
           description = `Lòt 3 Gagnant (${firstLot3}) - ${mult}x`;
         }
       }
-      // 3. Mariage (2 numéros de 2 chiffres, ex: ["12", "34"])
-      else if (cleanNumbers.length === 2) {
-        const numA = cleanNumbers[0].padStart(2, '0');
-        const numB = cleanNumbers[1].padStart(2, '0');
+      // 3. Mariage (avec Options 1, 2, 3, Tout & Maryaj Gratis)
+      else if (maryajPair) {
+        const [numA, numB] = maryajPair;
 
-        // Les deux numéros doivent être distincts et figurer parmi les 3 lots
-        const matchA = winningPairs.includes(numA);
-        const matchB = winningPairs.includes(numB);
+        if (numA !== numB) {
+          let isMaryajWin = false;
+          let optionLabel = 'Tout';
 
-        if (numA !== numB && matchA && matchB) {
-          const mult = multipliers.mariage ?? 1000;
-          gridWon = betAmount * mult;
-          description = `Mariage Gagnant (${numA} × ${numB}) - ${mult}x`;
+          const isOp1 = (numA === firstLot2 && numB === secondLot2) || (numA === secondLot2 && numB === firstLot2);
+          const isOp2 = (numA === firstLot2 && numB === thirdLot2) || (numA === thirdLot2 && numB === firstLot2);
+          const isOp3 = (numA === secondLot2 && numB === thirdLot2) || (numA === thirdLot2 && numB === secondLot2);
+
+          if (option === 'OP1' || option === 'OPTION1' || option === '1') {
+            isMaryajWin = isOp1;
+            optionLabel = 'Op 1 (1e-2e)';
+          } else if (option === 'OP2' || option === 'OPTION2' || option === '2') {
+            isMaryajWin = isOp2;
+            optionLabel = 'Op 2 (1e-3e)';
+          } else if (option === 'OP3' || option === 'OPTION3' || option === '3') {
+            isMaryajWin = isOp3;
+            optionLabel = 'Op 3 (2e-3e)';
+          } else {
+            // Option TOUT ou GRATIS
+            isMaryajWin = isOp1 || isOp2 || isOp3;
+            optionLabel = isOp1 ? 'Op 1' : isOp2 ? 'Op 2' : 'Op 3';
+          }
+
+          if (isMaryajWin) {
+            if (isGratis) {
+              const gratisWon = multipliers.mariageGratis ?? 1000;
+              gridWon = gratisWon;
+              description = `Mariage Gratis Gagnant (${numA} × ${numB}) - ${gratisWon} G`;
+            } else {
+              const mult = multipliers.mariage ?? 1000;
+              gridWon = betAmount * mult;
+              description = `Mariage Gagnant (${numA} × ${numB}) [${optionLabel}] - ${mult}x`;
+            }
+          }
         }
       }
-      // 4. Lòt 4 / Pick 4 (1 numéro de 4 chiffres)
+      // 4. Lòt 4 / Pick 4 (1 numéro de 4 chiffres, avec Options 1, 2, 3, Tout)
       else if (cleanNumbers.length === 1 && cleanNumbers[0].length === 4) {
         const playedNum4 = cleanNumbers[0];
-        const combined23 = secondLot2 + thirdLot2; // Traditionnellement 2e + 3e lot
+        const combOp1 = firstLot2 + secondLot2;  // Opsyon 1 : 1er lot + 2e lot
+        const combOp2 = firstLot2 + thirdLot2;   // Opsyon 2 : 1er lot + 3e lot
+        const combOp3 = secondLot2 + thirdLot2;  // Opsyon 3 : 2e lot + 3e lot
 
-        if (playedNum4 === combined23) {
+        let isLoto4Win = false;
+        let matchedOp = '';
+
+        if (option === 'OP1' || option === 'OPTION1' || option === '1') {
+          if (playedNum4 === combOp1) {
+            isLoto4Win = true;
+            matchedOp = 'Op 1 (1e-2e)';
+          }
+        } else if (option === 'OP2' || option === 'OPTION2' || option === '2') {
+          if (playedNum4 === combOp2) {
+            isLoto4Win = true;
+            matchedOp = 'Op 2 (1e-3e)';
+          }
+        } else if (option === 'OP3' || option === 'OPTION3' || option === '3') {
+          if (playedNum4 === combOp3) {
+            isLoto4Win = true;
+            matchedOp = 'Op 3 (2e-3e)';
+          }
+        } else {
+          // Option TOUT : gagne sur l'une des 3 combinaisons
+          if (playedNum4 === combOp1) {
+            isLoto4Win = true;
+            matchedOp = 'Op 1';
+          } else if (playedNum4 === combOp2) {
+            isLoto4Win = true;
+            matchedOp = 'Op 2';
+          } else if (playedNum4 === combOp3) {
+            isLoto4Win = true;
+            matchedOp = 'Op 3';
+          }
+        }
+
+        if (isLoto4Win) {
           const mult = multipliers.lot4 ?? 5000;
           gridWon = betAmount * mult;
-          description = `Lòt 4 Gagnant (${playedNum4}) - ${mult}x`;
+          description = `Lòt 4 Gagnant (${playedNum4}) [${matchedOp}] - ${mult}x`;
+        }
+      }
+      // 5. Lòt 5 (1 numéro de 5 chiffres)
+      else if (cleanNumbers.length === 1 && cleanNumbers[0].length === 5) {
+        const playedNum5 = cleanNumbers[0];
+        const comb5 = (firstLot3 || '') + secondLot2;
+        if (comb5 && playedNum5 === comb5) {
+          const mult = multipliers.lot5 ?? 25000;
+          gridWon = betAmount * mult;
+          description = `Lòt 5 Gagnant (${playedNum5}) - ${mult}x`;
         }
       }
 

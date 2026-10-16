@@ -68,9 +68,9 @@ export class TicketsService {
     }
 
     // Calcul du montant total de la mise
-    const totalAmount = dto.grids.reduce((acc, g) => acc + g.betAmount * (g.multiplier || 1), 0);
-    if (totalAmount <= 0) {
-      throw new BadRequestException('Le montant total du ticket doit être strictement positif.');
+    const totalAmount = dto.grids.reduce((acc, g) => acc + (g.betAmount || 0) * (g.multiplier || 1), 0);
+    if (totalAmount < 0) {
+      throw new BadRequestException('Le montant total du ticket ne peut pas être négatif.');
     }
 
     const now = new Date();
@@ -108,11 +108,15 @@ export class TicketsService {
       throw new BadRequestException('Le jeu sélectionné n’est pas disponible ou inactif.');
     }
 
-    // RÈGLE 7 : Validation des montants par grille
+    // RÈGLE 7 : Validation des montants par grille (sauf Maryaj Gratis)
     for (const grid of dto.grids) {
+      const isGratis = grid.isGratis === true || grid.option === 'GRATIS' || (grid.gameType === 'MARIAGE' && grid.betAmount === 0);
+      if (isGratis) {
+        continue;
+      }
       if (grid.betAmount < Number(game.minBetAmount) || grid.betAmount > Number(game.maxBetAmount)) {
         throw new BadRequestException(
-          `Mise non conforme : min $${game.minBetAmount}, max $${game.maxBetAmount} par combinaison.`,
+          `Mise non conforme : min ${game.minBetAmount} G, max ${game.maxBetAmount} G par combinaison.`,
         );
       }
     }

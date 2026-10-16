@@ -83,7 +83,10 @@ data class PayVendorResult(
 data class BetGrid(
     @SerializedName("numbers") val numbers: List<String>,
     @SerializedName("betAmount") val betAmount: Double,
-    @SerializedName("multiplier") val multiplier: Int? = 1
+    @SerializedName("multiplier") val multiplier: Int? = 1,
+    @SerializedName("option") val option: String? = null,
+    @SerializedName("gameType") val gameType: String? = null,
+    @SerializedName("isGratis") val isGratis: Boolean? = null
 )
 
 data class SellTicketRequest(
