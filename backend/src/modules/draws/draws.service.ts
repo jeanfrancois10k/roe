@@ -241,7 +241,12 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         let targetClose: Date | null = null;
         let targetDraw: Date | null = null;
 
-        for (const s of lotto.schedules) {
+        const effectiveSchedules =
+          Array.isArray((game.gameRules as any)?.schedules) && (game.gameRules as any).schedules.length > 0
+            ? (game.gameRules as any).schedules
+            : lotto.schedules;
+
+        for (const s of effectiveSchedules) {
           const cClose = new Date(now.getFullYear(), now.getMonth(), now.getDate(), s.closeHour, s.closeMinute, 0);
           const cDraw = new Date(now.getFullYear(), now.getMonth(), now.getDate(), s.drawHour, s.drawMinute, 0);
 
@@ -254,7 +259,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
 
         // Si toutes les sessions du jour sont terminées, planifier la 1ère session de demain
         if (!targetClose) {
-          const firstSched = lotto.schedules[0];
+          const firstSched = effectiveSchedules[0];
           targetClose = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, firstSched.closeHour, firstSched.closeMinute, 0);
           targetDraw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, firstSched.drawHour, firstSched.drawMinute, 0);
         }

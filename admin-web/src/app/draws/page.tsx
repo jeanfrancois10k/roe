@@ -20,6 +20,8 @@ import {
   ShieldAlert,
   Ban,
   Trash2,
+  Sliders,
+  Check,
 } from 'lucide-react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
@@ -54,6 +56,13 @@ export default function DrawsPage() {
   const [createDrawNumber, setCreateDrawNumber] = useState('');
   const [createClosingTime, setCreateClosingTime] = useState('');
   const [createActionLoading, setCreateActionLoading] = useState(false);
+
+  // Modal de Paramétrage Permanent des Horaires par Loterie
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [selectedGameForSchedule, setSelectedGameForSchedule] = useState<any>(null);
+  const [midiCloseTime, setMidiCloseTime] = useState('12:20');
+  const [soirCloseTime, setSoirCloseTime] = useState('19:20');
+  const [scheduleSaveLoading, setScheduleSaveLoading] = useState(false);
 
   // Modal de Saisie des Résultats Gagnants
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
@@ -124,7 +133,154 @@ export default function DrawsPage() {
     }
   };
 
-  // Création d'un nouveau tirage
+  // Calcul automatique de la prochaine heure de clôture selon les horaires enregistrés
+  const calculateDefaultClosingTime = (game: any): string => {
+    if (!game) return '';
+    const now = new Date();
+
+    const customSchedules = game.gameRules?.schedules;
+    let schedules: { closeHour: number; closeMinute: number }[] = [];
+
+    if (Array.isArray(customSchedules) && customSchedules.length > 0) {
+      schedules = customSchedules;
+    } else {
+      const defaultSchedules: Record<string, { closeHour: number; closeMinute: number }[]> = {
+        BOLET_NY: [
+          { closeHour: 12, closeMinute: 20 },
+          { closeHour: 19, closeMinute: 20 },
+        ],
+        BOLET_FL: [
+          { closeHour: 13, closeMinute: 20 },
+          { closeHour: 21, closeMinute: 20 },
+        ],
+        BOLET_GA: [
+          { closeHour: 12, closeMinute: 20 },
+          { closeHour: 18, closeMinute: 50 },
+        ],
+        BOLET_TX: [
+          { closeHour: 12, closeMinute: 15 },
+          { closeHour: 22, closeMinute: 0 },
+        ],
+        BOLET_TN: [
+          { closeHour: 12, closeMinute: 15 },
+          { closeHour: 18, closeMinute: 15 },
+        ],
+      };
+      schedules = defaultSchedules[game.code] || [
+        { closeHour: 12, closeMinute: 30 },
+        { closeHour: 19, closeMinute: 30 },
+      ];
+    }
+
+    let targetDate: Date | null = null;
+    for (const s of schedules) {
+      const candidate = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        s.closeHour,
+        s.closeMinute,
+        0
+      );
+      if (candidate.getTime() > now.getTime()) {
+        targetDate = candidate;
+        break;
+      }
+    }
+
+    if (!targetDate) {
+      const first = schedules[0];
+      targetDate = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        first.closeHour,
+        first.closeMinute,
+        0
+      );
+    }
+
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const hours = String(targetDate.getHours()).padStart(2, '0');
+    const minutes = String(targetDate.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  // Sélection d'une loterie dans le modal : pré-remplissage automatique immédiat
+  const handleSelectGameForCreate = (gameId: string) => {
+    setCreateGameId(gameId);
+    const game = games.find((g) => g.id === gameId);
+    if (game) {
+      const autoTime = calculateDefaultClosingTime(game);
+      setCreateClosingTime(autoTime);
+    } else {
+      setCreateClosingTime('');
+    }
+  };
+
+  // Ouverture du modal de modification des horaires permanents d'une loterie
+  const handleOpenScheduleModal = (game: any) => {
+    setSelectedGameForSchedule(game);
+    const customSchedules = game.gameRules?.schedules;
+    if (Array.isArray(customSchedules) && customSchedules.length >= 2) {
+      setMidiCloseTime(
+        `${String(customSchedules[0].closeHour).padStart(2, '0')}:${String(customSchedules[0].closeMinute).padStart(2, '0')}`
+      );
+      setSoirCloseTime(
+        `${String(customSchedules[1].closeHour).padStart(2, '0')}:${String(customSchedules[1].closeMinute).padStart(2, '0')}`
+      );
+    } else {
+      const defaultSchedules: Record<string, { midi: string; soir: string }> = {
+        BOLET_NY: { midi: '12:20', soir: '19:20' },
+        BOLET_FL: { midi: '13:20', soir: '21:20' },
+        BOLET_GA: { midi: '12:20', soir: '18:50' },
+        BOLET_TX: { midi: '12:15', soir: '22:00' },
+        BOLET_TN: { midi: '12:15', soir: '18:15' },
+      };
+      const def = defaultSchedules[game.code] || { midi: '12:20', soir: '19:20' };
+      setMidiCloseTime(def.midi);
+      setSoirCloseTime(def.soir);
+    }
+    setIsScheduleModalOpen(true);
+  };
+
+  // Enregistrement permanent des nouveaux horaires dans la base de données
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGameForSchedule) return;
+
+    setScheduleSaveLoading(true);
+    try {
+      const [mH, mM] = midiCloseTime.split(':').map(Number);
+      const [sH, sM] = soirCloseTime.split(':').map(Number);
+
+      const existingRules = selectedGameForSchedule.gameRules || {};
+      const updatedSchedules = [
+        { name: 'Midi', closeHour: mH, closeMinute: mM, drawHour: mH, drawMinute: (mM + 10) % 60 },
+        { name: 'Soir', closeHour: sH, closeMinute: sM, drawHour: sH, drawMinute: (sM + 10) % 60 },
+      ];
+
+      await api.patch(`/api/v1/games/${selectedGameForSchedule.id}`, {
+        gameRules: {
+          ...existingRules,
+          schedules: updatedSchedules,
+        },
+        drawFrequency: `Midi ${midiCloseTime} & Soir ${soirCloseTime}`,
+      });
+
+      setIsScheduleModalOpen(false);
+      fetchData();
+      alert(`✅ Horaires de clôture pour ${selectedGameForSchedule.name} enregistrés avec succès ! Ils restent actifs en permanence.`);
+    } catch (err: any) {
+      alert(`Erreur enregistrement horaires : ${err.message}`);
+    } finally {
+      setScheduleSaveLoading(false);
+    }
+  };
+
+  // Création d'un nouveau tirage (avec heure pré-remplie automatiquement)
   const handleCreateDraw = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createGameId) {
@@ -134,10 +290,11 @@ export default function DrawsPage() {
 
     setCreateActionLoading(true);
     try {
-      const now = new Date();
-      // Par défaut clôture dans 2 heures si non renseigné
-      const closingDate = createClosingTime ? new Date(createClosingTime) : new Date(now.getTime() + 2 * 60 * 60 * 1000);
-      const scheduledDate = new Date(closingDate.getTime() + 15 * 60 * 1000);
+      const selectedGame = games.find((g) => g.id === createGameId);
+      const closingDate = createClosingTime
+        ? new Date(createClosingTime)
+        : new Date(calculateDefaultClosingTime(selectedGame));
+      const scheduledDate = new Date(closingDate.getTime() + 10 * 60 * 1000);
 
       await api.post('/api/v1/draws', {
         gameId: createGameId,
@@ -329,6 +486,13 @@ export default function DrawsPage() {
                           <h4 className="font-extrabold text-white text-base mt-2">{game.name}</h4>
                           <p className="text-xs text-roe-textMuted mt-0.5 line-clamp-2">{game.description}</p>
                         </div>
+                        <button
+                          onClick={() => handleOpenScheduleModal(game)}
+                          className="p-2 rounded-xl bg-roe-card hover:bg-roe-gold/10 text-roe-textMuted hover:text-roe-gold border border-roe-border/60 hover:border-roe-gold/40 transition-all shrink-0"
+                          title="Modifier les horaires de fermeture permanents de cette loterie"
+                        >
+                          <Sliders size={15} />
+                        </button>
                       </div>
 
                       <div className="pt-2 border-t border-roe-border/40 grid grid-cols-2 gap-2 text-xs">
@@ -339,8 +503,16 @@ export default function DrawsPage() {
                           </p>
                         </div>
                         <div>
-                          <span className="text-[10px] text-roe-textMuted uppercase">Horaires Tirage</span>
-                          <p className="text-roe-gold font-medium text-xs">{game.drawFrequency || 'Midi & Soir'}</p>
+                          <span className="text-[10px] text-roe-textMuted uppercase">Horaires Fermeture</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <p className="text-roe-gold font-medium text-xs truncate">{game.drawFrequency || 'Midi & Soir'}</p>
+                            <button
+                              onClick={() => handleOpenScheduleModal(game)}
+                              className="text-[10px] text-roe-textMuted hover:text-roe-gold underline shrink-0"
+                            >
+                              Éditer
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -879,7 +1051,7 @@ export default function DrawsPage() {
                 </label>
                 <select
                   value={createGameId}
-                  onChange={(e) => setCreateGameId(e.target.value)}
+                  onChange={(e) => handleSelectGameForCreate(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-roe-card border border-roe-border text-white text-sm focus:border-roe-gold focus:outline-none"
                   required
                 >
@@ -904,17 +1076,25 @@ export default function DrawsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-roe-textMuted uppercase mb-1.5">
-                  Heure Limite de Clôture des Ventes
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-roe-textMuted uppercase">
+                    Heure Limite de Clôture des Ventes
+                  </label>
+                  {createGameId && (
+                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                      <Sparkles size={12} />
+                      Pré-remplie automatiquement
+                    </span>
+                  )}
+                </div>
                 <input
                   type="datetime-local"
                   value={createClosingTime}
                   onChange={(e) => setCreateClosingTime(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-roe-card border border-roe-border text-white text-sm focus:border-roe-gold focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-roe-card border border-roe-border text-white text-sm focus:border-roe-gold focus:outline-none font-mono"
                 />
                 <p className="text-[10px] text-roe-textMuted mt-1">
-                  Après cette heure, les terminaux Android refuseront les ventes pour ce tirage.
+                  ⚡ Heure officielle calculée selon les paramètres de la loterie. Modifiable si besoin.
                 </p>
               </div>
 
@@ -1023,6 +1203,84 @@ export default function DrawsPage() {
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg text-xs font-extrabold shadow-lg disabled:opacity-50"
                 >
                   {resultActionLoading ? 'Calcul des Gains...' : 'Proclamer les Résultats'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4 : PARAMÉTRAGE PERMANENT DES HORAIRES D'UNE LOTERIE */}
+      {isScheduleModalOpen && selectedGameForSchedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-roe-surface border border-roe-border/80 rounded-3xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Sliders size={20} className="text-roe-gold" />
+                <span>Horaires : {selectedGameForSchedule.name}</span>
+              </h3>
+            </div>
+
+            <p className="text-xs text-roe-textMuted mb-4">
+              Enregistrez les heures de fermeture pour cette loterie. Une fois sauvegardées, le système automatique ouvrira et fermera chaque jour à ces heures exactes sans intervention manuelle.
+            </p>
+
+            <form onSubmit={handleSaveSchedule} className="space-y-4">
+              <div className="p-4 rounded-2xl bg-roe-card border border-roe-border/60 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-roe-textMuted uppercase mb-1">
+                    Fermeture Tirage Midi (HH:mm)
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={midiCloseTime}
+                    onChange={(e) => setMidiCloseTime(e.target.value)}
+                    className="w-full text-center font-mono font-bold text-lg py-2 rounded-xl bg-roe-surface border border-roe-border text-white focus:outline-none focus:border-roe-gold"
+                  />
+                  <p className="text-[10px] text-roe-textMuted mt-1">
+                    Ex: 12:20 (Fermeture des ventes 10 min avant le tirage officiel de 12:30).
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-roe-border/40">
+                  <label className="block text-xs font-semibold text-roe-textMuted uppercase mb-1">
+                    Fermeture Tirage Soir (HH:mm)
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={soirCloseTime}
+                    onChange={(e) => setSoirCloseTime(e.target.value)}
+                    className="w-full text-center font-mono font-bold text-lg py-2 rounded-xl bg-roe-surface border border-roe-border text-white focus:outline-none focus:border-roe-gold"
+                  />
+                  <p className="text-[10px] text-roe-textMuted mt-1">
+                    Ex: 19:20 (Fermeture des ventes 10 min avant le tirage officiel de 19:30).
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-start gap-2">
+                <CheckCircle size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  Ces heures sont enregistrées dans la base de données et restent actives en permanence jusqu'à modification future.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-roe-border/50">
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-roe-card text-roe-textMuted hover:text-white text-xs font-bold"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={scheduleSaveLoading}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg text-xs font-extrabold shadow-lg disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {scheduleSaveLoading ? 'Enregistrement...' : 'Enregistrer Définitivement'}
                 </button>
               </div>
             </form>
