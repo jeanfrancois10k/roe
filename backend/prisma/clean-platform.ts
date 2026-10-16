@@ -133,52 +133,67 @@ async function main() {
     },
   };
 
-  const gameNY = await prisma.game.upsert({
-    where: { code: 'BOLET_NY' },
-    update: {
-      name: 'Bolet New York (Midi & Soir)',
-      minBetAmount: 5.00,     // 5 Gourdes min
-      maxBetAmount: 2500.00,  // 2 500 Gourdes max
-      currency: Currency.HTG,
-      drawFrequency: '12:30 PM & 07:30 PM',
-      gameRules: rules,
-    },
-    create: {
+  const officialLotteries = [
+    {
       code: 'BOLET_NY',
       name: 'Bolet New York (Midi & Soir)',
-      description: 'Loterie traditionnelle New York - Tirages Midi et Soir en direct',
-      minBetAmount: 5.00,
-      maxBetAmount: 2500.00,
-      currency: Currency.HTG,
+      description: 'Loterie traditionnelle New York (NY) - Tirages 12:30 PM & 07:30 PM',
       drawFrequency: '12:30 PM & 07:30 PM',
-      defaultCommission: 5.00,
-      gameRules: rules,
     },
-  });
-
-  const gameFL = await prisma.game.upsert({
-    where: { code: 'BOLET_FL' },
-    update: {
-      name: 'Bolet Florida (Midi & Soir)',
-      minBetAmount: 5.00,
-      maxBetAmount: 2500.00,
-      currency: Currency.HTG,
-      drawFrequency: '01:30 PM & 09:30 PM',
-      gameRules: rules,
-    },
-    create: {
+    {
       code: 'BOLET_FL',
       name: 'Bolet Florida (Midi & Soir)',
-      description: 'Loterie traditionnelle Florida - Tirages officiels de l’État de Floride',
-      minBetAmount: 5.00,
-      maxBetAmount: 2500.00,
-      currency: Currency.HTG,
+      description: 'Loterie officielle Florida (FL) - Tirages 01:30 PM & 09:30 PM',
       drawFrequency: '01:30 PM & 09:30 PM',
-      defaultCommission: 5.00,
-      gameRules: rules,
     },
-  });
-  console.log(`✅ Jeux réinitialisés en Gourdes (HTG) : ${gameNY.code}, ${gameFL.code}`);
+    {
+      code: 'BOLET_GA',
+      name: 'Bolet Géorgie (GA)',
+      description: 'Loterie officielle Géorgie (GA) - Tirages 12:29 PM & 07:00 PM',
+      drawFrequency: '12:29 PM & 07:00 PM',
+    },
+    {
+      code: 'BOLET_TX',
+      name: 'Bolet Texas (TX)',
+      description: 'Loterie officielle Texas (TX) - Tirages 12:27 PM & 10:12 PM',
+      drawFrequency: '12:27 PM & 10:12 PM',
+    },
+    {
+      code: 'BOLET_TN',
+      name: 'Bolet Tennessee (TN)',
+      description: 'Loterie officielle Tennessee (TN) - Tirages 12:28 PM & 06:28 PM',
+      drawFrequency: '12:28 PM & 06:28 PM',
+    },
+  ];
+
+  let gameNY: any = null;
+  for (const lotto of officialLotteries) {
+    const game = await prisma.game.upsert({
+      where: { code: lotto.code },
+      update: {
+        name: lotto.name,
+        description: lotto.description,
+        minBetAmount: 5.00,
+        maxBetAmount: 2500.00,
+        currency: Currency.HTG,
+        drawFrequency: lotto.drawFrequency,
+        gameRules: rules,
+      },
+      create: {
+        code: lotto.code,
+        name: lotto.name,
+        description: lotto.description,
+        minBetAmount: 5.00,
+        maxBetAmount: 2500.00,
+        currency: Currency.HTG,
+        drawFrequency: lotto.drawFrequency,
+        defaultCommission: 5.00,
+        gameRules: rules,
+      },
+    });
+    if (lotto.code === 'BOLET_NY') gameNY = game;
+  }
+  console.log(`✅ ${officialLotteries.length} Jeux réinitialisés en Gourdes (HTG) : NY, FL, GA, TX, TN`);
 
   // 6. Nouveau Tirage propre N° 101 ouvert pour aujourd'hui
   const now = new Date();

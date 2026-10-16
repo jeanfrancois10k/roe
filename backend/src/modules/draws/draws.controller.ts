@@ -63,6 +63,18 @@ export class DrawsController {
     return this.drawsService.create(dto, adminId);
   }
 
+  @Post(':id/open')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async open(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body('minutes') minutes?: number,
+  ) {
+    return this.drawsService.openDraw(id, adminId, minutes ? Number(minutes) : undefined);
+  }
+
   @Post(':id/close')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)

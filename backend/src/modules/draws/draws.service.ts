@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -16,10 +18,78 @@ import { SetResultsDto, WinningResultsDto } from './dto/set-results.dto';
 import { OverrideResultsDto } from './dto/override-results.dto';
 import { DrawStatus, TicketStatus, TicketPayoutStatus } from '@prisma/client';
 
+export interface LotteryDefinition {
+  code: string;
+  name: string;
+  description: string;
+  drawFrequency: string;
+  schedules: Array<{
+    name: string;
+    closeHour: number;
+    closeMinute: number;
+    drawHour: number;
+    drawMinute: number;
+  }>;
+}
+
+export const OFFICIAL_LOTTERIES: LotteryDefinition[] = [
+  {
+    code: 'BOLET_NY',
+    name: 'Bolet New York (NY)',
+    description: 'Loterie traditionnelle New York - Midi (12:30 PM) et Soir (07:30 PM)',
+    drawFrequency: '12:30 PM & 07:30 PM',
+    schedules: [
+      { name: 'Midi', closeHour: 12, closeMinute: 20, drawHour: 12, drawMinute: 30 },
+      { name: 'Soir', closeHour: 19, closeMinute: 20, drawHour: 19, drawMinute: 30 },
+    ],
+  },
+  {
+    code: 'BOLET_FL',
+    name: 'Bolet Florida (FL)',
+    description: 'Loterie traditionnelle Florida - Midi (01:30 PM) et Soir (09:30 PM)',
+    drawFrequency: '01:30 PM & 09:30 PM',
+    schedules: [
+      { name: 'Midi', closeHour: 13, closeMinute: 20, drawHour: 13, drawMinute: 30 },
+      { name: 'Soir', closeHour: 21, closeMinute: 20, drawHour: 21, drawMinute: 30 },
+    ],
+  },
+  {
+    code: 'BOLET_GA',
+    name: 'Bolet Géorgie (GA)',
+    description: 'Loterie traditionnelle Géorgie - Midi (12:29 PM) et Soir (07:00 PM)',
+    drawFrequency: '12:29 PM & 07:00 PM',
+    schedules: [
+      { name: 'Midi', closeHour: 12, closeMinute: 20, drawHour: 12, drawMinute: 29 },
+      { name: 'Soir', closeHour: 18, closeMinute: 50, drawHour: 19, drawMinute: 0 },
+    ],
+  },
+  {
+    code: 'BOLET_TX',
+    name: 'Bolet Texas (TX)',
+    description: 'Loterie traditionnelle Texas - Midi (12:27 PM) et Soir (10:12 PM)',
+    drawFrequency: '12:27 PM & 10:12 PM',
+    schedules: [
+      { name: 'Midi', closeHour: 12, closeMinute: 15, drawHour: 12, drawMinute: 27 },
+      { name: 'Soir', closeHour: 22, closeMinute: 0, drawHour: 22, drawMinute: 12 },
+    ],
+  },
+  {
+    code: 'BOLET_TN',
+    name: 'Bolet Tennessee (TN)',
+    description: 'Loterie traditionnelle Tennessee - Midi (12:28 PM) et Soir (06:28 PM)',
+    drawFrequency: '12:28 PM & 06:28 PM',
+    schedules: [
+      { name: 'Midi', closeHour: 12, closeMinute: 15, drawHour: 12, drawMinute: 28 },
+      { name: 'Soir', closeHour: 18, closeMinute: 15, drawHour: 18, drawMinute: 28 },
+    ],
+  },
+];
+
 @Injectable()
-export class DrawsService {
+export class DrawsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DrawsService.name);
   private readonly validationSecret: string;
+  private timer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -31,6 +101,195 @@ export class DrawsService {
     this.validationSecret =
       this.configService.get<string>('DRAW_VALIDATION_SECRET') ||
       'roe_bolet_certified_draw_seal_secret_2026';
+  }
+
+  async onModuleInit() {
+    try {
+      await this.ensureDefaultLotteries();
+      await this.autoProcessDraws();
+    } catch (err: any) {
+      this.logger.error(`Erreur initialisation loteries et tirages : ${err.message}`);
+    }
+
+    // Cycle automatique toutes les 30 secondes
+    this.timer = setInterval(async () => {
+      try {
+        await this.autoProcessDraws();
+      } catch (err: any) {
+        this.logger.error(`Erreur cycle autoProcessDraws : ${err.message}`);
+      }
+    }, 30000);
+  }
+
+  onModuleDestroy() {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  /**
+   * Assure que les 5 loteries officielles (NY, FL, GA, TX, TN) existent en base
+   */
+  async ensureDefaultLotteries() {
+    const defaultRules = {
+      borlette: {
+        firstPrizeMultiplier: 50,
+        secondPrizeMultiplier: 20,
+        thirdPrizeMultiplier: 10,
+      },
+      mariage: {
+        multiplier: 1000,
+        mariageGratis: 1000,
+      },
+      lot3: {
+        multiplier: 500,
+      },
+      lot4: {
+        multiplier: 5000,
+      },
+      lot5: {
+        multiplier: 25000,
+      },
+    };
+
+    for (const lotto of OFFICIAL_LOTTERIES) {
+      await this.prisma.game.upsert({
+        where: { code: lotto.code },
+        update: {
+          name: lotto.name,
+          description: lotto.description,
+          drawFrequency: lotto.drawFrequency,
+          status: 'ACTIVE',
+        },
+        create: {
+          code: lotto.code,
+          name: lotto.name,
+          description: lotto.description,
+          drawFrequency: lotto.drawFrequency,
+          status: 'ACTIVE',
+          minBetAmount: 5.0,
+          maxBetAmount: 2500.0,
+          currency: 'HTG' as any,
+          defaultCommission: 5.0,
+          gameRules: defaultRules,
+        },
+      });
+    }
+    this.logger.log('✅ 5 Loteries officielles synchronisées : NY, FL, GA, TX, TN');
+  }
+
+  /**
+   * Moteur Automatique : Clôture à l'heure exacte et ouverture des sessions
+   */
+  async autoProcessDraws() {
+    const now = new Date();
+
+    // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
+    const expiredDraws = await this.prisma.draw.findMany({
+      where: {
+        status: DrawStatus.OPEN,
+        salesClosingAt: { lte: now },
+      },
+      include: { game: { select: { code: true, name: true } } },
+    });
+
+    for (const draw of expiredDraws) {
+      await this.prisma.draw.update({
+        where: { id: draw.id },
+        data: { status: DrawStatus.CLOSED },
+      });
+
+      if (this.realtimeGateway?.server) {
+        this.realtimeGateway.server.emit('draw:closed', {
+          drawId: draw.id,
+          drawNumber: draw.drawNumber,
+          gameCode: draw.game.code,
+          timestamp: new Date().toISOString(),
+          autoClosed: true,
+        });
+      }
+
+      await this.auditService.log({
+        action: 'DRAW_AUTO_CLOSED',
+        resource: `Draw:${draw.id}`,
+        newPayload: {
+          drawNumber: draw.drawNumber,
+          gameCode: draw.game.code,
+          closedAt: now.toISOString(),
+        },
+      });
+
+      this.logger.log(`⏰ Clôture automatique des ventes : Tirage N°${draw.drawNumber} (${draw.game.name})`);
+    }
+
+    // 2. Vérification et création / ouverture automatique pour les jeux actifs
+    for (const lotto of OFFICIAL_LOTTERIES) {
+      const game = await this.prisma.game.findUnique({ where: { code: lotto.code } });
+      if (!game || game.status !== 'ACTIVE') continue;
+
+      const activeDraws = await this.prisma.draw.findMany({
+        where: {
+          gameId: game.id,
+          status: { in: [DrawStatus.OPEN, DrawStatus.SCHEDULED] },
+          salesClosingAt: { gt: now },
+        },
+      });
+
+      // Si aucun tirage n'est actuellement ouvert pour ce jeu, planifier la prochaine session
+      if (activeDraws.length === 0) {
+        let targetClose: Date | null = null;
+        let targetDraw: Date | null = null;
+
+        for (const s of lotto.schedules) {
+          const cClose = new Date(now.getFullYear(), now.getMonth(), now.getDate(), s.closeHour, s.closeMinute, 0);
+          const cDraw = new Date(now.getFullYear(), now.getMonth(), now.getDate(), s.drawHour, s.drawMinute, 0);
+
+          if (cClose > now) {
+            targetClose = cClose;
+            targetDraw = cDraw;
+            break;
+          }
+        }
+
+        // Si toutes les sessions du jour sont terminées, planifier la 1ère session de demain
+        if (!targetClose) {
+          const firstSched = lotto.schedules[0];
+          targetClose = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, firstSched.closeHour, firstSched.closeMinute, 0);
+          targetDraw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, firstSched.drawHour, firstSched.drawMinute, 0);
+        }
+
+        const maxDraw = await this.prisma.draw.aggregate({
+          where: { gameId: game.id },
+          _max: { drawNumber: true },
+        });
+        const nextDrawNum = (maxDraw._max.drawNumber || 100) + 1;
+
+        const newDraw = await this.prisma.draw.create({
+          data: {
+            gameId: game.id,
+            drawNumber: nextDrawNum,
+            scheduledAt: targetDraw,
+            salesClosingAt: targetClose,
+            status: DrawStatus.OPEN,
+          },
+          include: { game: { select: { code: true, name: true } } },
+        });
+
+        if (this.realtimeGateway?.server) {
+          this.realtimeGateway.server.emit('draw:opened', {
+            drawId: newDraw.id,
+            drawNumber: newDraw.drawNumber,
+            gameCode: newDraw.game.code,
+            timestamp: new Date().toISOString(),
+            salesClosingAt: targetClose.toISOString(),
+            autoScheduled: true,
+          });
+        }
+
+        this.logger.log(`✨ Tirage N°${newDraw.drawNumber} pour ${game.name} ouvert automatiquement jusqu'à ${targetClose.toLocaleTimeString()}`);
+      }
+    }
   }
 
   /**
@@ -89,6 +348,9 @@ export class DrawsService {
   }
 
   async getOpenDraws(gameId?: string) {
+    // Vérification rapide pour s'assurer que l'état est synchronisé
+    await this.autoProcessDraws().catch(() => {});
+
     const now = new Date();
     const where: any = {
       status: DrawStatus.OPEN,
@@ -142,6 +404,71 @@ export class DrawsService {
     return draw;
   }
 
+  /**
+   * Ouverture manuelle / Activation par l'Administrateur
+   */
+  async openDraw(id: string, adminId?: string, minutesToExtend?: number) {
+    const draw = await this.prisma.draw.findUnique({
+      where: { id },
+      include: { game: { select: { code: true, name: true } } },
+    });
+    if (!draw) {
+      throw new NotFoundException('Tirage introuvable');
+    }
+
+    if (draw.status === DrawStatus.PUBLISHED) {
+      throw new BadRequestException('Impossible de rouvrir un tirage déjà publié.');
+    }
+
+    const now = new Date();
+    let newClosingAt = draw.salesClosingAt;
+    let newScheduledAt = draw.scheduledAt;
+
+    // Si l'heure de clôture est dépassée ou expirée, on prolonge automatiquement
+    if (new Date(draw.salesClosingAt) <= now) {
+      const extMinutes = minutesToExtend && minutesToExtend > 0 ? minutesToExtend : 120;
+      newClosingAt = new Date(now.getTime() + extMinutes * 60 * 1000);
+      newScheduledAt = new Date(newClosingAt.getTime() + 15 * 60 * 1000);
+    }
+
+    const updated = await this.prisma.draw.update({
+      where: { id },
+      data: {
+        status: DrawStatus.OPEN,
+        salesClosingAt: newClosingAt,
+        scheduledAt: newScheduledAt,
+      },
+      include: { game: { select: { code: true, name: true } } },
+    });
+
+    if (this.realtimeGateway?.server) {
+      this.realtimeGateway.server.emit('draw:opened', {
+        drawId: draw.id,
+        drawNumber: draw.drawNumber,
+        gameCode: updated.game.code,
+        timestamp: new Date().toISOString(),
+        salesClosingAt: newClosingAt.toISOString(),
+      });
+    }
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'DRAW_MANUALLY_OPENED',
+      resource: `Draw:${id}`,
+      newPayload: {
+        drawNumber: draw.drawNumber,
+        status: DrawStatus.OPEN,
+        salesClosingAt: newClosingAt.toISOString(),
+      },
+    });
+
+    this.logger.log(`🟢 Tirage N°${draw.drawNumber} (${updated.game.name}) activé manuellement par l'admin`);
+    return updated;
+  }
+
+  /**
+   * Clôture manuelle / Fermeture par l'Administrateur
+   */
   async closeDraw(id: string, adminId?: string) {
     const draw = await this.prisma.draw.findUnique({ where: { id } });
     if (!draw) {
@@ -174,6 +501,7 @@ export class DrawsService {
       newPayload: { drawNumber: draw.drawNumber, status: DrawStatus.CLOSED },
     });
 
+    this.logger.log(`🔴 Tirage N°${draw.drawNumber} (${updated.game.name}) fermé manuellement par l'admin`);
     return updated;
   }
 
