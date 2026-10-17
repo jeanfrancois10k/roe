@@ -134,13 +134,32 @@ data class SyncDelta(
 )
 
 data class SellTicketResponse(
-    @SerializedName("id") val id: String,
-    @SerializedName("ticketNumber") val ticketNumber: String,
-    @SerializedName("secureChecksum") val secureChecksum: String,
-    @SerializedName("totalAmount") val totalAmount: Double,
-    @SerializedName("status") val status: String,
-    @SerializedName("createdAt") val createdAt: String? = null
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("ticketNumber") val rawTicketNumber: String? = null,
+    @SerializedName("secureChecksum") val rawChecksum: String? = null,
+    @SerializedName("totalAmount") val rawTotalAmount: Double? = null,
+    @SerializedName("status") val status: String? = "CONFIRMED",
+    @SerializedName("createdAt") val createdAt: String? = null,
+    @SerializedName("ticket") val nestedTicket: NestedTicketInfo? = null
+) {
+    val ticketNumber: String
+        get() = rawTicketNumber ?: nestedTicket?.ticketNumber ?: "ROE-TICKET"
+
+    val secureChecksum: String
+        get() = rawChecksum ?: nestedTicket?.secureChecksum ?: ""
+
+    val totalAmount: Double
+        get() = rawTotalAmount ?: nestedTicket?.totalAmount ?: 0.0
+}
+
+data class NestedTicketInfo(
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("ticketNumber") val ticketNumber: String? = null,
+    @SerializedName("secureChecksum") val secureChecksum: String? = null,
+    @SerializedName("totalAmount") val totalAmount: Double? = null,
+    @SerializedName("status") val status: String? = null
 )
+
 
 data class OpenDrawGame(
     @SerializedName("id") val id: String,

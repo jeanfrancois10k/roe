@@ -356,25 +356,30 @@ export class TicketsService {
 
       this.logger.log(`Ticket émis avec succès : ${ticketNumber} ($${totalAmount}) par ${vendor.vendorCode}`);
 
+      const ticketPayload = {
+        id: createdTicket.id,
+        ticketNumber: createdTicket.ticketNumber,
+        secureChecksum: createdTicket.secureChecksum,
+        gameName: game.name,
+        drawNumber: draw.drawNumber,
+        scheduledAt: draw.scheduledAt,
+        totalAmount: Number(createdTicket.totalAmount),
+        status: createdTicket.status,
+        playedGrids: dto.grids,
+        vendorCode: vendor.vendorCode,
+        posAddress: vendor.posAddress,
+        createdAt: createdTicket.createdAt,
+        newBalance: netBalanceAfter,
+      };
+
       return {
         success: true,
-        ticket: {
-          id: createdTicket.id,
-          ticketNumber: createdTicket.ticketNumber,
-          secureChecksum: createdTicket.secureChecksum,
-          gameName: game.name,
-          drawNumber: draw.drawNumber,
-          scheduledAt: draw.scheduledAt,
-          totalAmount: Number(createdTicket.totalAmount),
-          playedGrids: dto.grids,
-          vendorCode: vendor.vendorCode,
-          posAddress: vendor.posAddress,
-          createdAt: createdTicket.createdAt,
-          newBalance: netBalanceAfter,
-        },
+        ...ticketPayload,
+        ticket: ticketPayload,
       };
     });
   }
+
 
   /**
    * Annulation de ticket dans la fen黎re autoris閑

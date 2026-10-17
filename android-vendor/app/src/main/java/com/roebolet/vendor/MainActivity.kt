@@ -216,14 +216,15 @@ class MainActivity : ComponentActivity() {
                     try {
                         val updateRes = apiService.checkAppUpdate()
                         if (updateRes.isSuccessful && updateRes.body() != null) {
+                            val info = updateRes.body()!!
                             // Version actuelle du code du terminal (versionCode = 2, v1.0.1)
                             val currentVersionCode = 2
                             if (info.latestVersionCode > currentVersionCode) {
                                 updateInfo = info
                                 showUpdateDialog = true
                             }
-
                         }
+
                     } catch (e: Exception) {
                         // Ignorer silencieusement si hors-ligne
                     }
