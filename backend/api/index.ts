@@ -64,8 +64,10 @@ async function bootstrap() {
 }
 
 export default async function handler(req: Request, res: Response) {
-  // Réponse ultra-rapide pour health check à la racine sans cold start
-  if (req.url === '/' || req.url === '') {
+  const urlPath = (req.url || '/').split('?')[0].replace(/\/api$/, '') || '/';
+
+  // Réponse ultra-rapide pour health check à la racine (https://roe-chi.vercel.app/)
+  if (urlPath === '/' || urlPath === '') {
     return res.status(200).json({
       platform: 'ROE BOLET - Transactional API',
       status: 'ONLINE',
@@ -76,6 +78,7 @@ export default async function handler(req: Request, res: Response) {
       timestamp: new Date().toISOString(),
     });
   }
+
 
   try {
     if (!isAppInitialized) {
