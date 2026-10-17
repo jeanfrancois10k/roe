@@ -64,20 +64,22 @@ async function bootstrap() {
 }
 
 export default async function handler(req: Request, res: Response) {
-  const urlPath = (req.url || '/').split('?')[0].replace(/\/api$/, '') || '/';
+  const rawUrl = req.url || '/';
+  const urlPath = rawUrl.split('?')[0].replace(/\/$/, '') || '/';
 
   // Réponse ultra-rapide pour health check à la racine (https://roe-chi.vercel.app/)
-  if (urlPath === '/' || urlPath === '') {
+  if (urlPath === '/' || urlPath === '/api' || urlPath === '/api/index') {
     return res.status(200).json({
       platform: 'ROE BOLET - Transactional API',
       status: 'ONLINE',
-      version: '1.0.0',
+      version: '1.0.1',
       documentation: '/api/docs',
       health: '/api/v1/health',
       environment: 'serverless-vercel',
       timestamp: new Date().toISOString(),
     });
   }
+
 
 
   try {
