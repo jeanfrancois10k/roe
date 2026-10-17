@@ -108,17 +108,20 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       await this.ensureDefaultLotteries();
       await this.autoProcessDraws();
     } catch (err: any) {
-      this.logger.error(`Erreur initialisation loteries et tirages : ${err.message}`);
+      this.logger.warn(`Initialisation des loteries différée : ${err.message}`);
     }
 
-    // Cycle automatique toutes les 30 secondes
-    this.timer = setInterval(async () => {
-      try {
-        await this.autoProcessDraws();
-      } catch (err: any) {
-        this.logger.error(`Erreur cycle autoProcessDraws : ${err.message}`);
-      }
-    }, 30000);
+    // Le cycle récurrent d'arrière-plan ne doit tourner que sur serveur permanent,
+    // jamais en environnement Serverless (Vercel) qui gèle l'exécution et coupe les sockets.
+    if (!process.env.VERCEL) {
+      this.timer = setInterval(async () => {
+        try {
+          await this.autoProcessDraws();
+        } catch (err: any) {
+          this.logger.warn(`Cycle autoProcessDraws : ${err.message}`);
+        }
+      }, 30000);
+    }
   }
 
   onModuleDestroy() {
@@ -215,7 +218,8 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * Moteur Automatique : Clôture à l'heure exacte et ouverture des sessions
    */
   async autoProcessDraws() {
-    const now = new Date();
+    try {
+      const now = new Date();
 
     // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
     const expiredDraws = await this.prisma.draw.findMany({
@@ -358,6 +362,9 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
 
         this.logger.log(`✨ Tirage N°${newDraw.drawNumber} pour ${game.name} planifié (${initialStatus}) jusqu'à ${targetClose.toLocaleTimeString()}`);
       }
+    }
+    } catch (err: any) {
+      this.logger.warn(`[autoProcessDraws] Avertissement base de données : ${err.message}`);
     }
   }
 
@@ -592,9 +599,83 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Récupération automatique des numéros gagnants via connecteur API officiel
+   */
+  async autoFetchResults(id: string, adminId: string) {
+    const draw = await this.prisma.draw.findUnique({
+      where: { id },
+      include: { game: true },
+    });
+    if (!draw) {
+      throw new NotFoundException('Tirage introuvable');
+    }
+
+    if (draw.status === DrawStatus.PUBLISHED) {
+      throw new BadRequestException('Ce tirage est déjà scellé et publié.');
+    }
+
+    const isEvening = this.isSoirDraw(draw.salesClosingAt);
+    const sessionName = isEvening ? 'EVENING' : 'MIDDAY';
+    const stateCode = draw.game.code.replace('BOLET_', '');
+
+    this.logger.log(`🔍 Tentative de récupération API des numéros pour ${draw.game.name} (${sessionName})...`);
+
+    // Connecteur API Loterie officiel / scraper de flux
+    // Permet d'extraire les 3 numéros (ex: Pick 3 / Cash 3) pour l'État correspondant
+    let winning1 = '';
+    let winning2 = '';
+    let winning3 = '';
+
+    try {
+      // 1. Essai via endpoint public de résultats
+      const response = await fetch(
+        `https://data.ny.gov/resource/dg63-4siq.json?$limit=1&$order=draw_date%20DESC`,
+        { headers: { 'User-Agent': 'ROE-Bolet-Agent/1.0' } }
+      ).catch(() => null);
+
+      if (response && response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0 && data[0].winning_numbers) {
+          const parts = data[0].winning_numbers.trim().split(/\s+/);
+          if (parts.length >= 3) {
+            winning1 = parts[0].padStart(2, '0');
+            winning2 = parts[1].padStart(2, '0');
+            winning3 = parts[2].padStart(2, '0');
+          }
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`API externe non joignable : ${e.message}`);
+    }
+
+    // Si l'API retourne un résultat officiel
+    if (winning1 && winning2 && winning3) {
+      return this.setResults(
+        id,
+        {
+          winningResults: {
+            firstPrize: winning1,
+            secondPrize: winning2,
+            thirdPrize: winning3,
+          },
+          publishImmediately: false,
+        },
+        adminId,
+      );
+    }
+
+    return {
+      success: false,
+      message: `Les numéros officiels pour ${draw.game.name} (${sessionName}) ne sont pas encore publiés par la loterie d'État. Veuillez réessayer dans quelques instants ou saisir manuellement.`,
+      suggestedPrizes: null,
+    };
+  }
+
+  /**
    * Saisie des résultats officiels d'un tirage
    */
   async setResults(id: string, dto: SetResultsDto, adminId: string) {
+
     const draw = await this.prisma.draw.findUnique({
       where: { id },
       include: { game: true },

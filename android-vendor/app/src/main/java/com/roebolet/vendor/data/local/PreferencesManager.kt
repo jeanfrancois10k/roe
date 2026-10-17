@@ -78,4 +78,11 @@ class PreferencesManager(context: Context) {
     fun setServerUrl(url: String) {
         prefs.edit().putString(KEY_SERVER_URL, url).apply()
     }
+
+    fun getLanguage(): String = prefs.getString("app_language", "ht") ?: "ht"
+
+    fun setLanguage(langCode: String) {
+        prefs.edit().putString("app_language", langCode).apply()
+    }
 }
+

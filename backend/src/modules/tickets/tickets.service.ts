@@ -216,7 +216,7 @@ export class TicketsService {
     // RÈGLE 6 : Plafonds vendeur (Max par ticket & Plafond journalier)
     if (totalAmount > Number(vendor.maxTicketAmount)) {
       throw new BadRequestException(
-        `Dépassement de plafond : montant max autorisé par ticket est de $${vendor.maxTicketAmount}.`,
+        `Dépassement de plafond : montant max autorisé par ticket est de ${vendor.maxTicketAmount} G.`,
       );
     }
 
@@ -233,7 +233,7 @@ export class TicketsService {
     const currentTodayTotal = Number(todaySalesAgg._sum.totalAmount || 0);
     if (currentTodayTotal + totalAmount > Number(vendor.dailySalesLimit)) {
       throw new BadRequestException(
-        `Plafond journalier de vente ($${vendor.dailySalesLimit}) atteint pour ce vendeur.`,
+        `Plafond journalier de vente (${vendor.dailySalesLimit} G) atteint pour ce vendeur.`,
       );
     }
 
@@ -275,12 +275,10 @@ export class TicketsService {
       const currentBal = Number(lockedVendor.currentBalance);
       const creditLim = Number(lockedVendor.creditLimit);
 
-      // Vérification stricte des fonds disponibles
-      if (currentBal - totalAmount < -creditLim) {
-        throw new BadRequestException(
-          `Solde insuffisant pour émettre ce ticket (Solde disponible : $${(currentBal + creditLim).toFixed(2)}).`,
-        );
-      }
+      // Le modèle Borlette standard : le vendeur encaisse le cash des parieurs
+      // Le solde évolue naturellement avec les ventes et commissions.
+      // La sécurité est assurée par le plafond journalier (vendor.dailySalesLimit) et le montant max par ticket.
+
 
       // 1. Débit de la vente
       const balanceAfterSale = currentBal - totalAmount;

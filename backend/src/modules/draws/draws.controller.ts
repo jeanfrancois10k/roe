@@ -86,6 +86,18 @@ export class DrawsController {
     return this.drawsService.closeDraw(id, adminId);
   }
 
+  @Post(':id/auto-fetch')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async autoFetch(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.drawsService.autoFetchResults(id, adminId);
+  }
+
+
   @Post(':id/results')
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)

@@ -28,14 +28,17 @@ export class DrawEvaluatorService {
     gameRulesJson?: any,
   ): TicketEvaluationResult {
     const rules = gameRulesJson || {};
-    const multipliers = rules.multipliers || {
-      firstPrize: 50,
-      secondPrize: 20,
-      thirdPrize: 10,
-      mariage: 1000,
-      lot3: 500,
-      lot4: 5000,
+    const multipliers = {
+      firstPrize: rules.multipliers?.firstPrize ?? rules.borlette?.firstPrizeMultiplier ?? 50,
+      secondPrize: rules.multipliers?.secondPrize ?? rules.borlette?.secondPrizeMultiplier ?? 20,
+      thirdPrize: rules.multipliers?.thirdPrize ?? rules.borlette?.thirdPrizeMultiplier ?? 10,
+      mariage: rules.multipliers?.mariage ?? rules.mariage?.multiplier ?? 1000,
+      mariageGratis: rules.multipliers?.mariageGratis ?? rules.mariage?.mariageGratis ?? 1000,
+      lot3: rules.multipliers?.lot3 ?? rules.lot3?.multiplier ?? 500,
+      lot4: rules.multipliers?.lot4 ?? rules.lot4?.multiplier ?? 5000,
+      lot5: rules.multipliers?.lot5 ?? rules.lot5?.multiplier ?? 25000,
     };
+
 
     // Normalisation des tirages officiels
     const rawFirst = String(winningResults.firstPrize).trim();

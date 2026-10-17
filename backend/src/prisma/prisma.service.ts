@@ -9,9 +9,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$connect();
       this.logger.log('Connexion PostgreSQL établie avec succès.');
-    } catch (error) {
-      this.logger.error('Échec de la connexion PostgreSQL:', error);
-      throw error;
+    } catch (error: any) {
+      this.logger.warn(`Échec de la connexion PostgreSQL initiale : ${error.message}`);
+      // En environnement Serverless, ne pas bloquer l'initialisation du serveur;
+      // Prisma tentera automatiquement la connexion lors de la première requête.
+      if (!process.env.VERCEL) {
+        throw error;
+      }
     }
   }
 

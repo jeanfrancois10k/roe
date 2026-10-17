@@ -57,11 +57,15 @@ export default function DrawsPage() {
   const [createClosingTime, setCreateClosingTime] = useState('');
   const [createActionLoading, setCreateActionLoading] = useState(false);
 
-  // Modal de Paramétrage Permanent des Horaires par Loterie
+  // Modal de Paramétrage Permanent des Horaires & Multiplicateurs par Loterie
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedGameForSchedule, setSelectedGameForSchedule] = useState<any>(null);
   const [midiCloseTime, setMidiCloseTime] = useState('12:20');
   const [soirCloseTime, setSoirCloseTime] = useState('19:20');
+  const [firstLotMultiplier, setFirstLotMultiplier] = useState(50);
+  const [secondLotMultiplier, setSecondLotMultiplier] = useState(20);
+  const [thirdLotMultiplier, setThirdLotMultiplier] = useState(10);
+  const [mariageMultiplier, setMariageMultiplier] = useState(1000);
   const [scheduleSaveLoading, setScheduleSaveLoading] = useState(false);
 
   // Modal de Saisie des Résultats Gagnants
@@ -220,7 +224,7 @@ export default function DrawsPage() {
     }
   };
 
-  // Ouverture du modal de modification des horaires permanents d'une loterie
+  // Ouverture du modal de modification des horaires et multiplicateurs d'une loterie
   const handleOpenScheduleModal = (game: any) => {
     setSelectedGameForSchedule(game);
     const customSchedules = game.gameRules?.schedules;
@@ -243,10 +247,19 @@ export default function DrawsPage() {
       setMidiCloseTime(def.midi);
       setSoirCloseTime(def.soir);
     }
+
+    // Chargement des multiplicateurs configurés pour cette loterie
+    const rules = game.gameRules || {};
+    const mults = rules.multipliers || rules.borlette || {};
+    setFirstLotMultiplier(Number(mults.firstPrize || mults.firstPrizeMultiplier || 50));
+    setSecondLotMultiplier(Number(mults.secondPrize || mults.secondPrizeMultiplier || 20));
+    setThirdLotMultiplier(Number(mults.thirdPrize || mults.thirdPrizeMultiplier || 10));
+    setMariageMultiplier(Number(rules.mariage?.multiplier || 1000));
+
     setIsScheduleModalOpen(true);
   };
 
-  // Enregistrement permanent des nouveaux horaires dans la base de données
+  // Enregistrement permanent des nouveaux horaires et multiplicateurs dans la base de données
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGameForSchedule) return;
@@ -262,23 +275,42 @@ export default function DrawsPage() {
         { name: 'Soir', closeHour: sH, closeMinute: sM, drawHour: sH, drawMinute: (sM + 10) % 60 },
       ];
 
+      const updatedMultipliers = {
+        firstPrize: Number(firstLotMultiplier),
+        secondPrize: Number(secondLotMultiplier),
+        thirdPrize: Number(thirdLotMultiplier),
+        mariage: Number(mariageMultiplier),
+      };
+
       await api.patch(`/api/v1/games/${selectedGameForSchedule.id}`, {
         gameRules: {
           ...existingRules,
           schedules: updatedSchedules,
+          multipliers: updatedMultipliers,
+          borlette: {
+            firstPrizeMultiplier: Number(firstLotMultiplier),
+            secondPrizeMultiplier: Number(secondLotMultiplier),
+            thirdPrizeMultiplier: Number(thirdLotMultiplier),
+          },
+          mariage: {
+            ...existingRules.mariage,
+            multiplier: Number(mariageMultiplier),
+            mariageGratis: Number(mariageMultiplier),
+          },
         },
-        drawFrequency: `Midi ${midiCloseTime} & Soir ${soirCloseTime}`,
+        drawFrequency: `Midi ${midiCloseTime} & Soir ${soirCloseTime} (1er: x${firstLotMultiplier}, 2e: x${secondLotMultiplier}, 3e: x${thirdLotMultiplier})`,
       });
 
       setIsScheduleModalOpen(false);
       fetchData();
-      alert(`✅ Horaires de clôture pour ${selectedGameForSchedule.name} enregistrés avec succès ! Ils restent actifs en permanence.`);
+      alert(`✅ Paramètres pour ${selectedGameForSchedule.name} (Horaires & Multiplicateurs 1er: x${firstLotMultiplier}, 2e: x${secondLotMultiplier}, 3e: x${thirdLotMultiplier}) enregistrés avec succès !`);
     } catch (err: any) {
-      alert(`Erreur enregistrement horaires : ${err.message}`);
+      alert(`Erreur enregistrement : ${err.message}`);
     } finally {
       setScheduleSaveLoading(false);
     }
   };
+
 
   // Création d'un nouveau tirage (avec heure pré-remplie automatiquement)
   const handleCreateDraw = async (e: React.FormEvent) => {
@@ -1149,6 +1181,42 @@ export default function DrawsPage() {
               </div>
             )}
 
+            {/* Bouton de Récupération Automatique via API */}
+            <div className="mb-4 p-3 rounded-2xl bg-roe-card/80 border border-roe-gold/30 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-roe-gold shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-white">Récupération Automatique API</p>
+                  <p className="text-[10px] text-roe-textMuted">Interroge les flux officiels de la loterie d'État</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setActionError(null);
+                    setResultActionLoading(true);
+                    const res = await api.post(`/api/v1/draws/${selectedDrawForResults.id}/auto-fetch`);
+                    if (res?.winningResults) {
+                      setFirstPrize(res.winningResults.firstPrize || '');
+                      setSecondPrize(res.winningResults.secondPrize || '');
+                      setThirdPrize(res.winningResults.thirdPrize || '');
+                    } else if (res?.message) {
+                      setActionError(res.message);
+                    }
+                  } catch (e: any) {
+                    setActionError(e.message || 'Impossible de joindre l’API officielle');
+                  } finally {
+                    setResultActionLoading(false);
+                  }
+                }}
+                disabled={resultActionLoading}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg text-xs font-extrabold hover:opacity-90 disabled:opacity-50 shrink-0"
+              >
+                {resultActionLoading ? 'Recherche...' : 'Remplir via API'}
+              </button>
+            </div>
+
             <form onSubmit={handleSaveResults} className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -1271,6 +1339,81 @@ export default function DrawsPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Multiplicateurs de Gains Personnalisables (1er, 2e, 3e lot) */}
+              <div className="p-4 rounded-2xl bg-roe-card border border-roe-gold/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-roe-gold uppercase tracking-wider">
+                    Multiplicateurs de Gains (Bòlèt)
+                  </span>
+                  <span className="text-[10px] text-roe-textMuted font-mono">Modifiable par l'Admin</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <label className="block text-[11px] font-bold text-roe-gold uppercase mb-1">
+                      1er Lot
+                    </label>
+                    <div className="flex items-center justify-center bg-roe-surface border border-roe-gold/50 rounded-xl px-2 py-1.5">
+                      <span className="text-xs font-bold text-roe-gold mr-1">X</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={firstLotMultiplier}
+                        onChange={(e) => setFirstLotMultiplier(Number(e.target.value))}
+                        className="w-12 text-center font-mono font-black text-sm bg-transparent text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-white uppercase mb-1">
+                      2e Lot
+                    </label>
+                    <div className="flex items-center justify-center bg-roe-surface border border-roe-border rounded-xl px-2 py-1.5">
+                      <span className="text-xs font-bold text-roe-textMuted mr-1">X</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={secondLotMultiplier}
+                        onChange={(e) => setSecondLotMultiplier(Number(e.target.value))}
+                        className="w-12 text-center font-mono font-black text-sm bg-transparent text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-white uppercase mb-1">
+                      3e Lot
+                    </label>
+                    <div className="flex items-center justify-center bg-roe-surface border border-roe-border rounded-xl px-2 py-1.5">
+                      <span className="text-xs font-bold text-roe-textMuted mr-1">X</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={thirdLotMultiplier}
+                        onChange={(e) => setThirdLotMultiplier(Number(e.target.value))}
+                        className="w-12 text-center font-mono font-black text-sm bg-transparent text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-roe-border/40 flex items-center justify-between">
+                  <span className="text-[11px] text-roe-textMuted font-bold">Maryaj (Multiplicateur) :</span>
+                  <div className="flex items-center bg-roe-surface border border-roe-border rounded-xl px-2.5 py-1">
+                    <span className="text-xs font-bold text-roe-textMuted mr-1">X</span>
+                    <input
+                      type="number"
+                      min={100}
+                      value={mariageMultiplier}
+                      onChange={(e) => setMariageMultiplier(Number(e.target.value))}
+                      className="w-16 text-center font-mono font-black text-xs bg-transparent text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
 
               <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-start gap-2">
                 <CheckCircle size={16} className="text-emerald-400 shrink-0 mt-0.5" />

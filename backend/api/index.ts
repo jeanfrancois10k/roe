@@ -1,3 +1,5 @@
+process.env.VERCEL = '1';
+
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
@@ -16,11 +18,15 @@ server.get('/', (req: any, res: any) => {
     version: '1.0.0',
     documentation: '/api/docs',
     health: '/api/v1/health',
+    environment: 'serverless-vercel',
+    timestamp: new Date().toISOString(),
   });
 });
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(server), {
+    logger: ['error', 'warn', 'log'],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -58,18 +64,39 @@ async function bootstrap() {
 }
 
 export default async function handler(req: Request, res: Response) {
+  // Réponse ultra-rapide pour health check à la racine sans cold start
+  if (req.url === '/' || req.url === '') {
+    return res.status(200).json({
+      platform: 'ROE BOLET - Transactional API',
+      status: 'ONLINE',
+      version: '1.0.0',
+      documentation: '/api/docs',
+      health: '/api/v1/health',
+      environment: 'serverless-vercel',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   try {
     if (!isAppInitialized) {
       await bootstrap();
       isAppInitialized = true;
     }
-    server(req, res);
+
+    return new Promise((resolve, reject) => {
+      res.on('finish', resolve);
+      res.on('close', resolve);
+      res.on('error', reject);
+      server(req, res);
+    });
   } catch (error: any) {
     console.error('Fatal Serverless bootstrap error:', error);
-    res.status(500).json({
-      statusCode: 500,
-      message: 'Erreur d’initialisation du serveur d’API Serverless.',
-      error: error?.message || String(error),
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Erreur d’initialisation du serveur d’API Serverless.',
+        error: error?.message || String(error),
+      });
+    }
   }
 }
