@@ -71,9 +71,31 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
-  logger.log(`🚀 Serveur ROE BOLET en ligne sur : http://localhost:${port}`);
-  logger.log(`📖 Documentation Swagger disponible sur : http://localhost:${port}/api/docs`);
+  if (!process.env.VERCEL) {
+    await app.listen(port);
+    logger.log(`🚀 Serveur ROE BOLET en ligne sur : http://localhost:${port}`);
+    logger.log(`📖 Documentation Swagger disponible sur : http://localhost:${port}/api/docs`);
+  } else {
+    await app.init();
+  }
+
+  return app;
 }
 
-bootstrap();
+let appPromise: any = null;
+
+if (!process.env.VERCEL) {
+  bootstrap();
+}
+
+export default async function handler(req: any, res: any) {
+  if (!appPromise) {
+    appPromise = bootstrap();
+  }
+  const app = await appPromise;
+  const server = app.getHttpAdapter().getInstance();
+  server(req, res);
+}
+
+export { bootstrap };
+
