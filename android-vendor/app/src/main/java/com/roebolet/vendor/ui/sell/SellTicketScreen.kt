@@ -11,7 +11,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -46,6 +49,7 @@ import com.roebolet.vendor.data.api.VendorTicketItem
 import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
+import com.roebolet.vendor.util.Barcode128View
 import com.roebolet.vendor.util.Strings
 
 data class LineItem(
@@ -986,63 +990,284 @@ fun SellTicketScreen(
                 onDismissReceipt()
             },
             containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
             title = {
-                Text(
-                    text = if (soldTicketResults.size == 1) "FICH LA ENPRIME AK SIKSE !" else "${soldTicketResults.size} FICH ENPRIME AK SIKSE !",
-                    color = Color(0xFF2E7D32),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Black
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (soldTicketResults.size == 1) "FICH LA ENPRIME AK SIKSE !" else "${soldTicketResults.size} FICH ENPRIME AK SIKSE !",
+                            color = Color(0xFF2E7D32),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = if (isCreole) "Tikè ofisyèl ki anrejistre sou sèvè a" else "Tickets officiels enregistrés sur le serveur",
+                            color = Color.Gray,
+                            fontSize = 11.sp
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            clearAllLines()
+                            onDismissReceipt()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Fèmen", tint = Color.Gray)
+                    }
+                }
             },
             text = {
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .heightIn(max = 480.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(text = "ROE BOLET OFISYÈL", color = TopBarPurple, fontWeight = FontWeight.Black, fontSize = 16.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    soldTicketResults.forEach { ticket ->
+                    items(soldTicketResults) { ticket ->
                         Surface(
-                            color = Color(0xFFF5F5F5),
+                            color = Color.White,
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(8.dp)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // 1. Logo & En-tête Loterie
+                                Text(text = "🌙", fontSize = 26.sp)
                                 Text(
-                                    text = ticket.ticketNumber,
+                                    text = lotteryHeaderNote,
+                                    color = Color(0xFF616161),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = lotteryName.uppercase(),
                                     color = Color.Black,
                                     fontWeight = FontWeight.Black,
-                                    fontSize = 14.sp,
+                                    fontSize = 15.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                if (lotterySlogan.isNotEmpty()) {
+                                    Text(
+                                        text = lotterySlogan,
+                                        color = Color(0xFF424242),
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Text(
+                                    text = if (lotteryBankRef.isNotEmpty()) "$lotteryBankRef • Tel: $lotteryPhone" else "Tel: $lotteryPhone",
+                                    color = Color(0xFF616161),
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = "POS: ${ticket.vendorCode ?: deviceUuid.take(16)}",
+                                    color = Color(0xFF757575),
+                                    fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = "Montan : ${String.format("%.2f", ticket.totalAmount)} HTG", color = Color(0xFF6236FF), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text(text = "Siyati : ${ticket.secureChecksum.take(8)}...", color = Color.Gray, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                val ticketDate = ticket.createdAt?.take(19)?.replace("T", " ")
+                                    ?: java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                                Text(
+                                    text = "Dat & Lè: $ticketDate",
+                                    color = Color(0xFF212121),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "********************************",
+                                    color = Color(0xFFBDBDBD),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                // 2. Nom du Tirage & Fiche N°
+                                Text(
+                                    text = ticket.gameName ?: "TIRAJ OFISYÈL",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = "#Ticket: ${ticket.ticketNumber}",
+                                    color = Color.Black,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Black
+                                )
+
+                                Text(
+                                    text = "********************************",
+                                    color = Color(0xFFBDBDBD),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+
+                                // 3. Grilles jouées
+                                val gridsToDisplay = ticket.playedGrids ?: getAllValidGrids()
+                                val regularGrids = gridsToDisplay.filter { it.isGratis != true }
+                                val gratisGrids = gridsToDisplay.filter { it.isGratis == true }
+
+                                regularGrids.forEach { g ->
+                                    val gameLabel = when ((g.gameType ?: "BORLETTE").uppercase()) {
+                                        "MARIAGE", "MAR" -> "Mariage"
+                                        "LOTTO3", "L3" -> "Lotto 3"
+                                        "LOTTO4", "L4" -> "Lotto 4"
+                                        "LOTTO5", "L5" -> "Lotto 5"
+                                        else -> "Borlette"
+                                    }
+                                    val separator = if (g.gameType?.contains("MAR", true) == true) "*" else "-"
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 1.5.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "$gameLabel  ${g.numbers.joinToString(separator)}",
+                                            color = Color.Black,
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${String.format("%.0f", g.betAmount)} HTG",
+                                            color = Color.Black,
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Black
+                                        )
+                                    }
                                 }
+
+                                if (gratisGrids.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Mariage Gratuit",
+                                        color = Color(0xFF424242),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp
+                                    )
+                                    gratisGrids.forEach { g ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 1.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Mariage  ${g.numbers.joinToString("*")}",
+                                                color = Color(0xFF616161),
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "xxxx HTG",
+                                                color = Color(0xFF757575),
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "********************************",
+                                    color = Color(0xFFBDBDBD),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                // 4. Total
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = "TOTAL", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                                    Text(
+                                        text = "${String.format("%.0f", ticket.totalAmount)} HTG",
+                                        color = Color.Black,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+
+                                Text(
+                                    text = "********************************",
+                                    color = Color(0xFFBDBDBD),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // 5. Code-barres scannable officiel Code 128
+                                Barcode128View(
+                                    code = ticket.ticketNumber,
+                                    height = 42.dp,
+                                    showCodeText = true
+                                )
+                                Text(
+                                    text = "Siyati : ${(ticket.secureChecksum).take(22)}...",
+                                    color = Color.Gray,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // 6. Mentions légales & Footer
+                                Text(
+                                    text = lotteryFooterNote,
+                                    color = Color(0xFF424242),
+                                    fontSize = 9.sp,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (lotteryMariageGratis.isNotEmpty()) {
+                                    Text(
+                                        text = lotteryMariageGratis,
+                                        color = Color(0xFF2E7D32),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                                Text(
+                                    text = lotteryProvider,
+                                    color = Color(0xFF757575),
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Total Peye : ${String.format("%.2f", totalSoldAmount)} HTG",
-                        color = Color.Black,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 15.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (isCreole) "Tikè sa yo anrejistre epi sele sou sèvè a." else "Ces tickets sont enregistrés et scellés sur le serveur.",
-                        color = Color.Gray,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center
-                    )
                 }
             },
             confirmButton = {
@@ -1052,9 +1277,16 @@ fun SellTicketScreen(
                         onDismissReceipt()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = TopBarPurple),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (isCreole) "FÈ YON LÒT FICH" else "FAIRE UN AUTRE TICKET", color = Color.White, fontWeight = FontWeight.Black)
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        if (isCreole) "FÈ YON LÒT FICH" else "FAIRE UN AUTRE TICKET",
+                        color = Color.White,
+                        fontWeight = FontWeight.Black
+                    )
                 }
             }
         )
@@ -1135,11 +1367,13 @@ fun SellTicketScreen(
                             fontFamily = FontFamily.Monospace
                         )
                     }
-                    val nowFormatted = java.text.SimpleDateFormat("yyyy/MM/dd   hh:mm a", java.util.Locale.US).format(java.util.Date())
+                    val nowFormatted = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
                     Text(
-                        text = "Date: $nowFormatted",
-                        color = Color(0xFF757575),
-                        fontSize = 10.sp
+                        text = "Dat & Lè: $nowFormatted",
+                        color = Color(0xFF212121),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1282,6 +1516,20 @@ fun SellTicketScreen(
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Code-barres scannable officiel Code 128 (Aperçu)
+                    Barcode128View(
+                        code = "ROE-${java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())}-PREVIEW",
+                        height = 42.dp,
+                        showCodeText = true
+                    )
+                    Text(
+                        text = if (isCreole) "Apèsi kòd-bar avan enpresyon" else "Aperçu code-barres avant impression",
+                        color = Color.Gray,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
                     )
                     Spacer(modifier = Modifier.height(4.dp))
 

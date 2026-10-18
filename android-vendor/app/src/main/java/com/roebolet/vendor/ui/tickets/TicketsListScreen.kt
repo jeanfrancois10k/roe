@@ -34,6 +34,7 @@ import com.roebolet.vendor.data.api.VendorTicketItem
 import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
+import com.roebolet.vendor.util.Barcode128View
 import com.roebolet.vendor.util.Strings
 
 @Composable
@@ -558,8 +559,14 @@ fun TicketsListScreen(
                         Text(text = previewTicket.ticketNumber, color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Black)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Dat / Lè :", color = Color(0xFF616161), fontSize = 11.sp)
-                        Text(text = previewTicket.createdAt.take(19).replace("T", " "), color = Color.Black, fontSize = 11.sp)
+                        Text(text = "Dat & Lè :", color = Color(0xFF616161), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = previewTicket.createdAt.take(19).replace("T", " "),
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
 
                     // Info Tirage
@@ -683,15 +690,13 @@ fun TicketsListScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Code-barres simulé thermique
-                    Text(
-                        text = "||| | |||| | |||||| || | |||| ||| |||||||",
-                        color = Color.Black,
-                        fontSize = 18.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 2.sp
+                    // Code-barres scannable officiel Code 128
+                    Barcode128View(
+                        code = previewTicket.ticketNumber,
+                        height = 42.dp,
+                        showCodeText = true
                     )
                     Text(
                         text = "Siyati : ${(previewTicket.secureChecksum ?: previewTicket.ticketNumber).take(20)}...",
@@ -830,9 +835,11 @@ fun TicketsListScreen(
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "Date: ${reprintTicket.createdAt.take(19).replace("T", " ")}",
-                        color = Color(0xFF757575),
-                        fontSize = 10.sp
+                        text = "Dat & Lè: ${reprintTicket.createdAt.take(19).replace("T", " ")}",
+                        color = Color(0xFF212121),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -972,12 +979,11 @@ fun TicketsListScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    Text(
-                        text = "||| | |||| | |||||| || | |||| ||| |||||||",
-                        color = Color.Black,
-                        fontSize = 16.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 2.sp
+                    // Code-barres scannable officiel Code 128
+                    Barcode128View(
+                        code = reprintTicket.ticketNumber,
+                        height = 42.dp,
+                        showCodeText = true
                     )
                     Text(
                         text = "Siyati : ${(reprintTicket.secureChecksum ?: reprintTicket.ticketNumber).take(22)}...",

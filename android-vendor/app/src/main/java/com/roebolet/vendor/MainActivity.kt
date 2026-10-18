@@ -550,7 +550,13 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     if (successfulSales.isNotEmpty()) {
-                                        balance += totalCharged
+                                        val lastSale = successfulSales.lastOrNull()
+                                        if (lastSale?.newBalance != null) {
+                                            balance = lastSale.newBalance!!
+                                        } else {
+                                            val defaultComm = totalCharged * 0.05
+                                            balance -= (totalCharged - defaultComm)
+                                        }
                                         prefs.updateBalance(balance)
                                         soldTicketResults = successfulSales
                                         fetchVendorTickets()
@@ -822,13 +828,26 @@ class MainActivity : ComponentActivity() {
                                         if (syncRes != null) {
                                             balance = syncRes.delta.vendorBalance
                                             prefs.updateBalance(balance)
+                                            fetchOpenDraws()
+                                            fetchVendorTickets()
                                             Toast.makeText(
                                                 this@MainActivity,
                                                 if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE) "✅ Senkwonize : ${syncRes.summary.success} fich valide" else "✅ Synchronisé : ${syncRes.summary.success} validés",
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         } else {
-                                            Toast.makeText(this@MainActivity, if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE) "Fini (Pa gen anyen pou senkwonize)" else "Terminé (Rien à synchroniser)", Toast.LENGTH_SHORT).show()
+                                            try {
+                                                val ctrlRes = apiService.getControlSummary("Bearer $token")
+                                                if (ctrlRes.isSuccessful && ctrlRes.body() != null) {
+                                                    balance = ctrlRes.body()!!.currentBalance
+                                                    prefs.updateBalance(balance)
+                                                }
+                                                fetchOpenDraws()
+                                                fetchVendorTickets()
+                                                Toast.makeText(this@MainActivity, if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE) "✅ Done senkwonize avèk siksè" else "✅ Données synchronisées avec succès", Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(this@MainActivity, if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE) "Fini (Pa gen anyen pou senkwonize)" else "Terminé (Rien à synchroniser)", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     }
                                 }

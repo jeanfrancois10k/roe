@@ -147,9 +147,16 @@ data class SellTicketResponse(
     @SerializedName("id") val id: String? = null,
     @SerializedName("ticketNumber") val rawTicketNumber: String? = null,
     @SerializedName("secureChecksum") val rawChecksum: String? = null,
+    @SerializedName("gameName") val gameName: String? = null,
+    @SerializedName("drawNumber") val drawNumber: Any? = null,
+    @SerializedName("scheduledAt") val scheduledAt: String? = null,
     @SerializedName("totalAmount") val rawTotalAmount: Double? = null,
     @SerializedName("status") val status: String? = "CONFIRMED",
     @SerializedName("createdAt") val createdAt: String? = null,
+    @SerializedName("newBalance") val newBalance: Double? = null,
+    @SerializedName("playedGrids") val playedGrids: List<BetGrid>? = null,
+    @SerializedName("vendorCode") val vendorCode: String? = null,
+    @SerializedName("posAddress") val posAddress: String? = null,
     @SerializedName("ticket") val nestedTicket: NestedTicketInfo? = null
 ) {
     val ticketNumber: String
