@@ -45,7 +45,7 @@ export class TicketsService {
       this.configService.get<string>('HMAC_TICKET_SECRET') ||
       'roe_bolet_hmac_ticket_checksum_salt_998877';
     this.cancellationWindowMinutes =
-      Number(this.configService.get<number>('CANCELLATION_WINDOW_MINUTES')) || 5;
+      Number(this.configService.get<number>('CANCELLATION_WINDOW_MINUTES')) || 30;
   }
 
   private generateChecksum(ticketNumber: string, amount: number, drawId: string): string {
@@ -491,7 +491,7 @@ export class TicketsService {
     if (query.gameId) where.gameId = query.gameId;
     if (query.status) where.status = query.status;
     if (query.payoutStatus) where.payoutStatus = query.payoutStatus;
-    if (query.search) where.ticketNumber = { contains: query.search };
+    if (query.search) where.ticketNumber = { contains: query.search, mode: 'insensitive' };
 
     const [total, items] = await Promise.all([
       this.prisma.ticket.count({ where }),
@@ -500,9 +500,9 @@ export class TicketsService {
         skip,
         take: limit,
         include: {
-          game: { select: { code: true, name: true } },
-          draw: { select: { drawNumber: true, scheduledAt: true } },
-          vendor: { select: { vendorCode: true, fullName: true } },
+          game: { select: { id: true, code: true, name: true } },
+          draw: { select: { id: true, drawNumber: true, scheduledAt: true, salesClosingAt: true, status: true } },
+          vendor: { select: { vendorCode: true, fullName: true, posAddress: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),

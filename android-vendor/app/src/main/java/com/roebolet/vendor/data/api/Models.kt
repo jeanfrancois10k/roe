@@ -198,7 +198,22 @@ data class VendorTicketItem(
     @SerializedName("payoutStatus") val payoutStatus: String? = "UNPAID",
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("game") val game: Map<String, Any>? = null,
-    @SerializedName("draw") val draw: Map<String, Any>? = null
+    @SerializedName("draw") val draw: Map<String, Any>? = null,
+    @SerializedName("secureChecksum") val secureChecksum: String? = null,
+    @SerializedName("playedGrids") val playedGrids: List<BetGrid>? = null,
+    @SerializedName("cancelledAt") val cancelledAt: String? = null,
+    @SerializedName("cancellationReason") val cancellationReason: String? = null
+)
+
+data class CancelTicketRequest(
+    @SerializedName("ticketId") val ticketId: String,
+    @SerializedName("reason") val reason: String = "Annulation demandée par le vendeur"
+)
+
+data class CancelTicketResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("message") val message: String,
+    @SerializedName("newBalance") val newBalance: Double? = null
 )
 
 data class TicketsListResponse(

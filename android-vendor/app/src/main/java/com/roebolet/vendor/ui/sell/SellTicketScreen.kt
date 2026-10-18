@@ -3,8 +3,10 @@ package com.roebolet.vendor.ui.sell
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -36,7 +38,10 @@ import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.data.api.BetGrid
 import com.roebolet.vendor.data.api.OpenDrawItem
 import com.roebolet.vendor.data.api.SellTicketResponse
+import com.roebolet.vendor.data.api.VendorTicketItem
 import com.roebolet.vendor.ui.theme.*
+import com.roebolet.vendor.util.AppLanguage
+import com.roebolet.vendor.util.Strings
 
 data class LineItem(
     val number: String = "",
@@ -45,7 +50,7 @@ data class LineItem(
     val isGratis: Boolean = false
 )
 
-private val TopBarPurple = Color(0xFF6236FF) // Violet vibrant correspondant à la photo
+private val TopBarPurple = Color(0xFF6236FF)
 private val TabBarPurple = Color(0xFF6236FF)
 private val BodyBg = Color(0xFFECEFF1)
 private val LineDividerColor = Color(0xFF9E9E9E)
@@ -58,18 +63,29 @@ fun SellTicketScreen(
     isLoadingDraws: Boolean,
     isSubmitting: Boolean,
     errorMessage: String?,
-    soldTicketResult: SellTicketResponse?,
+    soldTicketResults: List<SellTicketResponse>?,
+    currentLanguage: AppLanguage = AppLanguage.CREOLE,
+    initialTicketToReplay: VendorTicketItem? = null,
+    onResetReplay: () -> Unit = {},
     onBackClick: () -> Unit,
-    onSubmitTicket: (drawId: String, gameId: String, grids: List<BetGrid>) -> Unit,
+    onSubmitTicket: (selectedDraws: List<OpenDrawItem>, grids: List<BetGrid>) -> Unit,
     onDismissReceipt: () -> Unit
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val isCreole = currentLanguage == AppLanguage.CREOLE
 
-    // Sélection du tirage actif
-    var selectedDrawIndex by remember { mutableStateOf(0) }
+    // Sélection multi-tirages (1 ou plusieurs tirages en même temps)
+    var selectedDrawIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDrawPicker by remember { mutableStateOf(false) }
     var showOptionsMenu by remember { mutableStateOf(false) }
+
+    // Initialiser la sélection avec le premier tirage ouvert par défaut
+    LaunchedEffect(openDraws) {
+        if (selectedDrawIds.isEmpty() && openDraws.isNotEmpty()) {
+            selectedDrawIds = setOf(openDraws.first().id)
+        }
+    }
 
     // Onglets de jeu : BÒLET, LOTO 3, LOTO 4, LOTO 5, MARYAJ
     val tabs = listOf("BÒLET", "LOTO 3", "LOTO 4", "LOTO 5", "MARYAJ")
@@ -85,6 +101,81 @@ fun SellTicketScreen(
     val loto4Lines = remember { mutableStateListOf(*Array(10) { LineItem() }) }
     val loto5Lines = remember { mutableStateListOf(*Array(10) { LineItem() }) }
     val maryajLines = remember { mutableStateListOf(*Array(10) { LineItem() }) }
+
+    // Fonctions d'effacement
+    fun clearAllLines() {
+        for (i in 0 until 10) {
+            boletLines[i] = LineItem()
+            loto3Lines[i] = LineItem()
+            loto4Lines[i] = LineItem()
+            loto5Lines[i] = LineItem()
+            maryajLines[i] = LineItem()
+        }
+    }
+
+    // Gestion du Replay / Modification d'une fiche existante
+    LaunchedEffect(initialTicketToReplay) {
+        initialTicketToReplay?.let { ticket ->
+            clearAllLines()
+            var bIdx = 0
+            var l3Idx = 0
+            var l4Idx = 0
+            var l5Idx = 0
+            var mIdx = 0
+
+            ticket.playedGrids?.forEach { grid ->
+                val numStr = grid.numbers.joinToString(if (grid.gameType == "MARIAGE") "x" else "")
+                val amtStr = if (grid.isGratis == true) "" else grid.betAmount.toInt().toString()
+                val opt = grid.option ?: if (grid.isGratis == true) "GRATIS" else "TOUT"
+                val isGratis = grid.isGratis == true
+
+                when (grid.gameType) {
+                    "BORLETTE", "BOLET" -> {
+                        if (bIdx < 10) {
+                            boletLines[bIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                            bIdx++
+                        }
+                    }
+                    "LOTO3" -> {
+                        if (l3Idx < 10) {
+                            loto3Lines[l3Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                            l3Idx++
+                        }
+                    }
+                    "LOTO4" -> {
+                        if (l4Idx < 10) {
+                            loto4Lines[l4Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                            l4Idx++
+                        }
+                    }
+                    "LOTO5" -> {
+                        if (l5Idx < 10) {
+                            loto5Lines[l5Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                            l5Idx++
+                        }
+                    }
+                    "MARIAGE", "MARYAJ" -> {
+                        if (mIdx < 10) {
+                            maryajLines[mIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                            mIdx++
+                        }
+                    }
+                    else -> {
+                        if (bIdx < 10) {
+                            boletLines[bIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                            bIdx++
+                        }
+                    }
+                }
+            }
+            Toast.makeText(
+                context,
+                if (isCreole) "Fich ${ticket.ticketNumber} chaje pou rejoue. Ou ka modifye l !" else "Ticket ${ticket.ticketNumber} chargé pour rejouer.",
+                Toast.LENGTH_SHORT
+            ).show()
+            onResetReplay()
+        }
+    }
 
     // Liste active selon l'onglet courant
     val currentLines = when (selectedTabIndex) {
@@ -104,8 +195,12 @@ fun SellTicketScreen(
         else -> 5 // Maryaj (ex: "12x34" ou "1234")
     }
 
-    val currentDraw = openDraws.getOrNull(selectedDrawIndex)
-    val lotteryTitle = currentDraw?.let { "${it.game.name} - Bòlet" } ?: "Georgia - Bòlet"
+    val selectedDraws = openDraws.filter { selectedDrawIds.contains(it.id) }
+    val lotteryTitle = when {
+        selectedDraws.isEmpty() -> if (isCreole) "Chwazi Tiraj" else "Choisir Tirage"
+        selectedDraws.size == 1 -> "${selectedDraws.first().game.name} - Bòlet"
+        else -> if (isCreole) "${selectedDraws.size} Tiraj chwazi" else "${selectedDraws.size} Tirages sélectionnés"
+    }
 
     // Calcul du total global sur toutes les grilles saisies
     fun getAllValidGrids(): List<BetGrid> {
@@ -129,7 +224,7 @@ fun SellTicketScreen(
             }
         }
 
-        // 3. LOTO 4 (avec Options: TOUT, OP 1, OP 2, OP 3)
+        // 3. LOTO 4
         loto4Lines.forEach { line ->
             val num = line.number.trim()
             val amt = line.amount.toDoubleOrNull() ?: 0.0
@@ -140,15 +235,7 @@ fun SellTicketScreen(
                     "OP3", "OPTION3", "3" -> "OP3"
                     else -> "TOUT"
                 }
-                list.add(
-                    BetGrid(
-                        numbers = listOf(num),
-                        betAmount = amt,
-                        multiplier = 1,
-                        option = optClean,
-                        gameType = "LOTO4"
-                    )
-                )
+                list.add(BetGrid(numbers = listOf(num), betAmount = amt, multiplier = 1, option = optClean, gameType = "LOTO4"))
             }
         }
 
@@ -161,7 +248,7 @@ fun SellTicketScreen(
             }
         }
 
-        // 5. MARYAJ (avec Découpage 2 numéros, Options & Maryaj Gratis)
+        // 5. MARYAJ
         maryajLines.forEach { line ->
             val raw = line.number.trim()
             val isGratis = line.isGratis || line.option.uppercase().contains("GRATIS")
@@ -184,16 +271,7 @@ fun SellTicketScreen(
                     else -> if (isGratis) "GRATIS" else "TOUT"
                 }
 
-                list.add(
-                    BetGrid(
-                        numbers = parts,
-                        betAmount = amt,
-                        multiplier = 1,
-                        option = optClean,
-                        gameType = "MARIAGE",
-                        isGratis = isGratis
-                    )
-                )
+                list.add(BetGrid(numbers = parts, betAmount = amt, multiplier = 1, option = optClean, gameType = "MARIAGE", isGratis = isGratis))
             }
         }
 
@@ -201,36 +279,24 @@ fun SellTicketScreen(
     }
 
     val allGrids = getAllValidGrids()
-    val totalAmount = allGrids.sumOf { it.betAmount * (it.multiplier ?: 1) }
-
-    fun clearAllLines() {
-        for (i in 0 until 10) {
-            boletLines[i] = LineItem()
-            loto3Lines[i] = LineItem()
-            loto4Lines[i] = LineItem()
-            loto5Lines[i] = LineItem()
-            maryajLines[i] = LineItem()
-        }
-        defaultLoto4Option = "TOUT"
-        defaultMaryajOption = "TOUT"
-        Toast.makeText(context, "Fich la efase nèt", Toast.LENGTH_SHORT).show()
-    }
+    val unitTotalAmount = allGrids.sumOf { it.betAmount }
+    val drawMultiplier = selectedDraws.size.coerceAtLeast(1)
+    val grandTotalAmount = unitTotalAmount * drawMultiplier
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BodyBg)
     ) {
-        // 1. TOP APP BAR (Violet avec titre et boutons ✕, ✓, ⋮)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(TopBarPurple)
-                .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+        // 1. TOP BAR VIOLETTE
+        Surface(
+            color = TopBarPurple,
+            modifier = Modifier.fillMaxWidth()
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -244,7 +310,7 @@ fun SellTicketScreen(
                     Text(
                         text = lotteryTitle,
                         color = Color.White,
-                        fontSize = 19.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Icon(
@@ -278,11 +344,11 @@ fun SellTicketScreen(
                         onClick = {
                             val validGrids = getAllValidGrids()
                             if (validGrids.isEmpty()) {
-                                Toast.makeText(context, "Tanpri antre omwen yon niméwo ak montan", Toast.LENGTH_SHORT).show()
-                            } else if (currentDraw == null) {
-                                Toast.makeText(context, "Chwazi yon tiraj ouvè avan", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, if (isCreole) "Tanpri antre omwen yon nimewo ak montan" else "Entrez au moins un numéro et montant", Toast.LENGTH_SHORT).show()
+                            } else if (selectedDraws.isEmpty()) {
+                                Toast.makeText(context, if (isCreole) "Chwazi omwen yon tiraj ouvè" else "Choisissez au moins un tirage ouvert", Toast.LENGTH_SHORT).show()
                             } else {
-                                onSubmitTicket(currentDraw.id, currentDraw.game.id, validGrids)
+                                onSubmitTicket(selectedDraws, validGrids)
                             }
                         },
                         enabled = !isSubmitting,
@@ -323,7 +389,7 @@ fun SellTicketScreen(
                             onDismissRequest = { showOptionsMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Efase fich la (Vide)") },
+                                text = { Text(if (isCreole) "Efase fich la (Vide)" else "Vider la fiche") },
                                 onClick = {
                                     showOptionsMenu = false
                                     clearAllLines()
@@ -333,11 +399,55 @@ fun SellTicketScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Chanje Tiraj") },
+                                text = { Text(if (isCreole) "Chwazi Tiraj (Plizyè)" else "Sélectionner Tirages (Multi)") },
                                 onClick = {
                                     showOptionsMenu = false
                                     showDrawPicker = true
                                 }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // BARRE RAPIDE DE SÉLECTION MULTI-TIRAGES (CHIPS DÉFILANTS)
+        if (openDraws.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF512BD4))
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                openDraws.forEach { draw ->
+                    val isSelected = selectedDrawIds.contains(draw.id)
+                    Surface(
+                        color = if (isSelected) Color.White else Color(0x33FFFFFF),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.clickable {
+                            selectedDrawIds = if (isSelected) {
+                                if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
+                            } else {
+                                selectedDrawIds + draw.id
+                            }
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = TopBarPurple, modifier = Modifier.size(13.dp))
+                            }
+                            Text(
+                                text = "${draw.game.name} (${draw.drawNumber})",
+                                color = if (isSelected) TopBarPurple else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
                             )
                         }
                     }
@@ -352,15 +462,12 @@ fun SellTicketScreen(
             contentColor = Color.White,
             edgePadding = 8.dp,
             indicator = { tabPositions ->
-                if (selectedTabIndex < tabPositions.size) {
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                        color = Color.White,
-                        height = 3.dp
-                    )
-                }
-            },
-            divider = {}
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                    color = Color.White,
+                    height = 3.dp
+                )
+            }
         ) {
             tabs.forEachIndexed { index, tabName ->
                 Tab(
@@ -371,24 +478,22 @@ fun SellTicketScreen(
                             text = tabName,
                             fontSize = 13.sp,
                             fontWeight = if (selectedTabIndex == index) FontWeight.Black else FontWeight.Bold,
-                            color = if (selectedTabIndex == index) Color.White else Color.White.copy(alpha = 0.7f),
-                            letterSpacing = 0.5.sp
+                            color = if (selectedTabIndex == index) Color.White else Color.White.copy(alpha = 0.7f)
                         )
                     }
                 )
             }
         }
 
-        // Bannière Erreur si nécessaire
-        if (errorMessage != null) {
+        // Messages d'erreur éventuels
+        errorMessage?.let {
             Surface(
                 color = RoeDanger.copy(alpha = 0.15f),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(8.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, RoeDanger)
+                shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = errorMessage,
+                    text = it,
                     color = RoeDanger,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -397,172 +502,98 @@ fun SellTicketScreen(
             }
         }
 
-        // 2.5 BARRE DE SÉLECTION D'OPTIONS RAPIDE (Pour Loto 4 et Maryaj)
-        if (selectedTabIndex == 2) {
-            Surface(
-                color = Color.White,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp),
-                shadowElevation = 1.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Opsyon Lòt 4 :",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TopBarPurple
-                    )
-                    listOf("TOUT", "OP 1", "OP 2", "OP 3").forEach { opt ->
-                        val isSelected = defaultLoto4Option == opt
-                        Surface(
-                            color = if (isSelected) TopBarPurple else Color(0xFFF0F0F0),
-                            shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) TopBarPurple else Color(0xFFCCCCCC)
-                            ),
-                            modifier = Modifier.clickable {
-                                defaultLoto4Option = opt
-                                for (i in 0 until 10) {
-                                    loto4Lines[i] = loto4Lines[i].copy(option = opt)
-                                }
-                            }
-                        ) {
-                            Text(
-                                text = opt,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) Color.White else TextDarkColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        } else if (selectedTabIndex == 4) {
-            Surface(
-                color = Color.White,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp),
-                shadowElevation = 1.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "Opsyon :",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TopBarPurple
-                    )
-                    listOf("TOUT", "OP 1", "OP 2", "OP 3", "GRATIS").forEach { opt ->
-                        val isSelected = defaultMaryajOption == opt
-                        val isGratisOpt = opt == "GRATIS"
-                        val activeColor = if (isGratisOpt) Color(0xFF2E7D32) else TopBarPurple
-                        Surface(
-                            color = if (isSelected) activeColor else Color(0xFFF0F0F0),
-                            shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) activeColor else Color(0xFFCCCCCC)
-                            ),
-                            modifier = Modifier.clickable {
-                                defaultMaryajOption = opt
-                                for (i in 0 until 10) {
-                                    maryajLines[i] = maryajLines[i].copy(option = opt, isGratis = isGratisOpt)
-                                }
-                            }
-                        ) {
-                            Text(
-                                text = if (isGratisOpt) "🎁 GRATIS" else opt,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) Color.White else (if (isGratisOpt) Color(0xFF2E7D32) else TextDarkColor),
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. TABLEAU DE SAISIE DE FICHE : LIGNES [ Niméwo | Opsyon | Montan ] (Exactement comme dans la photo)
+        // 3. TABLEAU DES 10 LIGNES DE JEU
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             items(10) { rowIndex ->
                 val line = currentLines[rowIndex]
+                val isGratisRow = line.isGratis || line.option.uppercase().contains("GRATIS")
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // COLONNE 1 : Niméwo
+                    // Index (1., 2., 3., ... 10.)
+                    Text(
+                        text = "${rowIndex + 1}.",
+                        color = LineDividerColor,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(26.dp)
+                    )
+
+                    // Champ 1 : Numéro
                     Box(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .height(44.dp)
                     ) {
                         Column {
-                            BasicTextField(
-                                value = line.number,
-                                onValueChange = { newVal ->
-                                    val cleaned = newVal.filter { c -> c.isDigit() || c == 'x' || c == 'X' || c == '-' || c == ' ' }
-                                    if (cleaned.length <= maxDigits) {
-                                        currentLines[rowIndex] = line.copy(number = cleaned)
-                                    }
-                                },
-                                singleLine = true,
-                                textStyle = TextStyle(
-                                    color = TextDarkColor,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                ),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = if (selectedTabIndex == 4) KeyboardType.Text else KeyboardType.Number,
-                                    imeAction = ImeAction.Next
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onNext = { focusManager.moveFocus(FocusDirection.Right) }
-                                ),
-                                cursorBrush = SolidColor(TopBarPurple),
-                                decorationBox = { innerTextField ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp)
-                                    ) {
-                                        if (line.number.isEmpty()) {
-                                            Text(
-                                                text = if (selectedTabIndex == 4) "12 × 34" else "Niméwo",
-                                                color = PlaceholderColor,
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                BasicTextField(
+                                    value = line.number,
+                                    onValueChange = { newVal ->
+                                        val digits = newVal.filter { it.isDigit() || it == 'x' || it == 'X' || it == '-' || it == '*' }
+                                        if (digits.length <= maxDigits) {
+                                            currentLines[rowIndex] = line.copy(number = digits)
+                                            if (digits.length == maxDigits && rowIndex < 9) {
+                                                focusManager.moveFocus(FocusDirection.Right)
+                                            }
                                         }
-                                        innerTextField()
+                                    },
+                                    textStyle = TextStyle(
+                                        color = TextDarkColor,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = if (selectedTabIndex == 4) KeyboardType.Text else KeyboardType.Number,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onNext = { focusManager.moveFocus(FocusDirection.Right) }
+                                    ),
+                                    cursorBrush = SolidColor(TopBarPurple),
+                                    decorationBox = { innerTextField ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            if (line.number.isEmpty()) {
+                                                Text(
+                                                    text = when (selectedTabIndex) {
+                                                        0 -> "00"
+                                                        1 -> "000"
+                                                        2 -> "0000"
+                                                        3 -> "00000"
+                                                        else -> "12x34"
+                                                    },
+                                                    color = PlaceholderColor,
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
                                     }
-                                }
-                            )
-                            // Ligne de soulignement
+                                )
+                            }
                             HorizontalDivider(
                                 color = if (line.number.isNotEmpty()) TopBarPurple else LineDividerColor,
                                 thickness = 1.dp
@@ -570,83 +601,76 @@ fun SellTicketScreen(
                         }
                     }
 
-                    // BADGE OPSYON INTERACTIF (Pour Loto 4 et Maryaj)
+                    // Sélecteur d'Options pour LOTO 4 et MARYAJ
                     if (selectedTabIndex == 2 || selectedTabIndex == 4) {
-                        val isGratisRow = line.isGratis || line.option == "GRATIS"
-                        Surface(
-                            color = if (isGratisRow) Color(0xFF2E7D32).copy(alpha = 0.15f) else TopBarPurple.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(6.dp),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isGratisRow) Color(0xFF2E7D32) else TopBarPurple
-                            ),
+                        Box(
                             modifier = Modifier
+                                .width(68.dp)
+                                .height(38.dp)
                                 .clickable {
-                                    if (selectedTabIndex == 2) {
-                                        val next = when (line.option) {
-                                            "TOUT" -> "OP 1"
-                                            "OP 1" -> "OP 2"
-                                            "OP 2" -> "OP 3"
-                                            else -> "TOUT"
-                                        }
-                                        currentLines[rowIndex] = line.copy(option = next)
-                                    } else {
-                                        val next = when (line.option) {
-                                            "TOUT" -> "OP 1"
-                                            "OP 1" -> "OP 2"
-                                            "OP 2" -> "OP 3"
-                                            "OP 3" -> "GRATIS"
-                                            else -> "TOUT"
-                                        }
-                                        currentLines[rowIndex] = line.copy(option = next, isGratis = next == "GRATIS")
+                                    val nextOpt = when (line.option) {
+                                        "TOUT" -> "OP 1"
+                                        "OP 1" -> "OP 2"
+                                        "OP 2" -> "OP 3"
+                                        "OP 3" -> if (selectedTabIndex == 4) "GRATIS" else "TOUT"
+                                        "GRATIS" -> "TOUT"
+                                        else -> "TOUT"
                                     }
-                                }
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    val gratisFlag = nextOpt == "GRATIS"
+                                    currentLines[rowIndex] = line.copy(option = nextOpt, isGratis = gratisFlag)
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (isGratisRow) "🎁 GRATIS" else line.option,
-                                color = if (isGratisRow) Color(0xFF2E7D32) else TopBarPurple,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Surface(
+                                color = if (isGratisRow) Color(0xFF2E7D32).copy(alpha = 0.15f) else TopBarPurple.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isGratisRow) Color(0xFF2E7D32) else TopBarPurple
+                                )
+                            ) {
+                                Text(
+                                    text = line.option,
+                                    color = if (isGratisRow) Color(0xFF2E7D32) else TopBarPurple,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
 
-                    // COLONNE 2 : Montan
+                    // Champ 2 : Montant
                     Box(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .height(44.dp)
                     ) {
-                        val isGratisRow = line.isGratis || line.option == "GRATIS"
                         Column {
-                            if (isGratisRow) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "GRATIS (0 G)",
-                                        color = Color(0xFF2E7D32),
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            } else {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
                                 BasicTextField(
-                                    value = line.amount,
+                                    value = if (isGratisRow) "GRATIS" else line.amount,
                                     onValueChange = { newVal ->
-                                        val cleaned = newVal.filter { c -> c.isDigit() }
-                                        if (cleaned.length <= 6) {
-                                            currentLines[rowIndex] = line.copy(amount = cleaned)
+                                        if (!isGratisRow) {
+                                            val digits = newVal.filter { it.isDigit() }
+                                            if (digits.length <= 6) {
+                                                currentLines[rowIndex] = line.copy(amount = digits)
+                                            }
                                         }
                                     },
-                                    singleLine = true,
+                                    readOnly = isGratisRow,
                                     textStyle = TextStyle(
-                                        color = TextDarkColor,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        color = if (isGratisRow) Color(0xFF2E7D32) else TextDarkColor,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Black,
                                         fontFamily = FontFamily.Monospace
                                     ),
+                                    singleLine = true,
                                     keyboardOptions = KeyboardOptions(
                                         keyboardType = KeyboardType.Number,
                                         imeAction = if (rowIndex < 9) ImeAction.Next else ImeAction.Done
@@ -662,7 +686,7 @@ fun SellTicketScreen(
                                                 .fillMaxWidth()
                                                 .padding(vertical = 4.dp)
                                         ) {
-                                            if (line.amount.isEmpty()) {
+                                            if (line.amount.isEmpty() && !isGratisRow) {
                                                 Text(
                                                     text = "Montan",
                                                     color = PlaceholderColor,
@@ -675,7 +699,6 @@ fun SellTicketScreen(
                                     }
                                 )
                             }
-                            // Ligne de soulignement
                             HorizontalDivider(
                                 color = if (isGratisRow) Color(0xFF2E7D32) else if (line.amount.isNotEmpty()) TopBarPurple else LineDividerColor,
                                 thickness = 1.dp
@@ -708,12 +731,20 @@ fun SellTicketScreen(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = "${String.format("%.2f", totalAmount)} HTG",
+                        text = "${String.format("%.2f", grandTotalAmount)} HTG",
                         color = TopBarPurple,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace
                     )
+                    if (selectedDraws.size > 1) {
+                        Text(
+                            text = "${String.format("%.2f", unitTotalAmount)} G x ${selectedDraws.size} tiraj",
+                            color = Color(0xFF616161),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Row(
@@ -731,11 +762,11 @@ fun SellTicketScreen(
                         onClick = {
                             val validGrids = getAllValidGrids()
                             if (validGrids.isEmpty()) {
-                                Toast.makeText(context, "Tanpri antre omwen yon niméwo ak montan", Toast.LENGTH_SHORT).show()
-                            } else if (currentDraw == null) {
-                                Toast.makeText(context, "Chwazi yon tiraj ouvè avan", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, if (isCreole) "Tanpri antre omwen yon nimewo ak montan" else "Entrez au moins un numéro et montant", Toast.LENGTH_SHORT).show()
+                            } else if (selectedDraws.isEmpty()) {
+                                Toast.makeText(context, if (isCreole) "Chwazi omwen yon tiraj ouvè" else "Choisissez au moins un tirage ouvert", Toast.LENGTH_SHORT).show()
                             } else {
-                                onSubmitTicket(currentDraw.id, currentDraw.game.id, validGrids)
+                                onSubmitTicket(selectedDraws, validGrids)
                             }
                         },
                         enabled = allGrids.isNotEmpty() && !isSubmitting,
@@ -755,35 +786,58 @@ fun SellTicketScreen(
         }
     }
 
-    // Modal de sélection de tirage / loterie (Georgia, New York, Florida)
+    // Modal de sélection Multi-Tirages (Georgia, New York, Florida)
     if (showDrawPicker) {
         AlertDialog(
             onDismissRequest = { showDrawPicker = false },
             title = {
                 Text(
-                    text = "Chwazi yon Tiraj / Loterie",
+                    text = Strings.t("multi_draws_select", currentLanguage),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
             },
             text = {
                 if (openDraws.isEmpty()) {
-                    Text("Pa gen okenn tiraj ki ouvè pou kounye a.")
+                    Text(if (isCreole) "Pa gen okenn tiraj ki ouvè pou kounye a." else "Aucun tirage ouvert actuellement.")
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        openDraws.forEachIndexed { index, draw ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = {
+                                selectedDrawIds = openDraws.map { it.id }.toSet()
+                            }) {
+                                Text(if (isCreole) "Tout chwazi" else "Tout sélectionner", color = TopBarPurple, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            Text(
+                                text = "${selectedDrawIds.size} / ${openDraws.size}",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        openDraws.forEach { draw ->
+                            val isChecked = selectedDrawIds.contains(draw.id)
                             Surface(
-                                color = if (selectedDrawIndex == index) TopBarPurple.copy(alpha = 0.15f) else Color.Transparent,
+                                color = if (isChecked) TopBarPurple.copy(alpha = 0.12f) else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp),
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
-                                    if (selectedDrawIndex == index) TopBarPurple else Color(0xFFE0E0E0)
+                                    if (isChecked) TopBarPurple else Color(0xFFE0E0E0)
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        selectedDrawIndex = index
-                                        showDrawPicker = false
+                                        selectedDrawIds = if (isChecked) {
+                                            if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
+                                        } else {
+                                            selectedDrawIds + draw.id
+                                        }
                                     }
                             ) {
                                 Row(
@@ -797,18 +851,26 @@ fun SellTicketScreen(
                                         Text(
                                             text = draw.game.name,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (selectedDrawIndex == index) TopBarPurple else Color.Black
+                                            color = if (isChecked) TopBarPurple else Color.Black
                                         )
                                         Text(
-                                            text = "Tiraj N° ${draw.drawNumber}",
+                                            text = "Tiraj N° ${draw.drawNumber} • Clôture : ${draw.salesClosingAt.take(16).replace("T", " ")}",
                                             fontSize = 11.sp,
                                             color = Color.Gray
                                         )
                                     }
 
-                                    if (selectedDrawIndex == index) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = TopBarPurple)
-                                    }
+                                    Checkbox(
+                                        checked = isChecked,
+                                        onCheckedChange = { checked ->
+                                            selectedDrawIds = if (checked) {
+                                                selectedDrawIds + draw.id
+                                            } else {
+                                                if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
+                                            }
+                                        },
+                                        colors = CheckboxDefaults.colors(checkedColor = TopBarPurple)
+                                    )
                                 }
                             }
                         }
@@ -817,14 +879,15 @@ fun SellTicketScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showDrawPicker = false }) {
-                    Text("Fèmen", color = TopBarPurple)
+                    Text(if (isCreole) "Fèmen" else "Fermer", color = TopBarPurple, fontWeight = FontWeight.Bold)
                 }
             }
         )
     }
 
-    // Modal Reçu Ticket Vendu ("Fich la reyisi")
-    if (soldTicketResult != null) {
+    // Modal Reçu Ticket Vendu Multi-Tirages ("Fich yo reyisi")
+    if (!soldTicketResults.isNullOrEmpty()) {
+        val totalSoldAmount = soldTicketResults.sumOf { it.totalAmount }
         AlertDialog(
             onDismissRequest = {
                 clearAllLines()
@@ -833,7 +896,7 @@ fun SellTicketScreen(
             containerColor = Color.White,
             title = {
                 Text(
-                    text = "FICH LA ENPRIME AK SIKSE !",
+                    text = if (soldTicketResults.size == 1) "FICH LA ENPRIME AK SIKSE !" else "${soldTicketResults.size} FICH ENPRIME AK SIKSE !",
                     color = Color(0xFF2E7D32),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black
@@ -847,12 +910,47 @@ fun SellTicketScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(text = "ROE BOLET OFISYÈL", color = TopBarPurple, fontWeight = FontWeight.Black, fontSize = 16.sp)
-                    Text(text = soldTicketResult.ticketNumber, color = Color.Black, fontWeight = FontWeight.Black, fontSize = 15.sp, fontFamily = FontFamily.Monospace)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    soldTicketResults.forEach { ticket ->
+                        Surface(
+                            color = Color(0xFFF5F5F5),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Text(
+                                    text = ticket.ticketNumber,
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 14.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = "Montan : ${String.format("%.2f", ticket.totalAmount)} HTG", color = Color(0xFF6236FF), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(text = "Siyati : ${ticket.secureChecksum.take(8)}...", color = Color.Gray, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "Total Peye : ${String.format("%.2f", soldTicketResult.totalAmount)} HTG", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(text = "Siyati Sekirite : ${soldTicketResult.secureChecksum.take(16)}...", color = Color.Gray, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = "Tikè sa anrejistre epi sele sou sèvè a.", color = Color.Gray, fontSize = 11.sp, textAlign = TextAlign.Center)
+                    Text(
+                        text = "Total Peye : ${String.format("%.2f", totalSoldAmount)} HTG",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (isCreole) "Tikè sa yo anrejistre epi sele sou sèvè a." else "Ces tickets sont enregistrés et scellés sur le serveur.",
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
             },
             confirmButton = {
@@ -864,7 +962,7 @@ fun SellTicketScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = TopBarPurple),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("FÈ YON LÒT FICH", color = Color.White, fontWeight = FontWeight.Black)
+                    Text(if (isCreole) "FÈ YON LÒT FICH" else "FAIRE UN AUTRE TICKET", color = Color.White, fontWeight = FontWeight.Black)
                 }
             }
         )

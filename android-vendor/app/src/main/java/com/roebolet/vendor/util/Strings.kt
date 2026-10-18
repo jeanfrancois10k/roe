@@ -63,6 +63,19 @@ object Strings {
             "test_printer" -> if (ht) "TESTE ENPRIMANT" else "TESTER L'IMPRIMANTE THERMIQUE"
             "app_version" -> if (ht) "Vèsyon Lojisyèl" else "Version Logiciel"
 
+            // Tickets History, Preview, Replay, Cancel
+            "tickets_history" -> if (ht) "ISTORIK FICH YO" else "HISTORIQUE DES TICKETS"
+            "search_ticket" -> if (ht) "Chèche nimewo fich..." else "Rechercher un ticket..."
+            "preview_ticket" -> if (ht) "Wè Fich" else "Aperçu Fiche"
+            "replay_ticket" -> if (ht) "Rejoue / Modifye" else "Rejouer / Modifier"
+            "cancel_sale" -> if (ht) "Annile Fich" else "Annuler la Vente"
+            "confirm_cancel_title" -> if (ht) "Konfime Anilasyon" else "Confirmer l'annulation"
+            "confirm_cancel_msg" -> if (ht) "Èske ou vle annile fich sa a vre ? Lajan an ap remèt nan balans ou." else "Êtes-vous sûr de vouloir annuler ce ticket ? Le montant sera recrédité."
+            "cancel_success" -> if (ht) "Fich la annile avèk siksè !" else "Ticket annulé avec succès !"
+            "ticket_preview_title" -> if (ht) "APÈSI FICH VANT" else "APERÇU DE LA FICHE DE VENTE"
+            "multi_draws_select" -> if (ht) "Chwazi Tiraj (Ou ka chwazi plizyè)" else "Choisir les tirages (Multi-sélection)"
+            "selected_draws_count" -> if (ht) "tiraj chwazi" else "tirage(s) sélectionné(s)"
+
             else -> key
         }
     }

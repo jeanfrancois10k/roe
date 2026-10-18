@@ -117,11 +117,13 @@ class MainActivity : ComponentActivity() {
         var isLoadingDraws by remember { mutableStateOf(false) }
         var isSubmittingTicket by remember { mutableStateOf(false) }
         var sellTicketError by remember { mutableStateOf<String?>(null) }
-        var soldTicketResult by remember { mutableStateOf<SellTicketResponse?>(null) }
+        var soldTicketResults by remember { mutableStateOf<List<SellTicketResponse>?>(null) }
+        var replayTicket by remember { mutableStateOf<VendorTicketItem?>(null) }
 
         // État Historique & Tickets
         var vendorTickets by remember { mutableStateOf<List<VendorTicketItem>>(emptyList()) }
         var isLoadingTickets by remember { mutableStateOf(false) }
+        var isCancellingTicket by remember { mutableStateOf(false) }
 
         // État Résultats des Tirages
         var drawResults by remember { mutableStateOf<List<DrawResultItem>>(emptyList()) }
@@ -187,6 +189,37 @@ class MainActivity : ComponentActivity() {
                     // Erreur silencieuse
                 } finally {
                     isLoadingTickets = false
+                }
+            }
+        }
+
+        fun cancelTicket(ticketId: String) {
+            lifecycleScope.launch {
+                isCancellingTicket = true
+                try {
+                    val token = prefs.getAccessToken() ?: return@launch
+                    val res = apiService.cancelTicket("Bearer $token", CancelTicketRequest(ticketId = ticketId))
+                    if (res.isSuccessful && res.body() != null) {
+                        val body = res.body()!!
+                        Toast.makeText(this@MainActivity, body.message, Toast.LENGTH_LONG).show()
+                        if (body.newBalance != null) {
+                            balance = body.newBalance
+                            prefs.updateBalance(body.newBalance)
+                        }
+                        fetchVendorTickets()
+                    } else {
+                        val errBody = res.errorBody()?.string() ?: ""
+                        val msg = try {
+                            org.json.JSONObject(errBody).optString("message", "Erreur lors de l'annulation")
+                        } catch (e: Exception) {
+                            "Erreur lors de l'annulation (HTTP ${res.code()})"
+                        }
+                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Erreur réseau : ${e.localizedMessage ?: "Annulation impossible"}", Toast.LENGTH_LONG).show()
+                } finally {
+                    isCancellingTicket = false
                 }
             }
         }
@@ -308,41 +341,60 @@ class MainActivity : ComponentActivity() {
                         isLoadingDraws = isLoadingDraws,
                         isSubmitting = isSubmittingTicket,
                         errorMessage = sellTicketError,
-                        soldTicketResult = soldTicketResult,
+                        soldTicketResults = soldTicketResults,
+                        currentLanguage = currentLanguage,
+                        initialTicketToReplay = replayTicket,
+                        onResetReplay = { replayTicket = null },
                         onBackClick = {
                             currentScreen = "DASHBOARD"
                             sellTicketError = null
                         },
-                        onSubmitTicket = { drawId, gameId, grids ->
+                        onSubmitTicket = { targetDraws, grids ->
                             lifecycleScope.launch {
                                 isSubmittingTicket = true
                                 sellTicketError = null
                                 try {
                                     val token = prefs.getAccessToken() ?: return@launch
-                                    val idempotencyKey = UUID.randomUUID().toString()
-                                    val request = SellTicketRequest(
-                                        gameId = gameId,
-                                        drawId = drawId,
-                                        deviceUuid = deviceUuid,
-                                        idempotencyKey = idempotencyKey,
-                                        grids = grids
-                                    )
-                                    val response = apiService.sellTicket("Bearer $token", request)
-                                    if (response.isSuccessful && response.body() != null) {
-                                        val sold = response.body()!!
-                                        soldTicketResult = sold
-                                        balance += sold.totalAmount
-                                        prefs.updateBalance(balance)
-                                    } else {
-                                        val errBody = response.errorBody()?.string() ?: ""
-                                        sellTicketError = if (errBody.isNotEmpty()) {
-                                            try {
-                                                org.json.JSONObject(errBody).optString("message", errBody)
-                                            } catch (e: Exception) {
-                                                errBody
-                                            }
+                                    val successfulSales = mutableListOf<SellTicketResponse>()
+                                    var totalCharged = 0.0
+                                    var lastErr = ""
+
+                                    for (draw in targetDraws) {
+                                        val idempotencyKey = UUID.randomUUID().toString()
+                                        val request = SellTicketRequest(
+                                            gameId = draw.game.id,
+                                            drawId = draw.id,
+                                            deviceUuid = deviceUuid,
+                                            idempotencyKey = idempotencyKey,
+                                            grids = grids
+                                        )
+                                        val response = apiService.sellTicket("Bearer $token", request)
+                                        if (response.isSuccessful && response.body() != null) {
+                                            val sold = response.body()!!
+                                            successfulSales.add(sold)
+                                            totalCharged += sold.totalAmount
                                         } else {
-                                            "Erreur de vente (HTTP ${response.code()})"
+                                            val errBody = response.errorBody()?.string() ?: ""
+                                            lastErr = try {
+                                                org.json.JSONObject(errBody).optString("message", "Erreur de vente sur tirage ${draw.game.name}")
+                                            } catch (e: Exception) {
+                                                "Erreur sur tirage ${draw.game.name} (HTTP ${response.code()})"
+                                            }
+                                        }
+                                    }
+
+                                    if (successfulSales.isNotEmpty()) {
+                                        balance += totalCharged
+                                        prefs.updateBalance(balance)
+                                        soldTicketResults = successfulSales
+                                        fetchVendorTickets()
+                                    }
+
+                                    if (lastErr.isNotEmpty()) {
+                                        if (successfulSales.isEmpty()) {
+                                            sellTicketError = lastErr
+                                        } else {
+                                            Toast.makeText(this@MainActivity, "Tiraj ki echwe : $lastErr", Toast.LENGTH_LONG).show()
                                         }
                                     }
                                 } catch (e: Exception) {
@@ -353,7 +405,7 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onDismissReceipt = {
-                            soldTicketResult = null
+                            soldTicketResults = null
                         }
                     )
                 }
@@ -429,8 +481,21 @@ class MainActivity : ComponentActivity() {
                         title = "MES TICKETS VENDUS",
                         tickets = vendorTickets,
                         isLoading = isLoadingTickets,
+                        isCancelling = isCancellingTicket,
+                        currentLanguage = currentLanguage,
+                        vendorCode = vendorCode,
+                        vendorName = vendorName,
+                        deviceUuid = deviceUuid,
                         onBackClick = { currentScreen = "DASHBOARD" },
-                        onRefreshClick = { fetchVendorTickets() }
+                        onRefreshClick = { fetchVendorTickets() },
+                        onReplayTicket = { ticket ->
+                            replayTicket = ticket
+                            currentScreen = "SELL_TICKET"
+                            fetchOpenDraws()
+                        },
+                        onCancelTicket = { ticketId ->
+                            cancelTicket(ticketId)
+                        }
                     )
                 }
 
