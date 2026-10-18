@@ -224,6 +224,15 @@ export default function DrawsPage() {
     }
   };
 
+  // Informations officielles des horaires des loteries certifiées
+  const LOTTERY_SCHEDULE_INFO: Record<string, { midiClose: string; midiDraw: string; soirClose: string; soirDraw: string }> = {
+    BOLET_NY: { midiClose: '14:15', midiDraw: '14:30 (02:30 PM)', soirClose: '22:20', soirDraw: '22:30 (10:30 PM)' },
+    BOLET_FL: { midiClose: '13:15', midiDraw: '13:30 (01:30 PM)', soirClose: '21:30', soirDraw: '21:45 (09:45 PM)' },
+    BOLET_GA: { midiClose: '12:15', midiDraw: '12:29 (12:29 PM)', soirClose: '18:45', soirDraw: '18:59 (06:59 PM)' },
+    BOLET_TX: { midiClose: '13:15', midiDraw: '13:27 (01:27 PM)', soirClose: '18:45', soirDraw: '19:00 (07:00 PM)' },
+    BOLET_TN: { midiClose: '13:15', midiDraw: '13:28 (01:28 PM)', soirClose: '19:15', soirDraw: '19:28 (07:28 PM)' },
+  };
+
   // Ouverture du modal de modification des horaires et multiplicateurs d'une loterie
   const handleOpenScheduleModal = (game: any) => {
     setSelectedGameForSchedule(game);
@@ -236,16 +245,9 @@ export default function DrawsPage() {
         `${String(customSchedules[1].closeHour).padStart(2, '0')}:${String(customSchedules[1].closeMinute).padStart(2, '0')}`
       );
     } else {
-      const defaultSchedules: Record<string, { midi: string; soir: string }> = {
-        BOLET_NY: { midi: '12:20', soir: '19:20' },
-        BOLET_FL: { midi: '13:20', soir: '21:20' },
-        BOLET_GA: { midi: '12:20', soir: '18:50' },
-        BOLET_TX: { midi: '12:15', soir: '22:00' },
-        BOLET_TN: { midi: '12:15', soir: '18:15' },
-      };
-      const def = defaultSchedules[game.code] || { midi: '12:20', soir: '19:20' };
-      setMidiCloseTime(def.midi);
-      setSoirCloseTime(def.soir);
+      const def = LOTTERY_SCHEDULE_INFO[game.code] || { midiClose: '14:15', soirClose: '22:20' };
+      setMidiCloseTime(def.midiClose);
+      setSoirCloseTime(def.soirClose);
     }
 
     // Chargement des multiplicateurs configurés pour cette loterie
@@ -269,10 +271,25 @@ export default function DrawsPage() {
       const [mH, mM] = midiCloseTime.split(':').map(Number);
       const [sH, sM] = soirCloseTime.split(':').map(Number);
 
+      const midiDrawTotal = mH * 60 + mM + 15;
+      const soirDrawTotal = sH * 60 + sM + 10;
+
       const existingRules = selectedGameForSchedule.gameRules || {};
       const updatedSchedules = [
-        { name: 'Midi', closeHour: mH, closeMinute: mM, drawHour: mH, drawMinute: (mM + 10) % 60 },
-        { name: 'Soir', closeHour: sH, closeMinute: sM, drawHour: sH, drawMinute: (sM + 10) % 60 },
+        {
+          name: 'Midi',
+          closeHour: mH,
+          closeMinute: mM,
+          drawHour: Math.floor(midiDrawTotal / 60) % 24,
+          drawMinute: midiDrawTotal % 60,
+        },
+        {
+          name: 'Soir',
+          closeHour: sH,
+          closeMinute: sM,
+          drawHour: Math.floor(soirDrawTotal / 60) % 24,
+          drawMinute: soirDrawTotal % 60,
+        },
       ];
 
       const updatedMultipliers = {
@@ -535,9 +552,21 @@ export default function DrawsPage() {
                           </p>
                         </div>
                         <div>
-                          <span className="text-[10px] text-roe-textMuted uppercase">Horaires Fermeture</span>
+                          <span className="text-[10px] text-roe-textMuted uppercase">Horaires Clôture</span>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-roe-gold font-medium text-xs truncate">{game.drawFrequency || 'Midi & Soir'}</p>
+                            {(() => {
+                              const s = game.gameRules?.schedules;
+                              const label = Array.isArray(s) && s.length >= 2
+                                ? `Midi ${String(s[0].closeHour).padStart(2, '0')}:${String(s[0].closeMinute).padStart(2, '0')} · Soir ${String(s[1].closeHour).padStart(2, '0')}:${String(s[1].closeMinute).padStart(2, '0')}`
+                                : (LOTTERY_SCHEDULE_INFO[game.code]
+                                    ? `Midi ${LOTTERY_SCHEDULE_INFO[game.code].midiClose} · Soir ${LOTTERY_SCHEDULE_INFO[game.code].soirClose}`
+                                    : (game.drawFrequency || 'Midi & Soir'));
+                              return (
+                                <p className="text-roe-gold font-bold text-xs truncate" title={label}>
+                                  {label}
+                                </p>
+                              );
+                            })()}
                             <button
                               onClick={() => handleOpenScheduleModal(game)}
                               className="text-[10px] text-roe-textMuted hover:text-roe-gold underline shrink-0"
@@ -1334,7 +1363,9 @@ export default function DrawsPage() {
                     className="w-full text-center font-mono font-bold text-lg py-2 rounded-xl bg-roe-surface border border-roe-border text-white focus:outline-none focus:border-roe-gold"
                   />
                   <p className="text-[10px] text-roe-textMuted mt-1">
-                    Ex: 12:20 (Fermeture des ventes 10 min avant le tirage officiel de 12:30).
+                    {LOTTERY_SCHEDULE_INFO[selectedGameForSchedule.code]
+                      ? `Tirage officiel : ${LOTTERY_SCHEDULE_INFO[selectedGameForSchedule.code].midiDraw} (Clôture recommandée : ${LOTTERY_SCHEDULE_INFO[selectedGameForSchedule.code].midiClose})`
+                      : 'Fermeture des ventes avant le tirage officiel.'}
                   </p>
                 </div>
 
@@ -1350,7 +1381,9 @@ export default function DrawsPage() {
                     className="w-full text-center font-mono font-bold text-lg py-2 rounded-xl bg-roe-surface border border-roe-border text-white focus:outline-none focus:border-roe-gold"
                   />
                   <p className="text-[10px] text-roe-textMuted mt-1">
-                    Ex: 19:20 (Fermeture des ventes 10 min avant le tirage officiel de 19:30).
+                    {LOTTERY_SCHEDULE_INFO[selectedGameForSchedule.code]
+                      ? `Tirage officiel : ${LOTTERY_SCHEDULE_INFO[selectedGameForSchedule.code].soirDraw} (Clôture recommandée : ${LOTTERY_SCHEDULE_INFO[selectedGameForSchedule.code].soirClose})`
+                      : 'Fermeture des ventes avant le tirage officiel.'}
                   </p>
                 </div>
               </div>

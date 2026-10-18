@@ -249,6 +249,37 @@ class MainActivity : ComponentActivity() {
         }
 
         // Vérification automatique des mises à jour Over-The-Air (OTA)
+        var isCheckingUpdateManual by remember { mutableStateOf(false) }
+
+        fun checkUpdateManual() {
+            lifecycleScope.launch {
+                isCheckingUpdateManual = true
+                try {
+                    val updateRes = apiService.checkAppUpdate()
+                    if (updateRes.isSuccessful && updateRes.body() != null) {
+                        val info = updateRes.body()!!
+                        val currentVersionCode = 3
+                        if (info.latestVersionCode > currentVersionCode) {
+                            updateInfo = info
+                            showUpdateDialog = true
+                        } else {
+                            val msg = if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE)
+                                "Aplikasyon w lan ajou deja (v1.0.2)"
+                            else
+                                "Votre application est déjà à jour (v1.0.2)"
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(this@MainActivity, "Impossible de vérifier la mise à jour", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Erreur réseau : ${e.localizedMessage ?: "Vérification impossible"}", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isCheckingUpdateManual = false
+                }
+            }
+        }
+
         LaunchedEffect(isNetworkAvailable) {
             if (isNetworkAvailable) {
                 lifecycleScope.launch {
@@ -256,14 +287,12 @@ class MainActivity : ComponentActivity() {
                         val updateRes = apiService.checkAppUpdate()
                         if (updateRes.isSuccessful && updateRes.body() != null) {
                             val info = updateRes.body()!!
-                            // Version actuelle du code du terminal (versionCode = 2, v1.0.1)
-                            val currentVersionCode = 2
+                            val currentVersionCode = 3
                             if (info.latestVersionCode > currentVersionCode) {
                                 updateInfo = info
                                 showUpdateDialog = true
                             }
                         }
-
                     } catch (e: Exception) {
                         // Ignorer silencieusement si hors-ligne
                     }
@@ -441,7 +470,9 @@ class MainActivity : ComponentActivity() {
                         deviceUuid = deviceUuid,
                         isOnline = isNetworkAvailable,
                         currentLanguage = currentLanguage,
+                        isCheckingUpdate = isCheckingUpdateManual,
                         onLanguageChange = { handleLanguageChange(it) },
+                        onCheckUpdateClick = { checkUpdateManual() },
                         onBackClick = { currentScreen = "DASHBOARD" },
                         onSaveServerUrl = { newUrl ->
                             prefs.setServerUrl(newUrl)

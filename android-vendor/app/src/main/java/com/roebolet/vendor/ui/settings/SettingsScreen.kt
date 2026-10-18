@@ -29,7 +29,9 @@ fun SettingsScreen(
     deviceUuid: String,
     isOnline: Boolean,
     currentLanguage: AppLanguage = AppLanguage.CREOLE,
+    isCheckingUpdate: Boolean = false,
     onLanguageChange: (AppLanguage) -> Unit = {},
+    onCheckUpdateClick: () -> Unit = {},
     onBackClick: () -> Unit,
     onSaveServerUrl: (String) -> Unit
 ) {
@@ -289,12 +291,49 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(if (isHt) "Vèsyon Lojisyèl" else "Version Logiciel", color = RoeTextMuted, fontSize = 12.sp)
-                    Text("v1.0.1 (Production Certifiée)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("v1.0.2 (Production Certifiée)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Bouton de Vérification des Mises à Jour (OTA)
+        Button(
+            onClick = onCheckUpdateClick,
+            enabled = !isCheckingUpdate,
+            colors = ButtonDefaults.buttonColors(containerColor = RoeGold),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            if (isCheckingUpdate) {
+                CircularProgressIndicator(
+                    color = RoeBackground,
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isHt) "Vérifikasyon ap fèt..." else "Vérification en cours...",
+                    color = RoeBackground,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Black
+                )
+            } else {
+                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = RoeBackground)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isHt) "VERIFYE MIZAJOU APLIKASYON" else "VÉRIFIER LES MISES À JOUR",
+                    color = RoeBackground,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Bouton de Test Impression Ticket
         Button(
