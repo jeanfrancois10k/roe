@@ -35,7 +35,10 @@ import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
 import com.roebolet.vendor.util.Barcode128View
+import com.roebolet.vendor.util.DrawPeriodBadge
+import com.roebolet.vendor.util.LotteryLogoView
 import com.roebolet.vendor.util.Strings
+import com.roebolet.vendor.util.TicketReceiptUtil
 
 @Composable
 fun TicketsListScreen(
@@ -71,6 +74,7 @@ fun TicketsListScreen(
     val lotteryFooterNote = prefs.getLotteryFooterNote()
     val lotteryProvider = prefs.getLotteryProvider()
     val lotteryMariageGratis = prefs.getLotteryMariageGratis()
+    val lotteryLogoUrl = prefs.getLotteryLogoUrl()
 
     // Filtrage dynamique en temps réel (numéro de ticket ou numéro joué)
     val filteredTickets = remember(tickets, searchQuery, serverFoundTicket) {
@@ -527,19 +531,22 @@ fun TicketsListScreen(
                         .padding(horizontal = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // En-tête officiel de la fiche
+                    // En-tête officiel de la fiche avec Logo
+                    LotteryLogoView(logoUrl = lotteryLogoUrl)
                     Text(
-                        text = "ROE BOLET OFISYÈL",
+                        text = lotteryName.uppercase(),
                         color = Color(0xFF6236FF),
                         fontWeight = FontWeight.Black,
                         fontSize = 16.sp
                     )
-                    Text(
-                        text = "BÒLÈT NOU - GENYEN ASIRANS",
-                        color = Color(0xFF757575),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
-                    )
+                    if (lotterySlogan.isNotEmpty()) {
+                        Text(
+                            text = lotterySlogan,
+                            color = Color(0xFF757575),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
 
                     HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
@@ -569,12 +576,22 @@ fun TicketsListScreen(
                         )
                     }
 
-                    // Info Tirage
-                    val gameName = previewTicket.game?.get("name")?.toString() ?: "Loterie"
+                    // Info Tirage & Identification MIDI / SOIR
+                    val rawGameName = previewTicket.game?.get("name")?.toString() ?: "Loterie"
                     val drawNum = previewTicket.draw?.get("drawNumber")?.toString() ?: ""
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Tiraj :", color = Color(0xFF616161), fontSize = 11.sp)
-                        Text(text = "$gameName (Tiraj $drawNum)", color = Color(0xFF6236FF), fontSize = 11.sp, fontWeight = FontWeight.Black)
+                    val schedAt = previewTicket.draw?.get("scheduledAt")?.toString() ?: previewTicket.createdAt
+                    val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedAt)
+                    val drawPeriod = TicketReceiptUtil.getDrawPeriod(rawGameName, schedAt)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "Tiraj :", color = Color(0xFF616161), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(text = drawDisplayName, color = Color(0xFF6236FF), fontSize = 11.sp, fontWeight = FontWeight.Black)
+                            DrawPeriodBadge(period = drawPeriod)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -800,7 +817,7 @@ fun TicketsListScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Logo & En-tête Loterie (Identique à la fiche réelle)
-                    Text(text = "🌙", fontSize = 28.sp)
+                    LotteryLogoView(logoUrl = lotteryLogoUrl)
                     Text(
                         text = "*** DUPLICATA / KOPI RE-ENPRIME ***",
                         color = Color(0xFF0284C7),
@@ -851,14 +868,20 @@ fun TicketsListScreen(
                         fontWeight = FontWeight.Bold
                     )
 
-                    // Nom du Tirage & Fiche N°
+                    // Nom du Tirage & Identification MIDI / SOIR
+                    val rawGameName = reprintTicket.game?.get("name")?.toString() ?: "TIRAJ OFISYÈL"
+                    val drawNum = reprintTicket.draw?.get("drawNumber")
+                    val schedAt = reprintTicket.draw?.get("scheduledAt")?.toString() ?: reprintTicket.createdAt
+                    val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedAt)
+                    val drawPeriod = TicketReceiptUtil.getDrawPeriod(rawGameName, schedAt)
                     Text(
-                        text = reprintTicket.game?.get("name")?.toString() ?: "TIRAJ OFISYÈL",
+                        text = drawDisplayName,
                         color = Color.Black,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
+                    DrawPeriodBadge(period = drawPeriod)
                     Text(
                         text = "#Ticket: ${reprintTicket.ticketNumber}",
                         color = Color.Black,

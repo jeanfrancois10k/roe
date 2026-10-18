@@ -1,11 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const logger = new Logger('ROE_BOLET_BOOTSTRAP');
   const app = await NestFactory.create(AppModule);
+
+  // Support payload images/logos en base64 jusqu'à 10MB
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   // Validation globale des DTOs avec rejet strict des propriétés inconnues
   app.useGlobalPipes(

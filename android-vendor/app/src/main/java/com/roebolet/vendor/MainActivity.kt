@@ -475,7 +475,8 @@ class MainActivity : ComponentActivity() {
                                 headerNote = lot.ticketHeaderNote ?: "*** ORIGINAL FICHE ***",
                                 footerNote = lot.ticketFooterNote ?: "FICH SA VALAB SELMAN POU 90 JOU, FICHE PAYABLE AU PORTEUR",
                                 providerInfo = lot.ticketProviderInfo ?: "ROE-TECH",
-                                mariageGratuitNote = lot.mariageGratuitNote ?: "MARYAJ GRATIS 1500 GDES"
+                                mariageGratuitNote = lot.mariageGratuitNote ?: "MARYAJ GRATIS 1500 GDES",
+                                logoUrl = lot.logoUrl ?: ""
                             )
                         }
                     } catch (e: Exception) {

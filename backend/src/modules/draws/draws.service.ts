@@ -622,7 +622,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         if (Array.isArray(data) && data.length > 0 && data[0].winning_numbers) {
           const parts = data[0].winning_numbers.trim().split(/\s+/);
           if (parts.length >= 3) {
-            winning1 = parts[0].padStart(2, '0');
+            winning1 = parts[0].padStart(3, '0');
             winning2 = parts[1].padStart(2, '0');
             winning3 = parts[2].padStart(2, '0');
           }

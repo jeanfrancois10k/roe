@@ -14,9 +14,13 @@ import {
   AlertTriangle,
   RefreshCw,
   Save,
-  Coins,
   QrCode,
   Sparkles,
+  Image as ImageIcon,
+  Upload,
+  Trash2,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
@@ -45,6 +49,9 @@ export default function SettingsPage() {
 
   // Devise
   const [activeCurrency, setActiveCurrency] = useState('HTG');
+
+  // Période de prévisualisation du ticket (Midi vs Soir)
+  const [previewPeriod, setPreviewPeriod] = useState<'MIDI' | 'SOIR'>('MIDI');
 
   const fetchSettings = async () => {
     try {
@@ -249,6 +256,83 @@ export default function SettingsPage() {
                     className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
                   />
                 </div>
+
+                {/* Logo Officiel de la Borlette */}
+                <div className="pt-3 border-t border-roe-border/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <ImageIcon size={15} className="text-roe-gold" /> Logo Officiel de la Borlette
+                    </label>
+                    <span className="text-[11px] text-roe-textMuted">PNG, JPG, SVG, WebP (Max 5 Mo)</span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-3.5 bg-roe-dark/70 rounded-xl border border-roe-border/60">
+                    {/* Zone de prévisualisation du Logo */}
+                    <div className="w-20 h-20 rounded-xl bg-white/5 border border-dashed border-roe-border flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                      {logoUrl ? (
+                        <img
+                          src={logoUrl}
+                          alt="Logo Borlette"
+                          className="w-full h-full object-contain p-1"
+                        />
+                      ) : (
+                        <div className="text-center p-1">
+                          <span className="text-2xl">🌙</span>
+                          <span className="block text-[9px] text-roe-textMuted mt-0.5">Par défaut</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions d'upload et URL */}
+                    <div className="flex-1 w-full space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-roe-gold/15 hover:bg-roe-gold/25 text-roe-gold border border-roe-gold/40 text-xs font-bold cursor-pointer transition">
+                          <Upload size={14} />
+                          <span>Choisir un logo...</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert('L’image ne doit pas dépasser 5 Mo.');
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  const result = ev.target?.result as string;
+                                  if (result) setLogoUrl(result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+
+                        {logoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setLogoUrl('')}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition"
+                          >
+                            <Trash2 size={13} />
+                            <span>Supprimer</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <input
+                        type="url"
+                        placeholder="Ou collez une URL d'image directe (https://...)"
+                        value={logoUrl}
+                        onChange={(e) => setLogoUrl(e.target.value)}
+                        className="w-full bg-roe-dark border border-roe-border/70 rounded-lg px-3 py-2 text-xs text-white placeholder-roe-textMuted/60 focus:outline-none focus:border-roe-gold font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Carte 2 : En-tête & Pied de page Ticket Thermique */}
@@ -333,16 +417,49 @@ export default function SettingsPage() {
                 <span className="text-xs font-bold text-roe-gold uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles size={15} /> Aperçu Reçu Thermique POS
                 </span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-roe-card border border-roe-border text-roe-textMuted font-mono">
-                  Format 58mm / 80mm
-                </span>
+
+                {/* Switcher de Période (Midi vs Soir) */}
+                <div className="flex items-center bg-roe-surface rounded-xl p-0.5 border border-roe-border/60">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPeriod('MIDI')}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      previewPeriod === 'MIDI'
+                        ? 'bg-amber-400 text-black shadow'
+                        : 'text-roe-textMuted hover:text-white'
+                    }`}
+                  >
+                    <Sun size={12} /> MIDI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPeriod('SOIR')}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      previewPeriod === 'SOIR'
+                        ? 'bg-indigo-600 text-white shadow'
+                        : 'text-roe-textMuted hover:text-white'
+                    }`}
+                  >
+                    <Moon size={12} /> SOIR
+                  </button>
+                </div>
               </div>
 
-              {/* SIMULATEUR DE PAPIER THERMIQUE EXACT (Comme dans la photo de l'utilisateur) */}
+              {/* SIMULATEUR DE PAPIER THERMIQUE EXACT */}
               <div className="bg-[#f8f9fa] text-black font-mono text-xs p-5 rounded-2xl shadow-2xl border border-gray-300 relative select-none">
-                {/* Icône Croissant de Lune / Logo */}
+                {/* Logo Officiel ou Icône Croissant de Lune */}
                 <div className="text-center mb-2">
-                  <div className="text-3xl font-black">🌙</div>
+                  {logoUrl ? (
+                    <div className="flex justify-center mb-1.5">
+                      <img
+                        src={logoUrl}
+                        alt="Logo Borlette"
+                        className="max-h-16 max-w-[150px] object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-3xl font-black">🌙</div>
+                  )}
                   <div className="text-[11px] font-bold tracking-widest text-gray-700 mt-1">
                     {ticketHeaderNote || '*** ORIGINAL FICHE ***'}
                   </div>
@@ -358,8 +475,8 @@ export default function SettingsPage() {
                   <div className="text-[10px] text-gray-500">
                     POS: 0b274983f3351707
                   </div>
-                  <div className="text-[10px] text-gray-500">
-                    Date: {new Date().toISOString().slice(0, 10).replace(/-/g, '/')}  10h29 AM
+                  <div className="text-[10px] text-gray-700 font-bold">
+                    Dat & Lè: {new Date().toISOString().slice(0, 10)} {previewPeriod === 'MIDI' ? '13:45:00' : '20:15:00'}
                   </div>
                 </div>
 
@@ -367,12 +484,23 @@ export default function SettingsPage() {
                   ********************************
                 </div>
 
-                {/* Nom du Tirage */}
+                {/* Nom du Tirage avec Identification Claire MIDI / SOIR */}
                 <div className="text-center font-bold text-sm uppercase">
-                  New york midi
+                  NEW YORK - {previewPeriod}
                 </div>
-                <div className="text-center text-[11px] text-gray-600">
-                  #Ticket: 511666212356
+                <div className="flex justify-center my-1">
+                  <span
+                    className={`text-[10px] font-black px-2.5 py-0.5 rounded tracking-wider ${
+                      previewPeriod === 'MIDI'
+                        ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                        : 'bg-indigo-100 text-indigo-950 border border-indigo-300'
+                    }`}
+                  >
+                    [ TIRAJ {previewPeriod} ]
+                  </span>
+                </div>
+                <div className="text-center text-[11px] text-gray-600 font-bold">
+                  #Ticket: ROE-{new Date().toISOString().slice(0, 10).replace(/-/g, '')}-8B0677C9
                 </div>
 
                 <div className="text-center my-1.5 font-bold tracking-widest text-gray-400">

@@ -50,7 +50,10 @@ import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
 import com.roebolet.vendor.util.Barcode128View
+import com.roebolet.vendor.util.DrawPeriodBadge
+import com.roebolet.vendor.util.LotteryLogoView
 import com.roebolet.vendor.util.Strings
+import com.roebolet.vendor.util.TicketReceiptUtil
 
 data class LineItem(
     val number: String = "",
@@ -97,6 +100,7 @@ fun SellTicketScreen(
     val lotteryFooterNote = prefs.getLotteryFooterNote()
     val lotteryProvider = prefs.getLotteryProvider()
     val lotteryMariageGratis = prefs.getLotteryMariageGratis()
+    val lotteryLogoUrl = prefs.getLotteryLogoUrl()
 
     // Sélection multi-tirages (1 ou plusieurs tirages en même temps)
     var selectedDrawIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -506,8 +510,14 @@ fun SellTicketScreen(
                             if (isSelected) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = TopBarPurple, modifier = Modifier.size(13.dp))
                             }
+                            val drawPeriod = TicketReceiptUtil.getDrawPeriod(draw.game.name, draw.scheduledAt)
+                            val cleanGameName = draw.game.name
+                                .replace(Regex("(?i)\\s*\\(midi\\s*&\\s*soir\\)"), "")
+                                .replace(Regex("(?i)\\s*\\(midi\\)"), "")
+                                .replace(Regex("(?i)\\s*\\(soir\\)"), "")
+                                .trim()
                             Text(
-                                text = "${draw.game.name} (${draw.drawNumber})",
+                                text = "$cleanGameName ($drawPeriod #${draw.drawNumber})",
                                 color = if (isSelected) TopBarPurple else Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
@@ -1044,7 +1054,7 @@ fun SellTicketScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 // 1. Logo & En-tête Loterie
-                                Text(text = "🌙", fontSize = 26.sp)
+                                LotteryLogoView(logoUrl = lotteryLogoUrl)
                                 Text(
                                     text = lotteryHeaderNote,
                                     color = Color(0xFF616161),
@@ -1097,14 +1107,23 @@ fun SellTicketScreen(
                                     fontWeight = FontWeight.Bold
                                 )
 
-                                // 2. Nom du Tirage & Fiche N°
+                                // 2. Nom du Tirage & Identification MIDI / SOIR
+                                val schedOrCreated = ticket.scheduledAt ?: ticket.createdAt
+                                val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(
+                                    ticket.gameName,
+                                    ticket.drawNumber,
+                                    schedOrCreated
+                                )
+                                val drawPeriod = TicketReceiptUtil.getDrawPeriod(ticket.gameName, schedOrCreated)
+
                                 Text(
-                                    text = ticket.gameName ?: "TIRAJ OFISYÈL",
+                                    text = drawDisplayName,
                                     color = Color.Black,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.Black,
                                     fontSize = 13.sp,
                                     textAlign = TextAlign.Center
                                 )
+                                DrawPeriodBadge(period = drawPeriod)
                                 Text(
                                     text = "#Ticket: ${ticket.ticketNumber}",
                                     color = Color.Black,
@@ -1331,7 +1350,7 @@ fun SellTicketScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Logo & En-tête Loterie (Identique à la fiche Borlette réelle)
-                    Text(text = "🌙", fontSize = 28.sp)
+                    LotteryLogoView(logoUrl = lotteryLogoUrl)
                     Text(
                         text = lotteryHeaderNote,
                         color = Color(0xFF616161),
@@ -1385,15 +1404,22 @@ fun SellTicketScreen(
                         fontWeight = FontWeight.Bold
                     )
 
-                    // Nom du ou des Tirages
+                    // Nom du ou des Tirages avec Identification MIDI / SOIR
                     selectedDraws.forEach { d ->
+                        val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(
+                            d.game.name,
+                            d.drawNumber,
+                            d.scheduledAt
+                        )
+                        val drawPeriod = TicketReceiptUtil.getDrawPeriod(d.game.name, d.scheduledAt)
                         Text(
-                            text = d.game.name,
+                            text = drawDisplayName,
                             color = Color.Black,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
                         )
+                        DrawPeriodBadge(period = drawPeriod)
                     }
 
                     Text(

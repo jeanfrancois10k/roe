@@ -200,6 +200,7 @@ data class DrawResultItem(
     @SerializedName("drawNumber") val drawNumber: Int,
     @SerializedName("gameCode") val gameCode: String,
     @SerializedName("gameName") val gameName: String,
+    @SerializedName("scheduledAt") val scheduledAt: String? = null,
     @SerializedName("publishedAt") val publishedAt: String?,
     @SerializedName("winningResults") val winningResults: Map<String, Any>?,
     @SerializedName("validationHash") val validationHash: String?

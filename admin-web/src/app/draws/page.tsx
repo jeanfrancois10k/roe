@@ -74,8 +74,23 @@ export default function DrawsPage() {
   const [firstPrize, setFirstPrize] = useState('');
   const [secondPrize, setSecondPrize] = useState('');
   const [thirdPrize, setThirdPrize] = useState('');
+  const [quickResultInput, setQuickResultInput] = useState('');
   const [resultActionLoading, setResultActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const handleQuickResultChange = (val: string) => {
+    setQuickResultInput(val);
+    const parts = val.trim().replace(/[^0-9]/g, ' ').split(/\s+/).filter(Boolean);
+    if (parts.length >= 3) {
+      setFirstPrize(parts[0].slice(0, 3));
+      setSecondPrize(parts[1].slice(0, 2));
+      setThirdPrize(parts[2].slice(0, 2));
+    } else if (parts.length === 1 && parts[0].length >= 7) {
+      setFirstPrize(parts[0].slice(0, 3));
+      setSecondPrize(parts[0].slice(3, 5));
+      setThirdPrize(parts[0].slice(5, 7));
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -368,8 +383,21 @@ export default function DrawsPage() {
     e.preventDefault();
     if (!selectedDrawForResults) return;
 
-    if (!firstPrize || !secondPrize || !thirdPrize) {
+    const rawFirst = firstPrize.trim();
+    const rawSecond = secondPrize.trim();
+    const rawThird = thirdPrize.trim();
+
+    if (!rawFirst || !rawSecond || !rawThird) {
       setActionError('Les 3 lots gagnants sont obligatoires');
+      return;
+    }
+
+    const normFirst = rawFirst.padStart(3, '0');
+    const normSecond = rawSecond.padStart(2, '0');
+    const normThird = rawThird.padStart(2, '0');
+
+    if (normFirst.length !== 3 || normSecond.length !== 2 || normThird.length !== 2) {
+      setActionError('Format attendu : 3 chiffres pour le 1er lot/Lòt 3 (ex: 040), 2 chiffres pour le 2e lot (ex: 22) et 2 chiffres pour le 3e lot (ex: 36).');
       return;
     }
 
@@ -378,9 +406,9 @@ export default function DrawsPage() {
 
     try {
       await api.post(`/api/v1/draws/${selectedDrawForResults.id}/results`, {
-        firstPrize: firstPrize.trim(),
-        secondPrize: secondPrize.trim(),
-        thirdPrize: thirdPrize.trim(),
+        firstPrize: normFirst,
+        secondPrize: normSecond,
+        thirdPrize: normThird,
       });
 
       // Publication automatique et calcul immédiat des gains
@@ -391,6 +419,7 @@ export default function DrawsPage() {
       setFirstPrize('');
       setSecondPrize('');
       setThirdPrize('');
+      setQuickResultInput('');
       fetchData();
     } catch (err: any) {
       setActionError(err.message || 'Erreur lors du calcul des résultats');
@@ -702,18 +731,27 @@ export default function DrawsPage() {
 
                       {/* Numéros gagnants s'ils existent */}
                       {winning && (
-                        <div className="p-3 rounded-xl bg-roe-card border border-roe-border/50 flex items-center justify-around">
-                          <div className="text-center">
-                            <span className="text-[9px] uppercase text-roe-textMuted font-bold">1er Lot</span>
-                            <p className="text-base font-black text-roe-gold font-mono">{winning.firstPrize || '--'}</p>
+                        <div className="p-3 rounded-xl bg-roe-card border border-roe-border/50 space-y-2">
+                          <div className="flex items-center justify-between text-[10px] font-bold">
+                            <span className="text-roe-textMuted uppercase">Résultats Officiels</span>
+                            <span className="font-mono text-roe-gold">Lòt 3 : {winning.firstPrize}</span>
                           </div>
-                          <div className="text-center">
-                            <span className="text-[9px] uppercase text-roe-textMuted font-bold">2e Lot</span>
-                            <p className="text-base font-black text-white font-mono">{winning.secondPrize || '--'}</p>
-                          </div>
-                          <div className="text-center">
-                            <span className="text-[9px] uppercase text-roe-textMuted font-bold">3e Lot</span>
-                            <p className="text-base font-black text-white font-mono">{winning.thirdPrize || '--'}</p>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="p-2 rounded-xl bg-roe-surface border border-roe-gold/40">
+                              <span className="text-[9px] uppercase text-roe-gold font-bold">1er & Lòt 3</span>
+                              <p className="text-base font-black text-roe-gold font-mono">{winning.firstPrize || '--'}</p>
+                              <span className="text-[8px] text-roe-textMuted font-mono">Lot : {winning.firstPrize ? winning.firstPrize.slice(-2) : '--'}</span>
+                            </div>
+                            <div className="p-2 rounded-xl bg-roe-surface border border-roe-border/60">
+                              <span className="text-[9px] uppercase text-roe-textMuted font-bold">2e Lot</span>
+                              <p className="text-base font-black text-white font-mono">{winning.secondPrize || '--'}</p>
+                              <span className="text-[8px] text-transparent select-none font-mono">-</span>
+                            </div>
+                            <div className="p-2 rounded-xl bg-roe-surface border border-roe-border/60">
+                              <span className="text-[9px] uppercase text-roe-textMuted font-bold">3e Lot</span>
+                              <p className="text-base font-black text-white font-mono">{winning.thirdPrize || '--'}</p>
+                              <span className="text-[8px] text-transparent select-none font-mono">-</span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -770,7 +808,7 @@ export default function DrawsPage() {
                       <th className="p-4 pl-6">N° & Loterie</th>
                       <th className="p-4">Clôture Ventes</th>
                       <th className="p-4">Statut</th>
-                      <th className="p-4 text-center">Numéros Gagnants (1er / 2e / 3e)</th>
+                      <th className="p-4 text-center">Numéros Gagnants (Lòt 3 & 1er / 2e / 3e)</th>
                       <th className="p-4 pr-6 text-right">Actions Administrateur</th>
                     </tr>
                   </thead>
@@ -824,12 +862,22 @@ export default function DrawsPage() {
 
                             <td className="p-4 text-center">
                               {winning ? (
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-roe-card border border-roe-border/60 font-mono text-sm">
-                                  <span className="font-extrabold text-roe-gold">{winning.firstPrize}</span>
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-roe-card border border-roe-border/60 font-mono text-sm">
+                                  <div className="flex items-center gap-1.5 bg-roe-gold/15 px-2 py-0.5 rounded-lg border border-roe-gold/30">
+                                    <span className="text-[10px] text-roe-gold font-black uppercase">Lòt 3</span>
+                                    <span className="font-black text-roe-gold text-base">{winning.firstPrize}</span>
+                                    <span className="text-[10px] text-roe-textMuted font-mono">({winning.firstPrize ? winning.firstPrize.slice(-2) : '--'})</span>
+                                  </div>
                                   <span className="text-roe-border">•</span>
-                                  <span className="font-bold text-white">{winning.secondPrize}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-roe-textMuted uppercase font-bold">2e</span>
+                                    <span className="font-bold text-white text-base">{winning.secondPrize}</span>
+                                  </div>
                                   <span className="text-roe-border">•</span>
-                                  <span className="font-bold text-white">{winning.thirdPrize}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-roe-textMuted uppercase font-bold">3e</span>
+                                    <span className="font-bold text-white text-base">{winning.thirdPrize}</span>
+                                  </div>
                                 </div>
                               ) : (
                                 <span className="text-xs text-roe-textMuted italic">En attente des résultats</span>
@@ -1210,13 +1258,23 @@ export default function DrawsPage() {
       {/* MODAL 2 : SAISIE DES RÉSULTATS GAGNANTS */}
       {isResultModalOpen && selectedDrawForResults && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-md bg-roe-surface border border-roe-border/80 rounded-3xl p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-              <Trophy size={20} className="text-roe-gold" />
-              <span>Proclamer les Résultats Gagnants</span>
-            </h3>
+          <div className="relative w-full max-w-lg bg-roe-surface border border-roe-border/80 rounded-3xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Trophy size={20} className="text-roe-gold" />
+                <span>Proclamer les Résultats Gagnants</span>
+              </h3>
+              {(() => {
+                const isMidi = new Date(selectedDrawForResults.salesClosingAt).getHours() < 16;
+                return (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-roe-gold/15 border border-roe-gold/40 text-roe-gold font-mono">
+                    {isMidi ? 'Tirage Midi' : 'Tirage Soir'}
+                  </span>
+                );
+              })()}
+            </div>
             <p className="text-xs text-roe-textMuted mb-4">
-              Tirage #{selectedDrawForResults.drawNumber} — {selectedDrawForResults.game?.name}
+              Tirage #{selectedDrawForResults.drawNumber} — <strong className="text-white">{selectedDrawForResults.game?.name}</strong> ({selectedDrawForResults.game?.code})
             </p>
 
             {actionError && (
@@ -1224,6 +1282,27 @@ export default function DrawsPage() {
                 {actionError}
               </div>
             )}
+
+            {/* Saisie Rapide / Collage Intelligent */}
+            <div className="mb-4 p-3 rounded-2xl bg-roe-card border border-roe-border/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-roe-gold uppercase flex items-center gap-1.5">
+                  <Sparkles size={14} />
+                  <span>Saisie Rapide (Collage ou Frappe)</span>
+                </label>
+                <span className="text-[10px] text-roe-textMuted font-mono">Format : 040 22 36</span>
+              </div>
+              <input
+                type="text"
+                placeholder="Tapez ou collez ici (ex: 040 22 36 ou 040-22-36)..."
+                value={quickResultInput}
+                onChange={(e) => handleQuickResultChange(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-roe-surface border border-roe-border text-white text-xs font-mono placeholder:text-roe-textMuted/50 focus:border-roe-gold focus:outline-none"
+              />
+              <p className="text-[10px] text-roe-textMuted">
+                💡 Les 3 champs ci-dessous se rempliront automatiquement dès la saisie.
+              </p>
+            </div>
 
             {/* Bouton de Récupération Automatique via API */}
             <div className="mb-4 p-3 rounded-2xl bg-roe-card/80 border border-roe-gold/30 flex items-center justify-between gap-3">
@@ -1245,6 +1324,7 @@ export default function DrawsPage() {
                       setFirstPrize(res.winningResults.firstPrize || '');
                       setSecondPrize(res.winningResults.secondPrize || '');
                       setThirdPrize(res.winningResults.thirdPrize || '');
+                      setQuickResultInput(`${res.winningResults.firstPrize || ''} ${res.winningResults.secondPrize || ''} ${res.winningResults.thirdPrize || ''}`.trim());
                     } else if (res?.message) {
                       setActionError(res.message);
                     }
@@ -1263,54 +1343,130 @@ export default function DrawsPage() {
 
             <form onSubmit={handleSaveResults} className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-center text-xs font-bold text-roe-gold uppercase mb-1">
-                    1er Lot
-                  </label>
+                {/* 1ER LOT & LÒT 3 (3 CHIFFRES) */}
+                <div className="space-y-1">
+                  <div className="text-center">
+                    <span className="block text-[10px] font-black text-roe-gold uppercase tracking-wider">
+                      1er Lot & Lòt 3
+                    </span>
+                    <span className="text-[9px] text-roe-gold/80 font-bold uppercase">(3 Chiffres)</span>
+                  </div>
                   <input
                     type="text"
                     maxLength={3}
-                    placeholder="Ex: 45"
+                    placeholder="Ex: 040"
                     value={firstPrize}
-                    onChange={(e) => setFirstPrize(e.target.value)}
+                    onChange={(e) => setFirstPrize(e.target.value.replace(/[^0-9]/g, ''))}
                     required
-                    className="w-full text-center font-mono font-black text-xl py-3 rounded-xl bg-roe-card border border-roe-gold text-white focus:outline-none"
+                    className="w-full text-center font-mono font-black text-xl py-3 rounded-xl bg-roe-card border-2 border-roe-gold text-roe-gold focus:outline-none shadow-md"
                   />
+                  <div className="text-center text-[9px] text-roe-textMuted font-mono">
+                    {firstPrize.length >= 2 ? (
+                      <span className="text-emerald-400 font-bold">
+                        L3: {firstPrize.padStart(3, '0')} · 1er: {firstPrize.slice(-2)}
+                      </span>
+                    ) : (
+                      'Pick 3 officiel'
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-center text-xs font-bold text-white uppercase mb-1">
-                    2e Lot
-                  </label>
+                {/* 2E LOT (2 CHIFFRES) */}
+                <div className="space-y-1">
+                  <div className="text-center">
+                    <span className="block text-[10px] font-bold text-white uppercase tracking-wider">
+                      2e Lot
+                    </span>
+                    <span className="text-[9px] text-roe-textMuted uppercase">(2 Chiffres)</span>
+                  </div>
                   <input
                     type="text"
-                    maxLength={3}
-                    placeholder="Ex: 88"
+                    maxLength={2}
+                    placeholder="Ex: 22"
                     value={secondPrize}
-                    onChange={(e) => setSecondPrize(e.target.value)}
+                    onChange={(e) => setSecondPrize(e.target.value.replace(/[^0-9]/g, ''))}
                     required
                     className="w-full text-center font-mono font-black text-xl py-3 rounded-xl bg-roe-card border border-roe-border text-white focus:outline-none"
                   />
+                  <div className="text-center text-[9px] text-roe-textMuted font-mono">
+                    Borlette 2e
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-center text-xs font-bold text-white uppercase mb-1">
-                    3e Lot
-                  </label>
+                {/* 3E LOT (2 CHIFFRES) */}
+                <div className="space-y-1">
+                  <div className="text-center">
+                    <span className="block text-[10px] font-bold text-white uppercase tracking-wider">
+                      3e Lot
+                    </span>
+                    <span className="text-[9px] text-roe-textMuted uppercase">(2 Chiffres)</span>
+                  </div>
                   <input
                     type="text"
-                    maxLength={3}
-                    placeholder="Ex: 12"
+                    maxLength={2}
+                    placeholder="Ex: 36"
                     value={thirdPrize}
-                    onChange={(e) => setThirdPrize(e.target.value)}
+                    onChange={(e) => setThirdPrize(e.target.value.replace(/[^0-9]/g, ''))}
                     required
                     className="w-full text-center font-mono font-black text-xl py-3 rounded-xl bg-roe-card border border-roe-border text-white focus:outline-none"
                   />
+                  <div className="text-center text-[9px] text-roe-textMuted font-mono">
+                    Borlette 3e
+                  </div>
+                </div>
+              </div>
+
+              {/* Aperçu Visuel Certifié */}
+              <div className="p-3.5 rounded-2xl bg-roe-card border border-roe-gold/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Trophy size={13} className="text-roe-gold" />
+                    <span>Aperçu Tirage Borlette Haïtienne</span>
+                  </span>
+                  <span className="text-[10px] text-roe-gold font-mono font-bold">Standard Officiel</span>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 py-1">
+                  <div className="flex flex-col items-center">
+                    <span className="px-3.5 py-1.5 rounded-xl bg-roe-gold text-roe-bg font-mono font-black text-lg shadow-md">
+                      {firstPrize ? firstPrize.padStart(3, '0') : '040'}
+                    </span>
+                    <span className="text-[9px] text-roe-gold mt-1 font-bold">
+                      Lòt 3 : {firstPrize ? firstPrize.padStart(3, '0') : '040'}
+                    </span>
+                    <span className="text-[9px] text-white/80 font-mono">
+                      1er Lot : {firstPrize ? firstPrize.slice(-2).padStart(2, '0') : '40'}
+                    </span>
+                  </div>
+
+                  <span className="text-xl font-bold text-roe-textMuted pb-6">-</span>
+
+                  <div className="flex flex-col items-center">
+                    <span className="px-3.5 py-1.5 rounded-xl bg-roe-surface border border-roe-border text-white font-mono font-black text-lg shadow-md">
+                      {secondPrize ? secondPrize.padStart(2, '0') : '22'}
+                    </span>
+                    <span className="text-[9px] text-roe-textMuted mt-1 font-bold">2e Lot</span>
+                    <span className="text-[9px] text-white/80 font-mono">
+                      {secondPrize ? secondPrize.padStart(2, '0') : '22'}
+                    </span>
+                  </div>
+
+                  <span className="text-xl font-bold text-roe-textMuted pb-6">-</span>
+
+                  <div className="flex flex-col items-center">
+                    <span className="px-3.5 py-1.5 rounded-xl bg-roe-surface border border-roe-border text-white font-mono font-black text-lg shadow-md">
+                      {thirdPrize ? thirdPrize.padStart(2, '0') : '36'}
+                    </span>
+                    <span className="text-[9px] text-roe-textMuted mt-1 font-bold">3e Lot</span>
+                    <span className="text-[9px] text-white/80 font-mono">
+                      {thirdPrize ? thirdPrize.padStart(2, '0') : '36'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
-                ⚠️ <strong>Important :</strong> La validation déclenchera le calcul mathématique automatique de tous les tickets vendus, l’attribution des gains aux gagnants et le calcul des commissions vendeurs.
+                ⚠️ <strong>Important :</strong> La validation déclenchera le calcul mathématique automatique de tous les tickets vendus (Borlette, Lòt 3, Maryaj, Lòt 4, Lòt 5), l’attribution des gains aux gagnants et le calcul des commissions vendeurs.
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-roe-border/50">

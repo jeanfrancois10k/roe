@@ -50,8 +50,8 @@ export class DrawEvaluatorService {
     const secondLot2 = rawSecond.slice(-2).padStart(2, '0');
     const thirdLot2 = rawThird.slice(-2).padStart(2, '0');
 
-    // Chiffres complets pour Lòt 3 / Lòt 4
-    const firstLot3 = rawFirst.length >= 3 ? rawFirst.slice(-3) : null;
+    // Chiffres complets pour Lòt 3 (3 chiffres obligatoires, ex: "040")
+    const firstLot3 = rawFirst.length >= 3 ? rawFirst.slice(-3) : (rawFirst ? rawFirst.padStart(3, '0') : null);
     const winningPairs = [firstLot2, secondLot2, thirdLot2];
 
     let totalWon = 0;

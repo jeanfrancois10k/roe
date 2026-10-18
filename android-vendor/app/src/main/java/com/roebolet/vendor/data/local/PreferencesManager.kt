@@ -100,7 +100,8 @@ class PreferencesManager(context: Context) {
         headerNote: String,
         footerNote: String,
         providerInfo: String,
-        mariageGratuitNote: String
+        mariageGratuitNote: String,
+        logoUrl: String = ""
     ) {
         prefs.edit()
             .putString("lottery_name", companyName)
@@ -111,6 +112,7 @@ class PreferencesManager(context: Context) {
             .putString("lottery_footer_note", footerNote)
             .putString("lottery_provider", providerInfo)
             .putString("lottery_mariage_gratis", mariageGratuitNote)
+            .putString("lottery_logo_url", logoUrl)
             .apply()
     }
 
@@ -122,5 +124,6 @@ class PreferencesManager(context: Context) {
     fun getLotteryFooterNote(): String = prefs.getString("lottery_footer_note", "FICH SA VALAB SELMAN POU 90 JOU, FICHE PAYABLE AU PORTEUR") ?: "FICH SA VALAB SELMAN POU 90 JOU, FICHE PAYABLE AU PORTEUR"
     fun getLotteryProvider(): String = prefs.getString("lottery_provider", "ROE-TECH") ?: "ROE-TECH"
     fun getLotteryMariageGratis(): String = prefs.getString("lottery_mariage_gratis", "MARYAJ GRATIS 1500 GDES") ?: "MARYAJ GRATIS 1500 GDES"
+    fun getLotteryLogoUrl(): String = prefs.getString("lottery_logo_url", "") ?: ""
 }
 

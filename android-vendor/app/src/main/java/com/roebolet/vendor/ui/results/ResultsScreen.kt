@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.data.api.DrawResultItem
 import com.roebolet.vendor.ui.theme.*
+import com.roebolet.vendor.util.DrawPeriodBadge
+import com.roebolet.vendor.util.TicketReceiptUtil
 
 @Composable
 fun ResultsScreen(
@@ -111,6 +113,8 @@ fun ResultsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(results) { res ->
+                    val period = TicketReceiptUtil.getDrawPeriod(res.gameName, res.scheduledAt ?: res.publishedAt)
+
                     Surface(
                         color = RoeSurface,
                         shape = RoundedCornerShape(16.dp),
@@ -125,7 +129,13 @@ fun ResultsScreen(
                             ) {
                                 Column {
                                     Text(text = res.gameName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black)
-                                    Text(text = "Tirage N° ${res.drawNumber}", color = RoeGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(text = "Tirage N° ${res.drawNumber}", color = RoeGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        DrawPeriodBadge(period = period)
+                                    }
                                 }
 
                                 Text(
@@ -135,20 +145,65 @@ fun ResultsScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             // Les 3 boules gagnantes
                             val first = res.winningResults?.get("firstPrize")?.toString() ?: "--"
                             val second = res.winningResults?.get("secondPrize")?.toString() ?: "--"
                             val third = res.winningResults?.get("thirdPrize")?.toString() ?: "--"
 
+                            // Bandeau résumé résultat officiel
+                            Surface(
+                                color = RoeCard,
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "RÉSULTAT BORLETTE :",
+                                        color = RoeTextMuted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "$first - $second - $third",
+                                        color = RoeGold,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                WinningBall(prizeLabel = "1er Lot", number = first, isFirst = true)
-                                WinningBall(prizeLabel = "2e Lot", number = second)
-                                WinningBall(prizeLabel = "3e Lot", number = third)
+                                WinningBall(
+                                    prizeLabel = "1er Lot & Lòt 3",
+                                    number = first,
+                                    subLabel = if (first.length >= 2) "1er: ${first.takeLast(2)}" else null,
+                                    isFirst = true
+                                )
+                                WinningBall(
+                                    prizeLabel = "2e Lot",
+                                    number = second,
+                                    subLabel = null
+                                )
+                                WinningBall(
+                                    prizeLabel = "3e Lot",
+                                    number = third,
+                                    subLabel = null
+                                )
                             }
                         }
                     }
@@ -159,24 +214,56 @@ fun ResultsScreen(
 }
 
 @Composable
-private fun WinningBall(prizeLabel: String, number: String, isFirst: Boolean = false) {
+private fun WinningBall(
+    prizeLabel: String,
+    number: String,
+    subLabel: String? = null,
+    isFirst: Boolean = false
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = prizeLabel, color = if (isFirst) RoeGold else RoeTextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = prizeLabel,
+            color = if (isFirst) RoeGold else RoeTextMuted,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold
+        )
         Spacer(modifier = Modifier.height(4.dp))
         Box(
             modifier = Modifier
-                .size(54.dp)
-                .clip(CircleShape)
+                .width(if (number.length >= 3) 64.dp else 52.dp)
+                .height(52.dp)
+                .clip(if (number.length >= 3) RoundedCornerShape(26.dp) else CircleShape)
                 .background(if (isFirst) RoeGold else RoeCard)
-                .border(2.dp, if (isFirst) RoeGoldDark else RoeBorder, CircleShape),
+                .border(
+                    2.dp,
+                    if (isFirst) RoeGoldDark else RoeBorder,
+                    if (number.length >= 3) RoundedCornerShape(26.dp) else CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = number,
                 color = if (isFirst) RoeBackground else Color.White,
-                fontSize = 18.sp,
+                fontSize = if (number.length >= 3) 16.sp else 18.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
+            )
+        }
+        if (subLabel != null) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subLabel,
+                color = RoeGold,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        } else {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "-",
+                color = Color.Transparent,
+                fontSize = 9.sp
             )
         }
     }
