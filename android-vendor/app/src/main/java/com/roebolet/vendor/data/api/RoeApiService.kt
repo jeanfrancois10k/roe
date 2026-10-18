@@ -53,4 +53,10 @@ interface RoeApiService {
 
     @GET("api/v1/settings/app/update")
     suspend fun checkAppUpdate(): Response<AppUpdateInfo>
+
+    @GET("api/v1/vendors/control-summary")
+    suspend fun getControlSummary(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Query("date") date: String? = null
+    ): Response<ControlSummaryResponse>
 }

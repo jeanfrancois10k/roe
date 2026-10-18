@@ -88,22 +88,47 @@ fun DashboardScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Solde Vendeur
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "SOLDE",
-                        color = RoeTextMuted,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = "${String.format("%.2f", balance)} G",
-                        color = RoeGold,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
+                // Ventes Totales & Bouton Contrôle
+                Surface(
+                    color = RoeCard,
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                    modifier = Modifier.clickable { onMenuClick("CONTRÔLE") }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "VENTES",
+                                color = RoeTextMuted,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = "${String.format("%.2f", Math.abs(balance))} G",
+                                color = RoeGold,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Surface(
+                            color = RoeGold,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "KONTWÒL",
+                                color = RoeBackground,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 // Bouton Déconnexion
@@ -182,7 +207,7 @@ fun DashboardScreen(
             MenuItem("VÉRIFIER TICKET", Icons.Default.QrCodeScanner, RoePurple),
             MenuItem("TICKETS", Icons.Default.Receipt, Color.White),
             MenuItem("RÉSULTATS", Icons.Default.EmojiEvents, RoeGold),
-            MenuItem("SOLDE", Icons.Default.AccountBalanceWallet, RoeSuccess),
+            MenuItem("CONTRÔLE", Icons.Default.PointOfSale, RoeGold),
             MenuItem("HISTORIQUE", Icons.Default.History, Color.White),
             MenuItem("SYNCHRO", Icons.Default.Sync, RoeTextMuted),
             MenuItem("PARAMÈTRES", Icons.Default.Settings, RoeTextMuted),

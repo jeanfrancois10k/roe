@@ -36,21 +36,21 @@ export const OFFICIAL_LOTTERIES: LotteryDefinition[] = [
   {
     code: 'BOLET_NY',
     name: 'Bolet New York (NY)',
-    description: 'Loterie traditionnelle New York - Midi (12:30 PM) et Soir (07:30 PM)',
-    drawFrequency: '12:30 PM & 07:30 PM',
+    description: 'Loterie traditionnelle New York - Midi (02:30 PM) et Soir (10:30 PM)',
+    drawFrequency: '02:30 PM & 10:30 PM',
     schedules: [
-      { name: 'Midi', closeHour: 12, closeMinute: 20, drawHour: 12, drawMinute: 30 },
-      { name: 'Soir', closeHour: 19, closeMinute: 20, drawHour: 19, drawMinute: 30 },
+      { name: 'Midi', closeHour: 14, closeMinute: 15, drawHour: 14, drawMinute: 30 },
+      { name: 'Soir', closeHour: 22, closeMinute: 20, drawHour: 22, drawMinute: 30 },
     ],
   },
   {
     code: 'BOLET_FL',
     name: 'Bolet Florida (FL)',
-    description: 'Loterie traditionnelle Florida - Midi (01:30 PM) et Soir (09:30 PM)',
-    drawFrequency: '01:30 PM & 09:30 PM',
+    description: 'Loterie traditionnelle Florida - Midi (01:30 PM) et Soir (09:45 PM)',
+    drawFrequency: '01:30 PM & 09:45 PM',
     schedules: [
-      { name: 'Midi', closeHour: 13, closeMinute: 20, drawHour: 13, drawMinute: 30 },
-      { name: 'Soir', closeHour: 21, closeMinute: 20, drawHour: 21, drawMinute: 30 },
+      { name: 'Midi', closeHour: 13, closeMinute: 15, drawHour: 13, drawMinute: 30 },
+      { name: 'Soir', closeHour: 21, closeMinute: 30, drawHour: 21, drawMinute: 45 },
     ],
   },
   {

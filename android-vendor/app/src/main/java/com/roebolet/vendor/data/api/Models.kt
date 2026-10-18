@@ -215,3 +215,21 @@ data class AppUpdateInfo(
     @SerializedName("changelog") val changelog: String,
     @SerializedName("isMandatory") val isMandatory: Boolean = false
 )
+
+data class ControlSummaryResponse(
+    @SerializedName("vendorId") val vendorId: String,
+    @SerializedName("vendorCode") val vendorCode: String,
+    @SerializedName("vendorName") val vendorName: String,
+    @SerializedName("posAddress") val posAddress: String? = null,
+    @SerializedName("date") val date: String,
+    @SerializedName("totalSales") val totalSales: Double,
+    @SerializedName("ticketsCount") val ticketsCount: Int,
+    @SerializedName("commissionRate") val commissionRate: Double,
+    @SerializedName("commissionAmount") val commissionAmount: Double,
+    @SerializedName("prizesPaid") val prizesPaid: Double,
+    @SerializedName("prizesPaidCount") val prizesPaidCount: Int,
+    @SerializedName("netDueToOwner") val netDueToOwner: Double,
+    @SerializedName("cashInHand") val cashInHand: Double,
+    @SerializedName("currentBalance") val currentBalance: Double,
+    @SerializedName("currency") val currency: String = "HTG"
+)

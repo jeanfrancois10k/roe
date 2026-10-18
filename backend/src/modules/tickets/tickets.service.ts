@@ -437,7 +437,7 @@ export class TicketsService {
         data: { currentBalance: balanceAfterCancel },
       });
 
-      // 蒀riture Ledger : Remboursement de la vente
+      // Écriture Ledger : Remboursement de la vente
       await tx.transaction.create({
         data: {
           vendorId: ticket.vendorId,

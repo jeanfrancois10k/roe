@@ -106,6 +106,14 @@ export class VendorsController {
     return this.vendorsService.getVendorTickets(id, Number(page), Number(limit));
   }
 
+  @Get(':id/control-summary')
+  async getControlSummary(
+    @Param('id') id: string,
+    @Query('date') date?: string,
+  ) {
+    return this.vendorsService.getControlSummary(id, date);
+  }
+
   @Post(':id/suspend')
   @HttpCode(HttpStatus.OK)
   async suspend(

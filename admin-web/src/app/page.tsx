@@ -32,10 +32,15 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<any>(null);
   const [currency, setCurrency] = useState<string>('HTG');
+  const [selectedVendorFilter, setSelectedVendorFilter] = useState<string>('');
 
-  const fetchStats = async () => {
+  const fetchStats = async (vendorId?: string) => {
     try {
-      const stats = await api.get('/api/v1/admin/dashboard/stats');
+      const targetVendor = vendorId !== undefined ? vendorId : selectedVendorFilter;
+      const url = targetVendor 
+        ? `/api/v1/admin/dashboard/stats?vendorId=${encodeURIComponent(targetVendor)}`
+        : '/api/v1/admin/dashboard/stats';
+      const stats = await api.get(url);
       setData(stats);
       if (stats.overview?.currency) {
         setCurrency(stats.overview.currency);
@@ -138,6 +143,116 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
+
+          {/* SÉLECTEUR DE FILTRAGE DES RAPPORTS PAR VENDEUR */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-roe-card border border-roe-border/60 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-roe-gold/15 text-roe-gold">
+                <Users size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Filtrer les Rapports & Métriques par Vendeur</h3>
+                <p className="text-xs text-roe-textMuted">
+                  {selectedVendorFilter && data?.selectedVendor
+                    ? `Affichage exclusif des données financières pour ${data.selectedVendor.fullName} (${data.selectedVendor.vendorCode})`
+                    : 'Vue globale consolidée de toutes les banques et points de vente'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedVendorFilter}
+                onChange={(e) => {
+                  const newVendorId = e.target.value;
+                  setSelectedVendorFilter(newVendorId);
+                  fetchStats(newVendorId);
+                }}
+                className="w-full sm:w-72 px-3.5 py-2.5 rounded-xl bg-roe-surface border border-roe-border text-white text-xs md:text-sm font-semibold focus:outline-none focus:border-roe-gold cursor-pointer"
+              >
+                <option value="">🏢 Tous les Vendeurs (Vue Globale)</option>
+                {data?.vendorsList?.map((v: any) => (
+                  <option key={v.id} value={v.id}>
+                    {v.vendorCode} — {v.fullName} ({v.status})
+                  </option>
+                ))}
+              </select>
+
+              {selectedVendorFilter && (
+                <button
+                  onClick={() => {
+                    setSelectedVendorFilter('');
+                    fetchStats('');
+                  }}
+                  className="px-3 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all whitespace-nowrap"
+                  title="Réinitialiser le filtre"
+                >
+                  ✕ Réinitialiser
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* FICHE CONTRÔLE / RÈGLEMENT DU VENDEUR SÉLECTIONNÉ */}
+          {selectedVendorFilter && data?.selectedVendor && (
+            <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-roe-surface via-roe-card to-roe-surface border border-roe-gold/40 shadow-2xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-roe-border/60 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-roe-gold/20 text-roe-gold flex items-center justify-center font-black text-sm">
+                    {data.selectedVendor.vendorCode.slice(-3)}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      Fiche de Contrôle Vendeur — {data.selectedVendor.fullName}
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                        {data.selectedVendor.status}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-roe-textMuted font-mono">
+                      Code: {data.selectedVendor.vendorCode} | Taux commission: {data.selectedVendor.defaultCommissionRate}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-1">
+                <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-roe-border">
+                  <p className="text-[11px] font-bold text-roe-textMuted uppercase tracking-wider">Ventes Brutes (Jour)</p>
+                  <p className="text-base sm:text-xl font-black text-white font-mono mt-1">
+                    {formatCurrency(overview.todaySalesAmount, activeCurrency)}
+                  </p>
+                  <p className="text-[10px] text-roe-textMuted mt-0.5">{overview.todayTicketsCount} ticket(s) émis</p>
+                </div>
+
+                <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-roe-border">
+                  <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Commission Vendeur</p>
+                  <p className="text-base sm:text-xl font-black text-amber-300 font-mono mt-1">
+                    {formatCurrency(overview.commissionsAmount, activeCurrency)}
+                  </p>
+                  <p className="text-[10px] text-roe-textMuted mt-0.5">Taux fixe: {data.selectedVendor.defaultCommissionRate}%</p>
+                </div>
+
+                <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-roe-border">
+                  <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Lots Payés aux Joueurs</p>
+                  <p className="text-base sm:text-xl font-black text-rose-300 font-mono mt-1">
+                    {formatCurrency(overview.paidPrizesAmount, activeCurrency)}
+                  </p>
+                  <p className="text-[10px] text-roe-textMuted mt-0.5">Avancés par le vendeur</p>
+                </div>
+
+                <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-500/20 to-roe-surface border border-emerald-500/40">
+                  <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Net Dû au Propriétaire</p>
+                  <p className="text-base sm:text-xl font-black text-emerald-300 font-mono mt-1">
+                    {formatCurrency(
+                      Math.max(0, overview.todaySalesAmount - overview.commissionsAmount - overview.paidPrizesAmount),
+                      activeCurrency
+                    )}
+                  </p>
+                  <p className="text-[10px] text-emerald-200/70 mt-0.5">Ventes - Comm - Lots</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Alertes Actives */}
           {data?.alerts && data.alerts.length > 0 && (

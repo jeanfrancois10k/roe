@@ -12,6 +12,7 @@ import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.data.network.NetworkMonitor
 import com.roebolet.vendor.data.socket.SocketManager
 import com.roebolet.vendor.ui.balance.BalanceScreen
+import com.roebolet.vendor.ui.control.ControlScreen
 import com.roebolet.vendor.ui.dashboard.DashboardScreen
 import com.roebolet.vendor.ui.login.LoginScreen
 import com.roebolet.vendor.ui.results.ResultsScreen
@@ -117,7 +118,32 @@ class MainActivity : ComponentActivity() {
         var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
         var showUpdateDialog by remember { mutableStateOf(false) }
 
+        // État Contrôle Journalier & Règlement
+        var controlSummary by remember { mutableStateOf<ControlSummaryResponse?>(null) }
+        var isLoadingControl by remember { mutableStateOf(false) }
+        var controlError by remember { mutableStateOf<String?>(null) }
+
         val deviceUuid = remember { prefs.getOrCreateDeviceUuid() }
+
+        fun fetchControlSummary() {
+            lifecycleScope.launch {
+                isLoadingControl = true
+                controlError = null
+                try {
+                    val token = prefs.getAccessToken() ?: return@launch
+                    val res = apiService.getControlSummary("Bearer $token")
+                    if (res.isSuccessful && res.body() != null) {
+                        controlSummary = res.body()
+                    } else {
+                        controlError = "Erreur lors du calcul du contrôle (HTTP ${res.code()})"
+                    }
+                } catch (e: Exception) {
+                    controlError = "Erreur réseau : ${e.message}"
+                } finally {
+                    isLoadingControl = false
+                }
+            }
+        }
 
         fun fetchOpenDraws() {
             lifecycleScope.launch {
@@ -263,7 +289,7 @@ class MainActivity : ComponentActivity() {
                                     if (response.isSuccessful && response.body() != null) {
                                         val sold = response.body()!!
                                         soldTicketResult = sold
-                                        balance -= sold.totalAmount
+                                        balance += sold.totalAmount
                                         prefs.updateBalance(balance)
                                     } else {
                                         val errBody = response.errorBody()?.string() ?: ""
@@ -375,6 +401,18 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                "CONTROL", "CONTRÔLE" -> {
+                    ControlScreen(
+                        vendorCode = vendorCode,
+                        vendorName = vendorName,
+                        controlSummary = controlSummary,
+                        isLoading = isLoadingControl,
+                        errorMessage = controlError,
+                        onRefreshClick = { fetchControlSummary() },
+                        onBackClick = { currentScreen = "DASHBOARD" }
+                    )
+                }
+
                 "BALANCE_DETAILS" -> {
                     BalanceScreen(
                         vendorCode = vendorCode,
@@ -427,8 +465,9 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = "DRAWS_RESULTS"
                                     fetchDrawResults()
                                 }
-                                "SOLDE" -> {
-                                    currentScreen = "BALANCE_DETAILS"
+                                "CONTRÔLE", "SOLDE", "KONTWÒL" -> {
+                                    currentScreen = "CONTROL"
+                                    fetchControlSummary()
                                 }
                                 "PARAMÈTRES" -> {
                                     currentScreen = "SETTINGS"

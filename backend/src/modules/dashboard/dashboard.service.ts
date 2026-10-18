@@ -5,10 +5,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getAdminStats() {
+  async getAdminStats(vendorId?: string) {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const ticketFilter = vendorId ? { vendorId } : {};
+    const transactionFilter = vendorId ? { vendorId } : {};
 
     // Requêtes parallèles pour performances optimales
     const [
@@ -25,32 +28,38 @@ export class DashboardService {
       recentTransactions,
       recentAuditLogs,
       suspendedVendors,
+      allVendors,
+      selectedVendor,
     ] = await Promise.all([
       this.prisma.vendor.count({ where: { status: 'ACTIVE' } }),
       this.prisma.vendor.count({ where: { status: 'SUSPENDED' } }),
       this.prisma.device.count({ where: { isOnline: true } }),
       this.prisma.device.count(),
       this.prisma.ticket.aggregate({
-        where: { createdAt: { gte: startOfToday }, status: 'CONFIRMED' },
+        where: { createdAt: { gte: startOfToday }, status: 'CONFIRMED', ...ticketFilter },
         _sum: { totalAmount: true },
         _count: { id: true },
       }),
       this.prisma.ticket.aggregate({
-        where: { createdAt: { gte: startOfMonth }, status: 'CONFIRMED' },
+        where: { createdAt: { gte: startOfMonth }, status: 'CONFIRMED', ...ticketFilter },
         _sum: { totalAmount: true },
       }),
-      this.prisma.ticket.count({ where: { status: 'CONFIRMED' } }),
-      this.prisma.ticket.count({ where: { isWinner: true } }),
+      this.prisma.ticket.count({ where: { status: 'CONFIRMED', ...ticketFilter } }),
+      this.prisma.ticket.count({ where: { isWinner: true, ...ticketFilter } }),
       this.prisma.ticket.aggregate({
-        where: { payoutStatus: 'PAID' },
+        where: {
+          payoutStatus: 'PAID',
+          ...(vendorId ? { OR: [{ vendorId }, { paidByVendorId: vendorId }] } : {}),
+        },
         _sum: { wonAmount: true },
       }),
       this.prisma.transaction.aggregate({
-        where: { type: 'COMMISSION' },
+        where: { type: 'COMMISSION', ...transactionFilter },
         _sum: { amount: true },
       }),
       this.prisma.transaction.findMany({
-        take: 8,
+        take: 10,
+        where: transactionFilter,
         orderBy: { createdAt: 'desc' },
         include: {
           vendor: { select: { vendorCode: true, fullName: true } },
@@ -67,6 +76,24 @@ export class DashboardService {
         where: { status: 'SUSPENDED' },
         select: { id: true, vendorCode: true, fullName: true, updatedAt: true },
       }),
+      this.prisma.vendor.findMany({
+        select: { id: true, vendorCode: true, fullName: true, status: true },
+        orderBy: { vendorCode: 'asc' },
+      }),
+      vendorId
+        ? this.prisma.vendor.findUnique({
+            where: { id: vendorId },
+            select: {
+              id: true,
+              vendorCode: true,
+              fullName: true,
+              currentBalance: true,
+              defaultCommissionRate: true,
+              creditLimit: true,
+              status: true,
+            },
+          })
+        : null,
     ]);
 
     const todaySalesAmount = Number(todaySales._sum.totalAmount || 0);
@@ -80,7 +107,7 @@ export class DashboardService {
 
     // Alertes automatiques
     const alerts = [];
-    if (suspendedVendorsCount > 0) {
+    if (suspendedVendorsCount > 0 && !vendorId) {
       alerts.push({
         id: 'alert-suspended',
         type: 'WARNING',
@@ -91,7 +118,7 @@ export class DashboardService {
       });
     }
 
-    if (onlineDevicesCount === 0 && totalDevicesCount > 0) {
+    if (onlineDevicesCount === 0 && totalDevicesCount > 0 && !vendorId) {
       alerts.push({
         id: 'alert-devices-offline',
         type: 'INFO',
@@ -118,6 +145,15 @@ export class DashboardService {
         currency: (await this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } }))?.value || 'HTG',
         currencySymbol: (await this.prisma.systemSetting.findUnique({ where: { key: 'CURRENCY_SYMBOL' } }))?.value || 'G',
       },
+      vendorsList: allVendors,
+      selectedVendor: selectedVendor
+        ? {
+            ...selectedVendor,
+            currentBalance: Number(selectedVendor.currentBalance),
+            defaultCommissionRate: Number(selectedVendor.defaultCommissionRate),
+            creditLimit: Number(selectedVendor.creditLimit),
+          }
+        : null,
       recentTransactions: recentTransactions.map((tx) => ({
         ...tx,
         amount: Number(tx.amount),

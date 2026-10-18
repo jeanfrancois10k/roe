@@ -15,7 +15,7 @@ import { ResetCredentialsDto } from './dto/reset-credentials.dto';
 import { VendorQueryDto } from './dto/vendor-query.dto';
 import { AssignDeviceDto } from './dto/assign-device.dto';
 import { BalanceAdjustmentDto } from './dto/balance-adjustment.dto';
-import { Role, VendorStatus, DeviceStatus, TransactionType, Prisma } from '@prisma/client';
+import { Role, VendorStatus, DeviceStatus, TransactionType, TicketStatus, TicketPayoutStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class VendorsService {
@@ -662,6 +662,81 @@ export class VendorsService {
     return {
       success: true,
       message: `Le vendeur ${vendor.vendorCode} (${vendor.fullName}) a été définitivement supprimé.`,
+    };
+  }
+
+  /**
+   * Rapport de Contrôle Journalier (Settlement / Fè Kontwòl)
+   * Calcule les ventes brutes, la commission du vendeur, les gains payés et le montant net dû au propriétaire.
+   */
+  async getControlSummary(vendorId: string, dateStr?: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+    if (!vendor) {
+      throw new NotFoundException('Vendeur introuvable');
+    }
+
+    const targetDate = dateStr ? new Date(dateStr) : new Date();
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
+    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+
+    // 1. Total Ventes du jour (Gross Sales)
+    const salesAgg = await this.prisma.ticket.aggregate({
+      where: {
+        vendorId,
+        createdAt: { gte: startOfDay, lte: endOfDay },
+        status: TicketStatus.CONFIRMED,
+      },
+      _sum: { totalAmount: true },
+      _count: { _all: true },
+    });
+    const totalSales = Number(salesAgg._sum.totalAmount || 0);
+    const ticketsCount = salesAgg._count._all || 0;
+
+    // 2. Taux de commission du vendeur
+    const commissionRate = Number(vendor.defaultCommissionRate || 8.0);
+    const commissionAmount = Number(((totalSales * commissionRate) / 100).toFixed(2));
+
+    // 3. Lots Payés par ce vendeur aujourd'hui (Prizes paid to customers)
+    const payoutAgg = await this.prisma.ticket.aggregate({
+      where: {
+        paidByVendorId: vendorId,
+        paidAt: { gte: startOfDay, lte: endOfDay },
+        payoutStatus: TicketPayoutStatus.PAID,
+      },
+      _sum: { wonAmount: true },
+      _count: { _all: true },
+    });
+    const prizesPaid = Number(payoutAgg._sum.wonAmount || 0);
+    const prizesPaidCount = payoutAgg._count._all || 0;
+
+    // 4. Montant Net Dû au Propriétaire (Net due to Bank Owner)
+    // Net = Ventes - Commission - Lots Payés
+    const netDueToOwner = Number((totalSales - commissionAmount - prizesPaid).toFixed(2));
+
+    // 5. Cash net en caisse théorique (Ventes - Lots Payés)
+    const cashInHand = Number((totalSales - prizesPaid).toFixed(2));
+
+    const currencySetting = await this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } });
+    const currency = currencySetting?.value || 'HTG';
+
+    return {
+      vendorId: vendor.id,
+      vendorCode: vendor.vendorCode,
+      vendorName: vendor.fullName,
+      posAddress: vendor.posAddress,
+      date: startOfDay.toISOString().split('T')[0],
+      totalSales,
+      ticketsCount,
+      commissionRate,
+      commissionAmount,
+      prizesPaid,
+      prizesPaidCount,
+      netDueToOwner,
+      cashInHand,
+      currentBalance: Number(vendor.currentBalance),
+      currency,
     };
   }
 }

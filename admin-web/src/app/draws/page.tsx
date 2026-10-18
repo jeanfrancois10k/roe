@@ -60,8 +60,8 @@ export default function DrawsPage() {
   // Modal de Paramétrage Permanent des Horaires & Multiplicateurs par Loterie
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [selectedGameForSchedule, setSelectedGameForSchedule] = useState<any>(null);
-  const [midiCloseTime, setMidiCloseTime] = useState('12:20');
-  const [soirCloseTime, setSoirCloseTime] = useState('19:20');
+  const [midiCloseTime, setMidiCloseTime] = useState('14:15');
+  const [soirCloseTime, setSoirCloseTime] = useState('22:20');
   const [firstLotMultiplier, setFirstLotMultiplier] = useState(50);
   const [secondLotMultiplier, setSecondLotMultiplier] = useState(20);
   const [thirdLotMultiplier, setThirdLotMultiplier] = useState(10);
