@@ -1043,12 +1043,14 @@ fun TicketsListScreen(
     ticketToCancel?.let { targetTicket ->
         AlertDialog(
             onDismissRequest = { if (!isCancelling) ticketToCancel = null },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
             title = {
                 Text(
                     text = Strings.t("confirm_cancel_title", currentLanguage),
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
                     fontSize = 16.sp,
-                    color = RoeDanger
+                    color = Color(0xFFDC2626)
                 )
             },
             text = {
@@ -1056,25 +1058,27 @@ fun TicketsListScreen(
                     Text(
                         text = Strings.t("confirm_cancel_msg", currentLanguage),
                         fontSize = 13.sp,
-                        color = Color.White
+                        color = Color(0xFF334155)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
-                        color = Color(0xFF1E2433),
-                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFF8FAFC),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
                             Text(
                                 text = "Ticket : ${targetTicket.ticketNumber}",
-                                color = RoeGold,
+                                color = Color(0xFF1E3A8A),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 13.sp,
                                 fontFamily = FontFamily.Monospace
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Montant remboursé : ${String.format("%.2f", targetTicket.totalAmount)} HTG",
-                                color = Color.White,
+                                color = Color(0xFF0F172A),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
@@ -1105,7 +1109,7 @@ fun TicketsListScreen(
                     onClick = { ticketToCancel = null },
                     enabled = !isCancelling
                 ) {
-                    Text(text = Strings.t("cancel", currentLanguage), color = Color.White)
+                    Text(text = Strings.t("cancel", currentLanguage), color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
                 }
             }
         )

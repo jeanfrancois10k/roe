@@ -845,37 +845,57 @@ fun SellTicketScreen(
         }
     }
 
-    // Modal de sélection Multi-Tirages (Georgia, New York, Florida)
+    // Modal de sélection Multi-Tirages (Georgia, New York, Florida) - Tendance Bleu & Blanc
     if (showDrawPicker) {
         AlertDialog(
             onDismissRequest = { showDrawPicker = false },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
             title = {
-                Text(
-                    text = Strings.t("multi_draws_select", currentLanguage),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = Strings.t("multi_draws_select", currentLanguage),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 17.sp,
+                        color = Color(0xFF1E3A8A) // Bleu Royal Profond
+                    )
+                }
             },
             text = {
                 if (openDraws.isEmpty()) {
-                    Text(if (isCreole) "Pa gen okenn tiraj ki ouvè pou kounye a." else "Aucun tirage ouvert actuellement.")
+                    Text(
+                        text = if (isCreole) "Pa gen okenn tiraj ki ouvè pou kounye a." else "Aucun tirage ouvert actuellement.",
+                        color = Color(0xFF475569),
+                        fontSize = 13.sp
+                    )
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            TextButton(onClick = {
-                                selectedDrawIds = openDraws.map { it.id }.toSet()
-                            }) {
-                                Text(if (isCreole) "Tout chwazi" else "Tout sélectionner", color = TopBarPurple, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            TextButton(
+                                onClick = {
+                                    selectedDrawIds = openDraws.map { it.id }.toSet()
+                                }
+                            ) {
+                                Text(
+                                    text = if (isCreole) "Tout chwazi" else "Tout sélectionner",
+                                    color = Color(0xFF2563EB),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
                             }
 
                             Text(
                                 text = "${selectedDrawIds.size} / ${openDraws.size}",
-                                color = Color.Gray,
-                                fontSize = 12.sp,
+                                color = Color(0xFF64748B),
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -883,11 +903,11 @@ fun SellTicketScreen(
                         openDraws.forEach { draw ->
                             val isChecked = selectedDrawIds.contains(draw.id)
                             Surface(
-                                color = if (isChecked) TopBarPurple.copy(alpha = 0.12f) else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp),
+                                color = if (isChecked) Color(0xFFEFF6FF) else Color(0xFFF8FAFC),
+                                shape = RoundedCornerShape(10.dp),
                                 border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (isChecked) TopBarPurple else Color(0xFFE0E0E0)
+                                    width = if (isChecked) 2.dp else 1.dp,
+                                    color = if (isChecked) Color(0xFF2563EB) else Color(0xFFCBD5E1)
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -906,16 +926,17 @@ fun SellTicketScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = draw.game.name,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isChecked) TopBarPurple else Color.Black
+                                            fontSize = 15.sp,
+                                            color = if (isChecked) Color(0xFF1E3A8A) else Color(0xFF0F172A)
                                         )
                                         Text(
-                                            text = "Tiraj N° ${draw.drawNumber} • Clôture : ${draw.salesClosingAt.take(16).replace("T", " ")}",
-                                            fontSize = 11.sp,
-                                            color = Color.Gray
+                                            text = "Tiraj N° ${draw.drawNumber} • Clôture : ${(draw.salesClosingAt ?: "").take(16).replace("T", " ")}",
+                                            fontSize = 12.sp,
+                                            color = Color(0xFF475569)
                                         )
                                     }
 
@@ -928,7 +949,11 @@ fun SellTicketScreen(
                                                 if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
                                             }
                                         },
-                                        colors = CheckboxDefaults.colors(checkedColor = TopBarPurple)
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = Color(0xFF2563EB),
+                                            uncheckedColor = Color(0xFF94A3B8),
+                                            checkmarkColor = Color.White
+                                        )
                                     )
                                 }
                             }
@@ -937,8 +962,16 @@ fun SellTicketScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDrawPicker = false }) {
-                    Text(if (isCreole) "Fèmen" else "Fermer", color = TopBarPurple, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = { showDrawPicker = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isCreole) "Valide & Fèmen" else "Confirmer & Fermer",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         )

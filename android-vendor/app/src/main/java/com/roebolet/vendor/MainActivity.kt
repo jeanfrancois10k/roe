@@ -148,14 +148,51 @@ class MainActivity : ComponentActivity() {
 
         val deviceUuid = remember { prefs.getOrCreateDeviceUuid() }
 
+        suspend fun attemptTokenRefresh(): String? {
+            val currentRefreshToken = prefs.getRefreshToken() ?: return null
+            return try {
+                val res = apiService.refreshToken(RefreshTokenRequest(currentRefreshToken))
+                if (res.isSuccessful && res.body() != null) {
+                    val body = res.body()!!
+                    prefs.updateTokens(body.accessToken, body.refreshToken)
+                    body.accessToken
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        fun onSessionExpired() {
+            prefs.clearSession()
+            isAuthenticated = false
+            currentScreen = "DASHBOARD"
+            errorMessage = if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE)
+                "Sesyon w lan ekspire. Tanpri rekonekte ak PIN ou."
+            else
+                "Votre session a expiré. Veuillez vous reconnecter avec votre code et PIN."
+        }
+
         fun fetchSalesReport(period: String = selectedReportPeriod) {
             selectedReportPeriod = period
             lifecycleScope.launch {
                 isLoadingReport = true
                 reportError = null
                 try {
-                    val token = prefs.getAccessToken() ?: return@launch
-                    val res = apiService.getSalesReport("Bearer $token", period = period)
+                    var token = prefs.getAccessToken() ?: return@launch
+                    var res = apiService.getSalesReport("Bearer $token", period = period)
+                    if (res.code() == 401) {
+                        val refreshed = attemptTokenRefresh()
+                        if (refreshed != null) {
+                            token = refreshed
+                            res = apiService.getSalesReport("Bearer $token", period = period)
+                        } else {
+                            onSessionExpired()
+                            return@launch
+                        }
+                    }
+
                     if (res.isSuccessful && res.body() != null) {
                         salesReport = res.body()
                     } else {
@@ -174,12 +211,29 @@ class MainActivity : ComponentActivity() {
                 isLoadingControl = true
                 controlError = null
                 try {
-                    val token = prefs.getAccessToken() ?: return@launch
-                    val res = apiService.getControlSummary("Bearer $token")
+                    var token = prefs.getAccessToken() ?: return@launch
+                    var res = apiService.getControlSummary("Bearer $token")
+                    if (res.code() == 401) {
+                        val refreshed = attemptTokenRefresh()
+                        if (refreshed != null) {
+                            token = refreshed
+                            res = apiService.getControlSummary("Bearer $token")
+                        } else {
+                            onSessionExpired()
+                            return@launch
+                        }
+                    }
+
                     if (res.isSuccessful && res.body() != null) {
                         controlSummary = res.body()
                     } else {
-                        controlError = "Erreur lors du calcul du contrôle (HTTP ${res.code()})"
+                        val errBody = res.errorBody()?.string() ?: ""
+                        val msg = try {
+                            org.json.JSONObject(errBody).optString("message", "Erreur lors du calcul du contrôle (HTTP ${res.code()})")
+                        } catch (e: Exception) {
+                            "Erreur lors du calcul du contrôle (HTTP ${res.code()})"
+                        }
+                        controlError = msg
                     }
                 } catch (e: Exception) {
                     controlError = "Erreur réseau : ${e.message}"
@@ -209,8 +263,19 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch {
                 isLoadingTickets = true
                 try {
-                    val token = prefs.getAccessToken() ?: return@launch
-                    val res = apiService.getVendorTickets("Bearer $token", 40)
+                    var token = prefs.getAccessToken() ?: return@launch
+                    var res = apiService.getVendorTickets("Bearer $token", 40)
+                    if (res.code() == 401) {
+                        val refreshed = attemptTokenRefresh()
+                        if (refreshed != null) {
+                            token = refreshed
+                            res = apiService.getVendorTickets("Bearer $token", 40)
+                        } else {
+                            onSessionExpired()
+                            return@launch
+                        }
+                    }
+
                     if (res.isSuccessful && res.body() != null) {
                         vendorTickets = res.body()!!.items
                     }
@@ -226,8 +291,19 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch {
                 isCancellingTicket = true
                 try {
-                    val token = prefs.getAccessToken() ?: return@launch
-                    val res = apiService.cancelTicket("Bearer $token", CancelTicketRequest(ticketId = ticketId))
+                    var token = prefs.getAccessToken() ?: return@launch
+                    var res = apiService.cancelTicket("Bearer $token", CancelTicketRequest(ticketId = ticketId))
+                    if (res.code() == 401) {
+                        val refreshed = attemptTokenRefresh()
+                        if (refreshed != null) {
+                            token = refreshed
+                            res = apiService.cancelTicket("Bearer $token", CancelTicketRequest(ticketId = ticketId))
+                        } else {
+                            onSessionExpired()
+                            return@launch
+                        }
+                    }
+
                     if (res.isSuccessful && res.body() != null) {
                         val body = res.body()!!
                         Toast.makeText(this@MainActivity, body.message, Toast.LENGTH_LONG).show()
@@ -256,12 +332,24 @@ class MainActivity : ComponentActivity() {
         fun searchTicketByNumber(ticketNumber: String, onComplete: (VendorTicketItem?) -> Unit) {
             lifecycleScope.launch {
                 try {
-                    val token = prefs.getAccessToken()
+                    var token = prefs.getAccessToken()
                     if (token == null) {
                         onComplete(null)
                         return@launch
                     }
-                    val res = apiService.getTicketByNumber("Bearer $token", ticketNumber.trim())
+                    var res = apiService.getTicketByNumber("Bearer $token", ticketNumber.trim())
+                    if (res.code() == 401) {
+                        val refreshed = attemptTokenRefresh()
+                        if (refreshed != null) {
+                            token = refreshed
+                            res = apiService.getTicketByNumber("Bearer $token", ticketNumber.trim())
+                        } else {
+                            onSessionExpired()
+                            onComplete(null)
+                            return@launch
+                        }
+                    }
+
                     if (res.isSuccessful && res.body() != null) {
                         onComplete(res.body())
                     } else {
@@ -340,15 +428,15 @@ class MainActivity : ComponentActivity() {
                     val updateRes = apiService.checkAppUpdate()
                     if (updateRes.isSuccessful && updateRes.body() != null) {
                         val info = updateRes.body()!!
-                        val currentVersionCode = 3
+                        val currentVersionCode = 4
                         if (info.latestVersionCode > currentVersionCode) {
                             updateInfo = info
                             showUpdateDialog = true
                         } else {
                             val msg = if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE)
-                                "Aplikasyon w lan ajou deja (v1.0.2)"
+                                "Aplikasyon w lan ajou deja (v1.0.3)"
                             else
-                                "Votre application est déjà à jour (v1.0.2)"
+                                "Votre application est déjà à jour (v1.0.3)"
                             Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
                         }
                     } else {
@@ -369,7 +457,7 @@ class MainActivity : ComponentActivity() {
                         val updateRes = apiService.checkAppUpdate()
                         if (updateRes.isSuccessful && updateRes.body() != null) {
                             val info = updateRes.body()!!
-                            val currentVersionCode = 3
+                            val currentVersionCode = 4
                             if (info.latestVersionCode > currentVersionCode) {
                                 updateInfo = info
                                 showUpdateDialog = true
@@ -421,7 +509,7 @@ class MainActivity : ComponentActivity() {
                                 isSubmittingTicket = true
                                 sellTicketError = null
                                 try {
-                                    val token = prefs.getAccessToken() ?: return@launch
+                                    var token = prefs.getAccessToken() ?: return@launch
                                     val successfulSales = mutableListOf<SellTicketResponse>()
                                     var totalCharged = 0.0
                                     var lastErr = ""
@@ -435,7 +523,18 @@ class MainActivity : ComponentActivity() {
                                             idempotencyKey = idempotencyKey,
                                             grids = grids
                                         )
-                                        val response = apiService.sellTicket("Bearer $token", request)
+                                        var response = apiService.sellTicket("Bearer $token", request)
+                                        if (response.code() == 401) {
+                                            val refreshed = attemptTokenRefresh()
+                                            if (refreshed != null) {
+                                                token = refreshed
+                                                response = apiService.sellTicket("Bearer $token", request)
+                                            } else {
+                                                onSessionExpired()
+                                                return@launch
+                                            }
+                                        }
+
                                         if (response.isSuccessful && response.body() != null) {
                                             val sold = response.body()!!
                                             successfulSales.add(sold)
@@ -490,11 +589,25 @@ class MainActivity : ComponentActivity() {
                             verifyError = null
                             lifecycleScope.launch {
                                 try {
-                                    val token = prefs.getAccessToken() ?: ""
-                                    val response = apiService.verifyTicket(
+                                    var token = prefs.getAccessToken() ?: ""
+                                    var response = apiService.verifyTicket(
                                         "Bearer $token",
                                         VerifyTicketRequest(query = query.trim())
                                     )
+                                    if (response.code() == 401) {
+                                        val refreshed = attemptTokenRefresh()
+                                        if (refreshed != null) {
+                                            token = refreshed
+                                            response = apiService.verifyTicket(
+                                                "Bearer $token",
+                                                VerifyTicketRequest(query = query.trim())
+                                            )
+                                        } else {
+                                            onSessionExpired()
+                                            return@launch
+                                        }
+                                    }
+
                                     if (response.isSuccessful && response.body() != null) {
                                         verifyResult = response.body()
                                     } else {
@@ -511,11 +624,25 @@ class MainActivity : ComponentActivity() {
                             verifyLoading = true
                             lifecycleScope.launch {
                                 try {
-                                    val token = prefs.getAccessToken() ?: ""
-                                    val response = apiService.payTicket(
+                                    var token = prefs.getAccessToken() ?: ""
+                                    var response = apiService.payTicket(
                                         "Bearer $token",
                                         PayTicketRequest(ticketId = ticketId, deviceUuid = deviceUuid)
                                     )
+                                    if (response.code() == 401) {
+                                        val refreshed = attemptTokenRefresh()
+                                        if (refreshed != null) {
+                                            token = refreshed
+                                            response = apiService.payTicket(
+                                                "Bearer $token",
+                                                PayTicketRequest(ticketId = ticketId, deviceUuid = deviceUuid)
+                                            )
+                                        } else {
+                                            onSessionExpired()
+                                            return@launch
+                                        }
+                                    }
+
                                     if (response.isSuccessful && response.body() != null) {
                                         val body = response.body()!!
                                         Toast.makeText(this@MainActivity, body.message, Toast.LENGTH_LONG).show()

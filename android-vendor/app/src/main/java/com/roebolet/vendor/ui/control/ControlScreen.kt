@@ -233,7 +233,7 @@ fun ControlScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        if (isLoading) {
+        if (isLoading && controlSummary == null && salesReport == null) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,7 +242,7 @@ fun ControlScreen(
             ) {
                 CircularProgressIndicator(color = RoeGold)
             }
-        } else if (errorMessage != null) {
+        } else if (errorMessage != null && controlSummary == null && salesReport == null) {
             Surface(
                 color = RoeDanger.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(14.dp),
@@ -253,7 +253,7 @@ fun ControlScreen(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Erreur de chargement", color = RoeDanger, fontWeight = FontWeight.Bold)
+                    Text(text = if (isHt) "Erè nan chajman" else "Erreur de chargement", color = RoeDanger, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = errorMessage, color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(12.dp))
@@ -261,7 +261,7 @@ fun ControlScreen(
                         onClick = onRefreshClick,
                         colors = ButtonDefaults.buttonColors(containerColor = RoeDanger)
                     ) {
-                        Text("Recommencer", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(if (isHt) "Rekòmanse" else "Recommencer", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -272,6 +272,34 @@ fun ControlScreen(
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Bannière d'avertissement si une erreur survient lors d'une réactualisation
+                if (errorMessage != null) {
+                    Surface(
+                        color = RoeDanger.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RoeDanger),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = errorMessage,
+                                color = RoeDanger,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = onRefreshClick, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Réessayer", tint = RoeDanger)
+                            }
+                        }
+                    }
+                }
                 if (selectedTabIndex == 0) {
                     // ==========================================
                     // ONGLET 1 : RÈGLEMAN & CAISSE
@@ -510,7 +538,7 @@ fun ControlScreen(
                                                 fontWeight = FontWeight.Black
                                             )
                                             Text(
-                                                text = "Tiraj N° ${drawItem.drawNumber} • ${drawItem.scheduledAt.take(16).replace("T", " ")}",
+                                                text = "Tiraj N° ${drawItem.drawNumber} • ${(drawItem.scheduledAt ?: "").take(16).replace("T", " ")}",
                                                 color = RoeTextMuted,
                                                 fontSize = 10.sp
                                             )

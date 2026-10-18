@@ -405,15 +405,20 @@ export class AuthService {
     const accessSecret = this.configService.get<string>('JWT_ACCESS_SECRET') || 'roe_bolet_super_secret_access_key_2026_@!';
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET') || 'roe_bolet_super_secret_refresh_key_2026_#?';
 
+    const isVendor = role === Role.VENDOR;
+    const accessExpiresIn = isVendor ? '30d' : '7d';
+    const accessExpiresSeconds = isVendor ? 30 * 24 * 3600 : 7 * 24 * 3600;
+    const refreshValidityDays = isVendor ? 90 : 30;
+
     const accessToken = this.jwtService.sign(payload, {
       secret: accessSecret,
-      expiresIn: '15m',
+      expiresIn: accessExpiresIn,
     });
 
     const rawRefreshToken = crypto.randomBytes(40).toString('hex');
     const tokenHash = this.hashToken(rawRefreshToken);
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 jours de validité
+    expiresAt.setDate(expiresAt.getDate() + refreshValidityDays);
 
     await this.prisma.refreshToken.create({
       data: {
@@ -427,7 +432,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken: rawRefreshToken,
-      expiresIn: 15 * 60, // 900 secondes
+      expiresIn: accessExpiresSeconds,
     };
   }
 }

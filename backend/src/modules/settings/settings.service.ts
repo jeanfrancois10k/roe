@@ -113,10 +113,10 @@ export class SettingsService {
     const map = new Map(settings.map((s) => [s.key, s.value]));
 
     return {
-      latestVersionName: map.get('ANDROID_LATEST_VERSION') || '1.0.2',
-      latestVersionCode: Number(map.get('ANDROID_LATEST_CODE') || '3'),
+      latestVersionName: map.get('ANDROID_LATEST_VERSION') || '1.0.3',
+      latestVersionCode: Number(map.get('ANDROID_LATEST_CODE') || '4'),
       apkUrl: map.get('ANDROID_APK_URL') || 'https://frontendroe.vercel.app/download/roe-bolet-vendor.apk',
-      changelog: map.get('ANDROID_CHANGELOG') || 'Mise à jour v1.0.2 : Sélecteur de langue Kreyòl / Français, bouton de vérification de mise à jour, et amélioration des performances.',
+      changelog: map.get('ANDROID_CHANGELOG') || 'Mise à jour v1.0.3 : Clarté visuelle blanc & bleu, session terminal prolongée 30 jours, rapport de contrôle optimisé et résilience 401.',
       isMandatory: map.get('ANDROID_FORCE_UPDATE') === 'true',
     };
   }

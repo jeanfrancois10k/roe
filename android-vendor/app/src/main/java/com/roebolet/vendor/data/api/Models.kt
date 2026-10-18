@@ -18,6 +18,16 @@ data class LoginResponse(
     @SerializedName("user") val user: UserInfo
 )
 
+data class RefreshTokenRequest(
+    @SerializedName("refreshToken") val refreshToken: String
+)
+
+data class RefreshTokenResponse(
+    @SerializedName("accessToken") val accessToken: String,
+    @SerializedName("refreshToken") val refreshToken: String,
+    @SerializedName("expiresIn") val expiresIn: Long
+)
+
 data class UserInfo(
     @SerializedName("id") val id: String,
     @SerializedName("username") val username: String,
@@ -270,16 +280,16 @@ data class SalesReportGlobal(
 )
 
 data class DrawSalesReportItem(
-    @SerializedName("drawId") val drawId: String,
-    @SerializedName("drawNumber") val drawNumber: Int,
-    @SerializedName("scheduledAt") val scheduledAt: String,
-    @SerializedName("gameId") val gameId: String,
-    @SerializedName("gameName") val gameName: String,
-    @SerializedName("gameCode") val gameCode: String,
-    @SerializedName("ticketsCount") val ticketsCount: Int,
-    @SerializedName("totalSales") val totalSales: Double,
-    @SerializedName("winningTicketsCount") val winningTicketsCount: Int,
-    @SerializedName("wonAmount") val wonAmount: Double
+    @SerializedName("drawId") val drawId: String = "",
+    @SerializedName("drawNumber") val drawNumber: Int = 0,
+    @SerializedName("scheduledAt") val scheduledAt: String? = "",
+    @SerializedName("gameId") val gameId: String = "",
+    @SerializedName("gameName") val gameName: String = "",
+    @SerializedName("gameCode") val gameCode: String = "",
+    @SerializedName("ticketsCount") val ticketsCount: Int = 0,
+    @SerializedName("totalSales") val totalSales: Double = 0.0,
+    @SerializedName("winningTicketsCount") val winningTicketsCount: Int = 0,
+    @SerializedName("wonAmount") val wonAmount: Double = 0.0
 )
 
 data class VendorSalesReportItem(

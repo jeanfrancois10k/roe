@@ -41,6 +41,13 @@ class PreferencesManager(context: Context) {
 
     fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
 
+    fun updateTokens(accessToken: String, refreshToken: String) {
+        prefs.edit()
+            .putString(KEY_ACCESS_TOKEN, accessToken)
+            .putString(KEY_REFRESH_TOKEN, refreshToken)
+            .apply()
+    }
+
     fun getVendorCode(): String = prefs.getString(KEY_VENDOR_CODE, "") ?: ""
 
     fun getVendorName(): String = prefs.getString(KEY_VENDOR_NAME, "") ?: ""

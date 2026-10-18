@@ -12,6 +12,11 @@ interface RoeApiService {
         @Body request: PinLoginRequest
     ): Response<LoginResponse>
 
+    @POST("api/v1/auth/refresh")
+    suspend fun refreshToken(
+        @Body request: RefreshTokenRequest
+    ): Response<RefreshTokenResponse>
+
     @GET("api/v1/auth/me")
     suspend fun getCurrentProfile(): Response<Map<String, Any>>
 
