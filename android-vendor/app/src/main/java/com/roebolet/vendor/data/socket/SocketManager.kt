@@ -35,15 +35,20 @@ class SocketManager private constructor() {
             val cleanUrl = baseUrl.trimEnd('/') + "/realtime"
             val options = IO.Options().apply {
                 query = "vendorId=$vendorId&deviceUuid=$deviceUuid"
-                transports = arrayOf("websocket")
+                transports = arrayOf("polling", "websocket")
                 reconnection = true
-                reconnectionDelay = 2000
+                reconnectionDelay = 10000
+                reconnectionAttempts = 5
             }
 
             socket = IO.socket(cleanUrl, options).apply {
                 on(Socket.EVENT_CONNECT) {
                     Log.i(TAG, "⚡ Connecté au serveur ROE BOLET (Socket.io)")
                     startHeartbeat(vendorId, deviceUuid)
+                }
+
+                on(Socket.EVENT_CONNECT_ERROR) {
+                    Log.d(TAG, "Mode veille Socket.IO (Serverless HTTP actif)")
                 }
 
                 on(Socket.EVENT_DISCONNECT) {

@@ -15,9 +15,37 @@ server.get('/', (req: any, res: any) => {
   res.status(200).json({
     platform: 'ROE BOLET - Transactional API',
     status: 'ONLINE',
-    version: '1.0.0',
+    version: '1.0.1',
     documentation: '/api/docs',
     health: '/api/v1/health',
+    environment: 'serverless-vercel',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Gestionnaire gracieux pour /socket.io/ sur environnement Serverless (Vercel)
+server.all('/socket.io*', (req: any, res: any) => {
+  const sid = 'roe_sid_' + Math.random().toString(36).substring(2, 12);
+  const transport = req.query?.transport;
+
+  // Si handshake Engine.IO v4 en polling
+  if (transport === 'polling') {
+    const handshakePayload = JSON.stringify({
+      sid,
+      upgrades: [],
+      pingInterval: 25000,
+      pingTimeout: 20000,
+      maxPayload: 1000000,
+    });
+    res.setHeader('Content-Type', 'text/plain; charset=UTF-8');
+    return res.status(200).send(`0${handshakePayload}`);
+  }
+
+  // Pour WebSocket upgrade ou interrogation d'état
+  return res.status(200).json({
+    status: 'ONLINE',
+    service: 'Socket.IO Serverless Standby',
+    sid,
     environment: 'serverless-vercel',
     timestamp: new Date().toISOString(),
   });
