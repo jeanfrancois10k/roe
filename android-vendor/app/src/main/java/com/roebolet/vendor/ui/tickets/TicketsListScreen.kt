@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.data.api.VendorTicketItem
+import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
 import com.roebolet.vendor.util.Strings
@@ -59,8 +60,16 @@ fun TicketsListScreen(
     var serverSearchError by remember { mutableStateOf<String?>(null) }
     var serverFoundTicket by remember { mutableStateOf<VendorTicketItem?>(null) }
     val context = LocalContext.current
-
     val isCreole = currentLanguage == AppLanguage.CREOLE
+
+    val prefs = remember { PreferencesManager(context) }
+    val lotteryName = prefs.getLotteryName()
+    val lotterySlogan = prefs.getLotterySlogan()
+    val lotteryPhone = prefs.getLotteryPhone()
+    val lotteryBankRef = prefs.getLotteryBankRef()
+    val lotteryFooterNote = prefs.getLotteryFooterNote()
+    val lotteryProvider = prefs.getLotteryProvider()
+    val lotteryMariageGratis = prefs.getLotteryMariageGratis()
 
     // Filtrage dynamique en temps réel (numéro de ticket ou numéro joué)
     val filteredTickets = remember(tickets, searchQuery, serverFoundTicket) {
@@ -782,83 +791,226 @@ fun TicketsListScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "ROE BOLET OFISYÈL", color = Color(0xFF6236FF), fontWeight = FontWeight.Black, fontSize = 16.sp)
-                    Text(text = "*** DUPLICATA / KOPI RE-ENPRIME ***", color = Color(0xFF0284C7), fontWeight = FontWeight.Black, fontSize = 11.sp)
+                    // Logo & En-tête Loterie (Identique à la fiche réelle)
+                    Text(text = "🌙", fontSize = 28.sp)
+                    Text(
+                        text = "*** DUPLICATA / KOPI RE-ENPRIME ***",
+                        color = Color(0xFF0284C7),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = lotteryName.uppercase(),
+                        color = Color.Black,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    if (lotterySlogan.isNotEmpty()) {
+                        Text(
+                            text = lotterySlogan,
+                            color = Color(0xFF424242),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Text(
+                        text = if (lotteryBankRef.isNotEmpty()) "$lotteryBankRef • Tel: $lotteryPhone" else "Tel: $lotteryPhone",
+                        color = Color(0xFF616161),
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = "POS: ${deviceUuid.take(16)}",
+                        color = Color(0xFF757575),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "Date: ${reprintTicket.createdAt.take(19).replace("T", " ")}",
+                        color = Color(0xFF757575),
+                        fontSize = 10.sp
+                    )
+
                     Spacer(modifier = Modifier.height(4.dp))
-                    HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Tèminal :", color = Color(0xFF616161), fontSize = 11.sp)
-                        Text(text = deviceUuid.take(16), color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Vandè :", color = Color(0xFF616161), fontSize = 11.sp)
-                        Text(text = if (vendorName.isNotEmpty()) "$vendorCode - $vendorName" else vendorCode, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Fich N° :", color = Color(0xFF616161), fontSize = 11.sp)
-                        Text(text = reprintTicket.ticketNumber, color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Black)
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Dat Vant :", color = Color(0xFF616161), fontSize = 11.sp)
-                        Text(text = reprintTicket.createdAt.take(19).replace("T", " "), color = Color.Black, fontSize = 11.sp)
-                    }
+                    // Nom du Tirage & Fiche N°
+                    Text(
+                        text = reprintTicket.game?.get("name")?.toString() ?: "TIRAJ OFISYÈL",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "#Ticket: ${reprintTicket.ticketNumber}",
+                        color = Color.Black,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                    Spacer(modifier = Modifier.height(6.dp))
-                    HorizontalDivider(color = Color(0xFF6236FF), thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
 
                     val grids = reprintTicket.playedGrids ?: emptyList()
-                    grids.forEach { g ->
+                    val regularGrids = grids.filter { it.isGratis != true }
+                    val gratisGrids = grids.filter { it.isGratis == true }
+
+                    regularGrids.forEach { g ->
+                        val gameLabel = when ((g.gameType ?: "BORLETTE").uppercase()) {
+                            "MARIAGE", "MAR" -> "Mariage"
+                            "LOTTO3", "L3" -> "Lotto 3"
+                            "LOTTO4", "L4" -> "Lotto 4"
+                            "LOTTO5", "L5" -> "Lotto 5"
+                            else -> "Borlette"
+                        }
+                        val separator = if (g.gameType?.contains("MAR", true) == true) "*" else "-"
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(vertical = 1.5.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = g.gameType ?: "BORLETTE", color = Color(0xFF424242), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text(text = g.numbers.joinToString("-"), color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                            Text(text = g.option ?: if (g.isGratis == true) "GRATIS" else "TOUT", color = Color.Gray, fontSize = 10.sp)
-                            Text(text = "${String.format("%.2f", g.betAmount)} G", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "$gameLabel  ${g.numbers.joinToString(separator)}",
+                                color = Color.Black,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${String.format("%.0f", g.betAmount)} HTG",
+                                color = Color.Black,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Black
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-                    HorizontalDivider(color = Color(0xFF6236FF), thickness = 1.5.dp)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    if (gratisGrids.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Mariage Gratuit",
+                            color = Color(0xFF424242),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        gratisGrids.forEach { g ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 1.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Mariage  ${g.numbers.joinToString("*")}",
+                                    color = Color(0xFF616161),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "xxxx HTG",
+                                    color = Color(0xFF757575),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
 
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // Total
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "TOTAL FICHE :", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                        Text(text = "TOTAL", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
                         Text(
-                            text = "${String.format("%.2f", reprintTicket.totalAmount)} HTG",
-                            color = Color(0xFF6236FF),
+                            text = "${String.format("%.0f", reprintTicket.totalAmount)} HTG",
+                            color = Color.Black,
                             fontWeight = FontWeight.Black,
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontFamily = FontFamily.Monospace
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
                         text = "||| | |||| | |||||| || | |||| ||| |||||||",
                         color = Color.Black,
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontFamily = FontFamily.Monospace,
                         letterSpacing = 2.sp
                     )
                     Text(
-                        text = "Siyati : ${(reprintTicket.secureChecksum ?: reprintTicket.ticketNumber).take(20)}...",
+                        text = "Siyati : ${(reprintTicket.secureChecksum ?: reprintTicket.ticketNumber).take(22)}...",
                         color = Color.Gray,
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Mentions légales & Footer
+                    Text(
+                        text = lotteryFooterNote,
+                        color = Color(0xFF424242),
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (lotteryMariageGratis.isNotEmpty()) {
+                        Text(
+                            text = lotteryMariageGratis,
+                            color = Color(0xFF2E7D32),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    Text(
+                        text = lotteryProvider,
+                        color = Color(0xFF757575),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
                     )
                 }
             },

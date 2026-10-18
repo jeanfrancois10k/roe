@@ -37,8 +37,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Rapports des Ventes', href: '/reports', icon: BarChart3 },
     { name: 'Vendeurs & POS', href: '/vendors', icon: Users },
     { name: 'Jeux & Tirages', href: '/draws', icon: Dices },
-    { name: 'Piste d’Audit', href: '/audit', icon: ShieldAlert },
-    { name: 'Transactions Ledger', href: '/#ledger', icon: ReceiptText },
+    { name: 'Transactions Ledger', href: '/transactions', icon: ReceiptText },
+    { name: 'Paramètres Loterie', href: '/settings', icon: Sliders },
     { name: 'Télécharger APK POS', href: '/download', icon: Smartphone, badge: 'v1.0.3' },
   ];
 

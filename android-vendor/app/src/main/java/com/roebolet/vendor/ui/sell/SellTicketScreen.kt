@@ -43,6 +43,7 @@ import com.roebolet.vendor.data.api.BetGrid
 import com.roebolet.vendor.data.api.OpenDrawItem
 import com.roebolet.vendor.data.api.SellTicketResponse
 import com.roebolet.vendor.data.api.VendorTicketItem
+import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
 import com.roebolet.vendor.util.Strings
@@ -82,6 +83,16 @@ fun SellTicketScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val isCreole = currentLanguage == AppLanguage.CREOLE
+
+    val prefs = remember { PreferencesManager(context) }
+    val lotteryName = prefs.getLotteryName()
+    val lotterySlogan = prefs.getLotterySlogan()
+    val lotteryPhone = prefs.getLotteryPhone()
+    val lotteryBankRef = prefs.getLotteryBankRef()
+    val lotteryHeaderNote = prefs.getLotteryHeaderNote()
+    val lotteryFooterNote = prefs.getLotteryFooterNote()
+    val lotteryProvider = prefs.getLotteryProvider()
+    val lotteryMariageGratis = prefs.getLotteryMariageGratis()
 
     // Sélection multi-tirages (1 ou plusieurs tirages en même temps)
     var selectedDrawIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -1051,122 +1062,179 @@ fun SellTicketScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "ROE BOLET OFISYÈL", color = TopBarPurple, fontWeight = FontWeight.Black, fontSize = 16.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    if (vendorName.isNotEmpty() || vendorCode.isNotEmpty()) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(text = "Vandè :", color = Color(0xFF616161), fontSize = 11.sp)
-                            Text(text = if (vendorName.isNotEmpty()) "$vendorCode - $vendorName" else vendorCode, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    if (deviceUuid.isNotEmpty()) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(text = "Tèminal :", color = Color(0xFF616161), fontSize = 11.sp)
-                            Text(text = deviceUuid.take(16), color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-
-                    // Tirages sélectionnés
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "Tiraj (${selectedDraws.size}) :", color = Color(0xFF616161), fontSize = 11.sp)
+                    // Logo & En-tête Loterie (Identique à la fiche Borlette réelle)
+                    Text(text = "🌙", fontSize = 28.sp)
+                    Text(
+                        text = lotteryHeaderNote,
+                        color = Color(0xFF616161),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = lotteryName.uppercase(),
+                        color = Color.Black,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    if (lotterySlogan.isNotEmpty()) {
                         Text(
-                            text = selectedDraws.joinToString(", ") { it.game.name },
-                            color = TopBarPurple,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth(0.7f)
+                            text = lotterySlogan,
+                            color = Color(0xFF424242),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Text(
+                        text = if (lotteryBankRef.isNotEmpty()) "$lotteryBankRef • Tel: $lotteryPhone" else "Tel: $lotteryPhone",
+                        color = Color(0xFF616161),
+                        fontSize = 11.sp
+                    )
+                    if (deviceUuid.isNotEmpty()) {
+                        Text(
+                            text = "POS: ${deviceUuid.take(16)}",
+                            color = Color(0xFF757575),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    val nowFormatted = java.text.SimpleDateFormat("yyyy/MM/dd   hh:mm a", java.util.Locale.US).format(java.util.Date())
+                    Text(
+                        text = "Date: $nowFormatted",
+                        color = Color(0xFF757575),
+                        fontSize = 10.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // Nom du ou des Tirages
+                    selectedDraws.forEach { d ->
+                        Text(
+                            text = d.game.name,
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(color = TopBarPurple, thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
 
-                    // Tableau des numéros joués
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = "JEU", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.2f))
-                        Text(text = "NIMEWO", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.5f), textAlign = TextAlign.Center)
-                        Text(text = "OPSYON", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.2f), textAlign = TextAlign.Center)
-                        Text(text = "MONTAN", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.2f), textAlign = TextAlign.End)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
+                    // Grilles régulières
+                    val regularGrids = validGrids.filter { it.isGratis != true }
+                    val gratisGrids = validGrids.filter { it.isGratis == true }
 
-                    validGrids.forEach { g ->
+                    regularGrids.forEach { g ->
+                        val gameLabel = when ((g.gameType ?: "BORLETTE").uppercase()) {
+                            "MARIAGE", "MAR" -> "Mariage"
+                            "LOTTO3", "L3" -> "Lotto 3"
+                            "LOTTO4", "L4" -> "Lotto 4"
+                            "LOTTO5", "L5" -> "Lotto 5"
+                            else -> "Borlette"
+                        }
+                        val separator = if (g.gameType?.contains("MAR", true) == true) "*" else "-"
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.dp),
+                                .padding(vertical = 1.5.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = g.gameType ?: "BORLETTE",
-                                color = Color(0xFF424242),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1.2f)
-                            )
-                            Text(
-                                text = g.numbers.joinToString("-"),
+                                text = "$gameLabel  ${g.numbers.joinToString(separator)}",
                                 color = Color.Black,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.weight(1.5f),
-                                textAlign = TextAlign.Center
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = g.option ?: if (g.isGratis == true) "GRATIS" else "TOUT",
-                                color = if (g.isGratis == true) Color(0xFF2E7D32) else Color(0xFF616161),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1.2f),
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "${String.format("%.2f", g.betAmount)} G",
+                                text = "${String.format("%.0f", g.betAmount)} HTG",
                                 color = Color.Black,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
                                 fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.weight(1.2f),
-                                textAlign = TextAlign.End
+                                fontWeight = FontWeight.Black
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(color = TopBarPurple, thickness = 1.5.dp)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    // Grilles gratuites (Mariage Gratuit)
+                    if (gratisGrids.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Mariage Gratuit",
+                            color = Color(0xFF424242),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        gratisGrids.forEach { g ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 1.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Mariage  ${g.numbers.joinToString("*")}",
+                                    color = Color(0xFF616161),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "xxxx HTG",
+                                    color = Color(0xFF757575),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
 
-                    // Total général
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // Total
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "TOTAL À PAYER :", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                        Text(text = "TOTAL", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "${String.format("%.2f", grandTotalAmount)} HTG",
-                                color = TopBarPurple,
+                                text = "${String.format("%.0f", grandTotalAmount)} HTG",
+                                color = Color.Black,
                                 fontWeight = FontWeight.Black,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontFamily = FontFamily.Monospace
                             )
                             if (selectedDraws.size > 1) {
                                 Text(
-                                    text = "${String.format("%.2f", unitTotalAmount)} G x ${selectedDraws.size} tiraj",
+                                    text = "${String.format("%.0f", unitTotalAmount)} G x ${selectedDraws.size} tiraj",
                                     color = Color.Gray,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
@@ -1174,6 +1242,41 @@ fun SellTicketScreen(
                             }
                         }
                     }
+
+                    Text(
+                        text = "********************************",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Mentions légales & Footer
+                    Text(
+                        text = lotteryFooterNote,
+                        color = Color(0xFF424242),
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (lotteryMariageGratis.isNotEmpty()) {
+                        Text(
+                            text = lotteryMariageGratis,
+                            color = Color(0xFF2E7D32),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    Text(
+                        text = lotteryProvider,
+                        color = Color(0xFF757575),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
                 }
             },
             confirmButton = {

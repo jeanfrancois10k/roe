@@ -84,5 +84,36 @@ class PreferencesManager(context: Context) {
     fun setLanguage(langCode: String) {
         prefs.edit().putString("app_language", langCode).apply()
     }
+
+    fun saveLotteryInfo(
+        companyName: String,
+        companySlogan: String,
+        phone: String,
+        bankRef: String,
+        headerNote: String,
+        footerNote: String,
+        providerInfo: String,
+        mariageGratuitNote: String
+    ) {
+        prefs.edit()
+            .putString("lottery_name", companyName)
+            .putString("lottery_slogan", companySlogan)
+            .putString("lottery_phone", phone)
+            .putString("lottery_bank_ref", bankRef)
+            .putString("lottery_header_note", headerNote)
+            .putString("lottery_footer_note", footerNote)
+            .putString("lottery_provider", providerInfo)
+            .putString("lottery_mariage_gratis", mariageGratuitNote)
+            .apply()
+    }
+
+    fun getLotteryName(): String = prefs.getString("lottery_name", "ROE BOLET") ?: "ROE BOLET"
+    fun getLotterySlogan(): String = prefs.getString("lottery_slogan", "Juétwèt") ?: "Juétwèt"
+    fun getLotteryPhone(): String = prefs.getString("lottery_phone", "42327120") ?: "42327120"
+    fun getLotteryBankRef(): String = prefs.getString("lottery_bank_ref", "bank 6") ?: "bank 6"
+    fun getLotteryHeaderNote(): String = prefs.getString("lottery_header_note", "*** ORIGINAL FICHE ***") ?: "*** ORIGINAL FICHE ***"
+    fun getLotteryFooterNote(): String = prefs.getString("lottery_footer_note", "FICH SA VALAB SELMAN POU 90 JOU, FICHE PAYABLE AU PORTEUR") ?: "FICH SA VALAB SELMAN POU 90 JOU, FICHE PAYABLE AU PORTEUR"
+    fun getLotteryProvider(): String = prefs.getString("lottery_provider", "ROE-TECH") ?: "ROE-TECH"
+    fun getLotteryMariageGratis(): String = prefs.getString("lottery_mariage_gratis", "MARYAJ GRATIS 1500 GDES") ?: "MARYAJ GRATIS 1500 GDES"
 }
 

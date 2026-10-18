@@ -2,6 +2,7 @@ import { Controller, Get, Patch, Body, Request, UseGuards } from '@nestjs/common
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { UpdateCurrencyDto } from './dto/update-currency.dto';
+import { UpdateLotterySettingsDto } from './dto/update-lottery-settings.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '@prisma/client';
@@ -29,6 +30,17 @@ export class SettingsController {
   async updateCurrency(@Body() dto: UpdateCurrencyDto, @Request() req: any) {
     const userId = req.user?.id || req.user?.userId;
     return this.settingsService.updateCurrency(dto, userId);
+  }
+
+  @Patch('lottery')
+  @ApiBearerAuth()
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: 'Mettre à jour les informations de la loterie (Nom, Téléphone, En-tête, Pied de page, etc.)' })
+  @ApiResponse({ status: 200, description: 'Paramètres de loterie mis à jour avec succès.' })
+  async updateLottery(@Body() dto: UpdateLotterySettingsDto, @Request() req: any) {
+    const userId = req.user?.id || req.user?.userId;
+    return this.settingsService.updateLotterySettings(dto, userId);
   }
 
   @Public()

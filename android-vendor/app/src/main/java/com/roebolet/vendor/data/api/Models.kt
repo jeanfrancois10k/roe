@@ -293,3 +293,24 @@ data class VendorSalesReportItem(
     @SerializedName("wonAmount") val wonAmount: Double
 )
 
+data class SystemSettingsResponse(
+    @SerializedName("defaultCurrency") val defaultCurrency: String? = "HTG",
+    @SerializedName("currencySymbol") val currencySymbol: String? = "G",
+    @SerializedName("lottery") val lottery: LotteryInfo? = null
+)
+
+data class LotteryInfo(
+    @SerializedName("companyName") val companyName: String = "ROE BOLET",
+    @SerializedName("companySlogan") val companySlogan: String? = "Juétwèt",
+    @SerializedName("companyPhone") val companyPhone: String? = "42327120",
+    @SerializedName("companyAddress") val companyAddress: String? = "Port-au-Prince, Haïti",
+    @SerializedName("bankRef") val bankRef: String? = "Bank 6",
+    @SerializedName("logoUrl") val logoUrl: String? = "",
+    @SerializedName("ticketHeaderNote") val ticketHeaderNote: String? = "*** ORIGINAL FICHE ***",
+    @SerializedName("ticketFooterNote") val ticketFooterNote: String? = "FICH SA VALAB SELMAN POU 90 JOU. FICHE PAYABLE AU PORTEUR.",
+    @SerializedName("ticketProviderInfo") val ticketProviderInfo: String? = "ROE-TECH",
+    @SerializedName("ticketValidityDays") val ticketValidityDays: Int = 90,
+    @SerializedName("mariageGratuitNote") val mariageGratuitNote: String? = "MARYAJ GRATIS 1500 GDES"
+)
+
+

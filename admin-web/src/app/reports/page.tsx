@@ -112,10 +112,10 @@ export default function ReportsPage() {
   );
 
   return (
-    <div className="flex h-screen bg-roe-dark text-white overflow-hidden font-sans">
+    <div className="min-h-screen bg-roe-dark text-white font-sans flex">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="flex-1 lg:pl-72 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
         <Header
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           title="Rapports des Ventes"
@@ -124,7 +124,7 @@ export default function ReportsPage() {
           currency={currency}
         />
 
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 space-y-6 md:space-y-8 max-w-7xl w-full mx-auto">
           {/* En-tête et Titre de page */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-roe-surface p-5 rounded-2xl border border-roe-border/60">
             <div>

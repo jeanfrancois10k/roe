@@ -375,6 +375,21 @@ class MainActivity : ComponentActivity() {
                                 showUpdateDialog = true
                             }
                         }
+
+                        val settingsRes = apiService.getSettings()
+                        if (settingsRes.isSuccessful && settingsRes.body()?.lottery != null) {
+                            val lot = settingsRes.body()!!.lottery!!
+                            prefs.saveLotteryInfo(
+                                companyName = lot.companyName,
+                                companySlogan = lot.companySlogan ?: "Juétwèt",
+                                phone = lot.companyPhone ?: "42327120",
+                                bankRef = lot.bankRef ?: "bank 6",
+                                headerNote = lot.ticketHeaderNote ?: "*** ORIGINAL FICHE ***",
+                                footerNote = lot.ticketFooterNote ?: "FICH SA VALAB SELMAN POU 90 JOU, FICHE PAYABLE AU PORTEUR",
+                                providerInfo = lot.ticketProviderInfo ?: "ROE-TECH",
+                                mariageGratuitNote = lot.mariageGratuitNote ?: "MARYAJ GRATIS 1500 GDES"
+                            )
+                        }
                     } catch (e: Exception) {
                         // Ignorer silencieusement si hors-ligne
                     }

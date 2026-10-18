@@ -79,4 +79,7 @@ interface RoeApiService {
         @retrofit2.http.Query("date") date: String? = null,
         @retrofit2.http.Query("vendorId") vendorId: String? = null
     ): Response<SalesReportResponse>
+
+    @GET("api/v1/settings")
+    suspend fun getSettings(): Response<SystemSettingsResponse>
 }
