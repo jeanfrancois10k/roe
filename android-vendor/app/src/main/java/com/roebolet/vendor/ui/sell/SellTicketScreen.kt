@@ -16,7 +16,11 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -72,7 +76,8 @@ fun SellTicketScreen(
     onResetReplay: () -> Unit = {},
     onBackClick: () -> Unit,
     onSubmitTicket: (selectedDraws: List<OpenDrawItem>, grids: List<BetGrid>) -> Unit,
-    onDismissReceipt: () -> Unit
+    onDismissReceipt: () -> Unit,
+    onSearchTicketByNumber: ((String, (VendorTicketItem?) -> Unit) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -83,6 +88,10 @@ fun SellTicketScreen(
     var showDrawPicker by remember { mutableStateOf(false) }
     var showOptionsMenu by remember { mutableStateOf(false) }
     var showPreValidationPreview by remember { mutableStateOf(false) }
+    var showSearchCodeDialog by remember { mutableStateOf(false) }
+    var searchCodeInput by remember { mutableStateOf("") }
+    var isSearchingCode by remember { mutableStateOf(false) }
+    var searchCodeError by remember { mutableStateOf<String?>(null) }
 
     // Initialiser la sélection avec le premier tirage ouvert par défaut
     LaunchedEffect(openDraws) {
@@ -117,61 +126,65 @@ fun SellTicketScreen(
         }
     }
 
-    // Gestion du Replay / Modification d'une fiche existante
-    LaunchedEffect(initialTicketToReplay) {
-        initialTicketToReplay?.let { ticket ->
-            clearAllLines()
-            var bIdx = 0
-            var l3Idx = 0
-            var l4Idx = 0
-            var l5Idx = 0
-            var mIdx = 0
+    fun loadTicketToEdit(ticket: VendorTicketItem) {
+        clearAllLines()
+        var bIdx = 0
+        var l3Idx = 0
+        var l4Idx = 0
+        var l5Idx = 0
+        var mIdx = 0
 
-            ticket.playedGrids?.forEach { grid ->
-                val numStr = grid.numbers.joinToString(if (grid.gameType == "MARIAGE") "x" else "")
-                val amtStr = if (grid.isGratis == true) "" else grid.betAmount.toInt().toString()
-                val opt = grid.option ?: if (grid.isGratis == true) "GRATIS" else "TOUT"
-                val isGratis = grid.isGratis == true
+        ticket.playedGrids?.forEach { grid ->
+            val numStr = grid.numbers.joinToString(if (grid.gameType == "MARIAGE") "x" else "")
+            val amtStr = if (grid.isGratis == true) "" else grid.betAmount.toInt().toString()
+            val opt = grid.option ?: if (grid.isGratis == true) "GRATIS" else "TOUT"
+            val isGratis = grid.isGratis == true
 
-                when (grid.gameType) {
-                    "BORLETTE", "BOLET" -> {
-                        if (bIdx < 10) {
-                            boletLines[bIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
-                            bIdx++
-                        }
+            when (grid.gameType) {
+                "BORLETTE", "BOLET" -> {
+                    if (bIdx < 10) {
+                        boletLines[bIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                        bIdx++
                     }
-                    "LOTO3" -> {
-                        if (l3Idx < 10) {
-                            loto3Lines[l3Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
-                            l3Idx++
-                        }
+                }
+                "LOTO3" -> {
+                    if (l3Idx < 10) {
+                        loto3Lines[l3Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                        l3Idx++
                     }
-                    "LOTO4" -> {
-                        if (l4Idx < 10) {
-                            loto4Lines[l4Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
-                            l4Idx++
-                        }
+                }
+                "LOTO4" -> {
+                    if (l4Idx < 10) {
+                        loto4Lines[l4Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                        l4Idx++
                     }
-                    "LOTO5" -> {
-                        if (l5Idx < 10) {
-                            loto5Lines[l5Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
-                            l5Idx++
-                        }
+                }
+                "LOTO5" -> {
+                    if (l5Idx < 10) {
+                        loto5Lines[l5Idx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                        l5Idx++
                     }
-                    "MARIAGE", "MARYAJ" -> {
-                        if (mIdx < 10) {
-                            maryajLines[mIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
-                            mIdx++
-                        }
+                }
+                "MARIAGE", "MARYAJ" -> {
+                    if (mIdx < 10) {
+                        maryajLines[mIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                        mIdx++
                     }
-                    else -> {
-                        if (bIdx < 10) {
-                            boletLines[bIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
-                            bIdx++
-                        }
+                }
+                else -> {
+                    if (bIdx < 10) {
+                        boletLines[bIdx] = LineItem(number = numStr, amount = amtStr, option = opt, isGratis = isGratis)
+                        bIdx++
                     }
                 }
             }
+        }
+    }
+
+    // Gestion du Replay / Modification d'une fiche existante
+    LaunchedEffect(initialTicketToReplay) {
+        initialTicketToReplay?.let { ticket ->
+            loadTicketToEdit(ticket)
             Toast.makeText(
                 context,
                 if (isCreole) "Fich ${ticket.ticketNumber} chaje pou rejoue. Ou ka modifye l !" else "Ticket ${ticket.ticketNumber} chargé pour rejouer.",
@@ -374,6 +387,24 @@ fun SellTicketScreen(
                         }
                     }
 
+                    // Bouton Recherche Ticket par Code (Modifier / Charger)
+                    if (onSearchTicketByNumber != null) {
+                        IconButton(
+                            onClick = {
+                                searchCodeError = null
+                                showSearchCodeDialog = true
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = Strings.t("search_by_code", currentLanguage),
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
                     // Bouton ⋮ (Menu Options)
                     Box {
                         IconButton(
@@ -409,6 +440,19 @@ fun SellTicketScreen(
                                     showDrawPicker = true
                                 }
                             )
+                            if (onSearchTicketByNumber != null) {
+                                DropdownMenuItem(
+                                    text = { Text(Strings.t("search_by_code", currentLanguage)) },
+                                    onClick = {
+                                        showOptionsMenu = false
+                                        searchCodeError = null
+                                        showSearchCodeDialog = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Search, contentDescription = null, tint = RoeGold)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -1162,6 +1206,132 @@ fun SellTicketScreen(
                         color = Color(0xFF616161),
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
+                    )
+                }
+            }
+        )
+    }
+
+    // MODAL DE RECHERCHE DE TICKET PAR CODE (POUR MODIFIER OU RÉIMPRIMER)
+    if (showSearchCodeDialog && onSearchTicketByNumber != null) {
+        AlertDialog(
+            onDismissRequest = { if (!isSearchingCode) showSearchCodeDialog = false },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = Strings.t("search_ticket_code_title", currentLanguage),
+                            color = TopBarPurple,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = Strings.t("search_ticket_code_sub", currentLanguage),
+                            color = Color.Gray,
+                            fontSize = 11.sp
+                        )
+                    }
+                    IconButton(onClick = { showSearchCodeDialog = false }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = Color.Gray)
+                    }
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = searchCodeInput,
+                        onValueChange = {
+                            searchCodeInput = it.uppercase()
+                            searchCodeError = null
+                        },
+                        placeholder = { Text(Strings.t("ticket_code_placeholder", currentLanguage), fontSize = 12.sp) },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = TopBarPurple)
+                        },
+                        trailingIcon = {
+                            if (searchCodeInput.isNotEmpty()) {
+                                IconButton(onClick = { searchCodeInput = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Effacer", tint = Color.Gray)
+                                }
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black,
+                            focusedBorderColor = TopBarPurple,
+                            unfocusedBorderColor = Color(0xFFBDBDBD)
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    if (searchCodeError != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = searchCodeError ?: "",
+                            color = Color(0xFFD32F2F),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val code = searchCodeInput.trim()
+                        if (code.isNotEmpty()) {
+                            isSearchingCode = true
+                            searchCodeError = null
+                            onSearchTicketByNumber(code) { found ->
+                                isSearchingCode = false
+                                if (found != null) {
+                                    loadTicketToEdit(found)
+                                    showSearchCodeDialog = false
+                                    Toast.makeText(
+                                        context,
+                                        Strings.t("ticket_loaded_for_modification", currentLanguage),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } else {
+                                    searchCodeError = Strings.t("ticket_not_found", currentLanguage)
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TopBarPurple),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isSearchingCode && searchCodeInput.isNotBlank()
+                ) {
+                    if (isSearchingCode) {
+                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = Strings.t("modify_or_replay", currentLanguage),
+                            color = Color.White,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showSearchCodeDialog = false },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = Strings.t("close", currentLanguage),
+                        color = Color(0xFF616161),
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

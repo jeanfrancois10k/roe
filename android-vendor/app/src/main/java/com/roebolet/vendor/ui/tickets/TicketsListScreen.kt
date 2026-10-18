@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -21,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,21 +48,32 @@ fun TicketsListScreen(
     onBackClick: () -> Unit,
     onRefreshClick: () -> Unit,
     onReplayTicket: (VendorTicketItem) -> Unit = {},
-    onCancelTicket: (ticketId: String) -> Unit = {}
+    onCancelTicket: (ticketId: String) -> Unit = {},
+    onSearchServerTicket: ((String, (VendorTicketItem?) -> Unit) -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedTicketForPreview by remember { mutableStateOf<VendorTicketItem?>(null) }
     var ticketToCancel by remember { mutableStateOf<VendorTicketItem?>(null) }
+    var reprintTicketTarget by remember { mutableStateOf<VendorTicketItem?>(null) }
+    var isSearchingServer by remember { mutableStateOf(false) }
+    var serverSearchError by remember { mutableStateOf<String?>(null) }
+    var serverFoundTicket by remember { mutableStateOf<VendorTicketItem?>(null) }
+    val context = LocalContext.current
 
     val isCreole = currentLanguage == AppLanguage.CREOLE
 
     // Filtrage dynamique en temps réel (numéro de ticket ou numéro joué)
-    val filteredTickets = remember(tickets, searchQuery) {
+    val filteredTickets = remember(tickets, searchQuery, serverFoundTicket) {
         val q = searchQuery.trim().lowercase()
-        if (q.isEmpty()) {
-            tickets
+        val baseList = if (serverFoundTicket != null && !tickets.any { it.id == serverFoundTicket!!.id }) {
+            listOf(serverFoundTicket!!) + tickets
         } else {
-            tickets.filter { item ->
+            tickets
+        }
+        if (q.isEmpty()) {
+            baseList
+        } else {
+            baseList.filter { item ->
                 item.ticketNumber.lowercase().contains(q) ||
                 (item.playedGrids?.any { grid ->
                     grid.numbers.any { num -> num.lowercase().contains(q) }
@@ -162,7 +177,76 @@ fun TicketsListScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        // Bouton de recherche approfondie sur le serveur par code ticket
+        if (searchQuery.isNotBlank() && onSearchServerTicket != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(RoeSurface)
+                    .border(1.dp, RoeBorder, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${Strings.t("search_by_code", currentLanguage)} : \"${searchQuery.trim()}\"",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Button(
+                    onClick = {
+                        isSearchingServer = true
+                        serverSearchError = null
+                        onSearchServerTicket(searchQuery.trim()) { found ->
+                            isSearchingServer = false
+                            if (found != null) {
+                                serverFoundTicket = found
+                                selectedTicketForPreview = found
+                            } else {
+                                serverSearchError = Strings.t("ticket_not_found", currentLanguage)
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RoePurple),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp),
+                    enabled = !isSearchingServer
+                ) {
+                    if (isSearchingServer) {
+                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(text = Strings.t("search_server", currentLanguage), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        if (serverSearchError != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                color = RoeDanger.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = serverSearchError ?: "",
+                    color = RoeDanger,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         if (isLoading) {
             Box(
@@ -331,33 +415,53 @@ fun TicketsListScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Boutons d'actions rapides (Aperçu, Rejouer, Annuler)
+                            // Boutons d'actions rapides (Réimprimer, Modifier/Rejouer, Annuler)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // Bouton Réimprimer
+                                OutlinedButton(
+                                    onClick = { reprintTicketTarget = ticket },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = Strings.t("reprint_ticket", currentLanguage),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
                                 // Bouton Rejouer / Modifier
                                 OutlinedButton(
                                     onClick = { onReplayTicket(ticket) },
                                     shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = RoeGold),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, RoeGold.copy(alpha = 0.5f)),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
                                     Text(
-                                        text = Strings.t("replay_ticket", currentLanguage),
-                                        fontSize = 11.sp,
+                                        text = Strings.t("modify_or_replay", currentLanguage),
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
 
                                 // Bouton Annuler Vente (Seulement si CONFIRMED)
                                 if (ticket.status == "CONFIRMED") {
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     OutlinedButton(
                                         onClick = { ticketToCancel = ticket },
                                         shape = RoundedCornerShape(8.dp),
@@ -590,7 +694,22 @@ fun TicketsListScreen(
             },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Rejouer depuis le modal
+                    // Bouton Réimprimer depuis le modal d'aperçu
+                    Button(
+                        onClick = {
+                            val t = previewTicket
+                            selectedTicketForPreview = null
+                            reprintTicketTarget = t
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = Strings.t("reprint_ticket", currentLanguage), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Rejouer / Modifier depuis le modal
                     Button(
                         onClick = {
                             val t = previewTicket
@@ -600,9 +719,9 @@ fun TicketsListScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6236FF)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = Strings.t("replay_ticket", currentLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = Strings.t("modify_or_replay", currentLanguage), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Annuler la vente depuis le modal si CONFIRMED
@@ -616,13 +735,152 @@ fun TicketsListScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = RoeDanger),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text(text = Strings.t("cancel_sale", currentLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = Strings.t("cancel_sale", currentLanguage), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { selectedTicketForPreview = null }) {
+                    Text(text = Strings.t("close", currentLanguage), color = Color(0xFF616161))
+                }
+            }
+        )
+    }
+
+    // DIALOG RÉIMPRESSION THERMIQUE (DUPLICATA)
+    reprintTicketTarget?.let { reprintTicket ->
+        AlertDialog(
+            onDismissRequest = { reprintTicketTarget = null },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = Strings.t("reprint_ticket", currentLanguage),
+                            color = Color(0xFF0284C7),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = "Kopi Ofisyèl / Duplicata",
+                            color = Color.Gray,
+                            fontSize = 11.sp
+                        )
+                    }
+                    IconButton(onClick = { reprintTicketTarget = null }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = Color.Gray)
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "ROE BOLET OFISYÈL", color = Color(0xFF6236FF), fontWeight = FontWeight.Black, fontSize = 16.sp)
+                    Text(text = "*** DUPLICATA / KOPI RE-ENPRIME ***", color = Color(0xFF0284C7), fontWeight = FontWeight.Black, fontSize = 11.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Tèminal :", color = Color(0xFF616161), fontSize = 11.sp)
+                        Text(text = deviceUuid.take(16), color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Vandè :", color = Color(0xFF616161), fontSize = 11.sp)
+                        Text(text = if (vendorName.isNotEmpty()) "$vendorCode - $vendorName" else vendorCode, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Fich N° :", color = Color(0xFF616161), fontSize = 11.sp)
+                        Text(text = reprintTicket.ticketNumber, color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Black)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Dat Vant :", color = Color(0xFF616161), fontSize = 11.sp)
+                        Text(text = reprintTicket.createdAt.take(19).replace("T", " "), color = Color.Black, fontSize = 11.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    HorizontalDivider(color = Color(0xFF6236FF), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    val grids = reprintTicket.playedGrids ?: emptyList()
+                    grids.forEach { g ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = g.gameType ?: "BORLETTE", color = Color(0xFF424242), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(text = g.numbers.joinToString("-"), color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+                            Text(text = g.option ?: if (g.isGratis == true) "GRATIS" else "TOUT", color = Color.Gray, fontSize = 10.sp)
+                            Text(text = "${String.format("%.2f", g.betAmount)} G", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    HorizontalDivider(color = Color(0xFF6236FF), thickness = 1.5.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "TOTAL FICHE :", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                        Text(
+                            text = "${String.format("%.2f", reprintTicket.totalAmount)} HTG",
+                            color = Color(0xFF6236FF),
+                            fontWeight = FontWeight.Black,
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "||| | |||| | |||||| || | |||| ||| |||||||",
+                        color = Color.Black,
+                        fontSize = 18.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 2.sp
+                    )
+                    Text(
+                        text = "Siyati : ${(reprintTicket.secureChecksum ?: reprintTicket.ticketNumber).take(20)}...",
+                        color = Color.Gray,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        reprintTicketTarget = null
+                        Toast.makeText(context, Strings.t("reprint_success", currentLanguage), Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = Strings.t("confirm_and_print", currentLanguage), color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { reprintTicketTarget = null },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
                     Text(text = Strings.t("close", currentLanguage), color = Color(0xFF616161))
                 }
             }

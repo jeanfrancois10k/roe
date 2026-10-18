@@ -253,6 +253,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        fun searchTicketByNumber(ticketNumber: String, onComplete: (VendorTicketItem?) -> Unit) {
+            lifecycleScope.launch {
+                try {
+                    val token = prefs.getAccessToken()
+                    if (token == null) {
+                        onComplete(null)
+                        return@launch
+                    }
+                    val res = apiService.getTicketByNumber("Bearer $token", ticketNumber.trim())
+                    if (res.isSuccessful && res.body() != null) {
+                        onComplete(res.body())
+                    } else {
+                        onComplete(null)
+                    }
+                } catch (e: Exception) {
+                    onComplete(null)
+                }
+            }
+        }
+
         fun fetchDrawResults() {
             lifecycleScope.launch {
                 isLoadingResults = true
@@ -438,6 +458,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onDismissReceipt = {
                             soldTicketResults = null
+                        },
+                        onSearchTicketByNumber = { code, callback ->
+                            searchTicketByNumber(code, callback)
                         }
                     )
                 }
@@ -527,6 +550,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onCancelTicket = { ticketId ->
                             cancelTicket(ticketId)
+                        },
+                        onSearchServerTicket = { code, callback ->
+                            searchTicketByNumber(code, callback)
                         }
                     )
                 }
@@ -545,9 +571,18 @@ class MainActivity : ComponentActivity() {
                         vendorCode = vendorCode,
                         vendorName = vendorName,
                         controlSummary = controlSummary,
-                        isLoading = isLoadingControl,
-                        errorMessage = controlError,
-                        onRefreshClick = { fetchControlSummary() },
+                        salesReport = salesReport,
+                        selectedPeriod = selectedReportPeriod,
+                        isLoading = isLoadingControl || isLoadingReport,
+                        errorMessage = controlError ?: reportError,
+                        currentLanguage = currentLanguage,
+                        onPeriodChange = { newPeriod ->
+                            fetchSalesReport(newPeriod)
+                        },
+                        onRefreshClick = {
+                            fetchControlSummary()
+                            fetchSalesReport(selectedReportPeriod)
+                        },
                         onBackClick = { currentScreen = "DASHBOARD" }
                     )
                 }
@@ -628,6 +663,7 @@ class MainActivity : ComponentActivity() {
                                 "CONTROL", "CONTRÔLE", "SOLDE", "KONTWÒL" -> {
                                     currentScreen = "CONTROL"
                                     fetchControlSummary()
+                                    fetchSalesReport(selectedReportPeriod)
                                 }
                                 "REPORTS", "RAPÒ", "RAPÒ VANT", "RAPPORTS" -> {
                                     currentScreen = "REPORTS"

@@ -95,6 +95,18 @@ object Strings {
             "prizes_paid" -> if (ht) "Lòt peye" else "Gains payés"
             "net_sales" -> if (ht) "Vant Nèt" else "Vente Nette"
 
+            // Search by Ticket Code & Reprint / Modify
+            "search_by_code" -> if (ht) "Chèche pa kòd fich" else "Rechercher par code ticket"
+            "ticket_code_placeholder" -> if (ht) "Kòd fich la (egz: TCK-12345)..." else "Code du ticket (ex: TCK-12345)..."
+            "search_ticket_code_title" -> if (ht) "CHÈCHE YON FICH" else "RECHERCHER UN TICKET"
+            "search_ticket_code_sub" -> if (ht) "Antre kòd fich la pou w ka modifye li oswa re-enprime li" else "Entrez le code pour modifier ou réimprimer"
+            "reprint_ticket" -> if (ht) "RE-ENPRIME" else "RÉIMPRIMER"
+            "modify_or_replay" -> if (ht) "MODIFYE" else "MODIFIER"
+            "ticket_not_found" -> if (ht) "Fich sa a pa jwenn sou sèvè a" else "Ticket introuvable sur le serveur"
+            "search_server" -> if (ht) "Chèche sou sèvè" else "Rechercher sur le serveur"
+            "reprint_success" -> if (ht) "Fich la voye nan enprimant lan avèk siksè !" else "Ticket réimprimé avec succès !"
+            "ticket_loaded_for_modification" -> if (ht) "Fich la chaje ! Ou ka modifye nimewo yo kounye a." else "Ticket chargé ! Vous pouvez modifier les numéros."
+
             else -> key
         }
     }

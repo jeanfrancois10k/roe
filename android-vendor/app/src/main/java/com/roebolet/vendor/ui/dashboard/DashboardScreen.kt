@@ -231,13 +231,12 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Grille des 8 boutons
+        // Grille des 7 boutons
         val menuItems = listOf(
             MenuItem(if (isHt) "VERIFYE FICH" else "VÉRIFIER TICKET", Icons.Default.QrCodeScanner, RoePurple, "VERIFY_TICKET"),
             MenuItem(if (isHt) "FICH YO" else "TICKETS", Icons.Default.Receipt, Color.White, "TICKETS"),
             MenuItem(if (isHt) "REZILTA" else "RÉSULTATS", Icons.Default.EmojiEvents, RoeGold, "RESULTS"),
             MenuItem(if (isHt) "KONTWÒL" else "CONTRÔLE", Icons.Default.PointOfSale, RoeGold, "CONTROL"),
-            MenuItem(if (isHt) "RAPÒ VANT" else "RAPPORTS", Icons.Default.Assessment, RoeGold, "REPORTS"),
             MenuItem(if (isHt) "ISTORIK" else "HISTORIQUE", Icons.Default.History, Color.White, "HISTORY"),
             MenuItem(if (isHt) "SENKWO" else "SYNCHRO", Icons.Default.Sync, RoeTextMuted, "SYNC"),
             MenuItem(if (isHt) "PARAMÈT" else "PARAMÈTRES", Icons.Default.Settings, RoeTextMuted, "SETTINGS"),
@@ -245,30 +244,25 @@ fun DashboardScreen(
 
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Ligne 1 : Vérifier Ticket + Tickets
-            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[0], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[1], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
 
             // Ligne 2 : Résultats + Contrôle
-            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[2], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[3], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
 
-            // Ligne 3 : Rapports + Historique
-            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Ligne 3 : Historique + Synchro + Paramètres
+            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[4], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[5], modifier = Modifier.weight(1f)) { onMenuClick(it) }
-            }
-
-            // Ligne 4 : Synchro + Paramètres
-            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DashboardItem(menuItems[6], modifier = Modifier.weight(1f)) { onMenuClick(it) }
-                DashboardItem(menuItems[7], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
         }
     }

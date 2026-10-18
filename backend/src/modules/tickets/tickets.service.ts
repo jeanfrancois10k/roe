@@ -542,14 +542,25 @@ export class TicketsService {
   }
 
   async findByNumber(ticketNumber: string) {
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { ticketNumber },
+    const clean = (ticketNumber || '').trim();
+    let ticket = await this.prisma.ticket.findUnique({
+      where: { ticketNumber: clean },
       include: {
         game: { select: { code: true, name: true } },
         draw: { select: { drawNumber: true, scheduledAt: true, status: true, winningResults: true } },
         vendor: { select: { vendorCode: true, fullName: true, posAddress: true } },
       },
     });
+    if (!ticket) {
+      ticket = await this.prisma.ticket.findFirst({
+        where: { ticketNumber: { equals: clean, mode: 'insensitive' } },
+        include: {
+          game: { select: { code: true, name: true } },
+          draw: { select: { drawNumber: true, scheduledAt: true, status: true, winningResults: true } },
+          vendor: { select: { vendorCode: true, fullName: true, posAddress: true } },
+        },
+      });
+    }
     if (!ticket) {
       throw new NotFoundException('Numéro de ticket inconnu');
     }

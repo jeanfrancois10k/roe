@@ -51,6 +51,12 @@ interface RoeApiService {
         @retrofit2.http.Query("limit") limit: Int = 30
     ): Response<TicketsListResponse>
 
+    @GET("api/v1/tickets/number/{ticketNumber}")
+    suspend fun getTicketByNumber(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Path("ticketNumber") ticketNumber: String
+    ): Response<VendorTicketItem>
+
     @POST("api/v1/tickets/cancel")
     suspend fun cancelTicket(
         @retrofit2.http.Header("Authorization") authHeader: String,
