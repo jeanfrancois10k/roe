@@ -298,7 +298,7 @@ export default function DrawsPage() {
             mariageGratis: Number(mariageMultiplier),
           },
         },
-        drawFrequency: `Midi ${midiCloseTime} & Soir ${soirCloseTime} (1er: x${firstLotMultiplier}, 2e: x${secondLotMultiplier}, 3e: x${thirdLotMultiplier})`,
+        drawFrequency: `Midi ${midiCloseTime} & Soir ${soirCloseTime}`,
       });
 
       setIsScheduleModalOpen(false);
@@ -547,6 +547,21 @@ export default function DrawsPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Multiplicateurs de gains configurés */}
+                      {(() => {
+                        const m = game.gameRules?.multipliers || game.gameRules?.borlette || {};
+                        const p1 = m.firstPrize || m.firstPrizeMultiplier || 50;
+                        const p2 = m.secondPrize || m.secondPrizeMultiplier || 20;
+                        const p3 = m.thirdPrize || m.thirdPrizeMultiplier || 10;
+                        const mar = game.gameRules?.mariage?.multiplier || 1000;
+                        return (
+                          <div className="pt-2 border-t border-roe-border/30 flex items-center justify-between text-[11px]">
+                            <span className="text-roe-textMuted font-mono">1er: <strong className="text-roe-gold">x{p1}</strong> · 2e: <strong className="text-white">x{p2}</strong> · 3e: <strong className="text-white">x{p3}</strong></span>
+                            <span className="text-roe-gold font-mono font-bold">Maryaj: x{mar}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

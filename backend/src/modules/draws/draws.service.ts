@@ -196,7 +196,6 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         update: {
           name: lotto.name,
           description: lotto.description,
-          drawFrequency: lotto.drawFrequency,
           status: 'ACTIVE',
         },
         create: {

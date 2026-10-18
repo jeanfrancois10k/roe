@@ -94,6 +94,19 @@ class MainActivity : ComponentActivity() {
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var isLoading by remember { mutableStateOf(false) }
 
+        // Langue de l'application (Kreyòl par défaut, Français)
+        var currentLanguage by remember {
+            mutableStateOf(
+                if (prefs.getLanguage() == "fr") com.roebolet.vendor.util.AppLanguage.FRENCH
+                else com.roebolet.vendor.util.AppLanguage.CREOLE
+            )
+        }
+
+        fun handleLanguageChange(newLang: com.roebolet.vendor.util.AppLanguage) {
+            currentLanguage = newLang
+            prefs.setLanguage(newLang.code)
+        }
+
         // État Vérification de Tickets
         var verifyResult by remember { mutableStateOf<VerifyTicketResponse?>(null) }
         var verifyLoading by remember { mutableStateOf(false) }
@@ -427,6 +440,8 @@ class MainActivity : ComponentActivity() {
                         currentServerUrl = prefs.getServerUrl(),
                         deviceUuid = deviceUuid,
                         isOnline = isNetworkAvailable,
+                        currentLanguage = currentLanguage,
+                        onLanguageChange = { handleLanguageChange(it) },
                         onBackClick = { currentScreen = "DASHBOARD" },
                         onSaveServerUrl = { newUrl ->
                             prefs.setServerUrl(newUrl)
@@ -442,39 +457,41 @@ class MainActivity : ComponentActivity() {
                         balance = balance,
                         isOnline = isNetworkAvailable,
                         pendingSyncCount = pendingSyncCount,
+                        currentLanguage = currentLanguage,
+                        onLanguageChange = { handleLanguageChange(it) },
                         onMenuClick = { action ->
                             when (action) {
-                                "VENTE" -> {
+                                "SELL", "VENTE", "NOUVO VANT", "NOUVELLE VENTE" -> {
                                     currentScreen = "SELL_TICKET"
                                     fetchOpenDraws()
                                 }
-                                "VÉRIFIER TICKET" -> {
+                                "VERIFY_TICKET", "VÉRIFIER TICKET", "VERIFYE FICH" -> {
                                     currentScreen = "VERIFY_TICKET"
                                     verifyResult = null
                                     verifyError = null
                                 }
-                                "TICKETS" -> {
+                                "TICKETS", "FICH YO" -> {
                                     currentScreen = "TICKETS_LIST"
                                     fetchVendorTickets()
                                 }
-                                "HISTORIQUE" -> {
+                                "HISTORY", "HISTORIQUE", "ISTORIK" -> {
                                     currentScreen = "TICKETS_LIST"
                                     fetchVendorTickets()
                                 }
-                                "RÉSULTATS" -> {
+                                "RESULTS", "RÉSULTATS", "REZILTA" -> {
                                     currentScreen = "DRAWS_RESULTS"
                                     fetchDrawResults()
                                 }
-                                "CONTRÔLE", "SOLDE", "KONTWÒL" -> {
+                                "CONTROL", "CONTRÔLE", "SOLDE", "KONTWÒL" -> {
                                     currentScreen = "CONTROL"
                                     fetchControlSummary()
                                 }
-                                "PARAMÈTRES" -> {
+                                "SETTINGS", "PARAMÈTRES", "PARAMÈT" -> {
                                     currentScreen = "SETTINGS"
                                 }
-                                "SYNCHRO" -> {
+                                "SYNC", "SYNCHRO", "SENKWO" -> {
                                     lifecycleScope.launch {
-                                        Toast.makeText(this@MainActivity, "Synchronisation en cours...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE) "Senkwonizasyon ap fèt..." else "Synchronisation en cours...", Toast.LENGTH_SHORT).show()
                                         val token = prefs.getAccessToken() ?: return@launch
                                         val syncRes = syncManager.syncPendingBatch(apiService, token, deviceUuid)
                                         if (syncRes != null) {
@@ -482,16 +499,16 @@ class MainActivity : ComponentActivity() {
                                             prefs.updateBalance(balance)
                                             Toast.makeText(
                                                 this@MainActivity,
-                                                "✅ Synchronisé : ${syncRes.summary.success} validés",
+                                                if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE) "✅ Senkwonize : ${syncRes.summary.success} fich valide" else "✅ Synchronisé : ${syncRes.summary.success} validés",
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         } else {
-                                            Toast.makeText(this@MainActivity, "Terminé (Rien à synchroniser)", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(this@MainActivity, if (currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE) "Fini (Pa gen anyen pou senkwonize)" else "Terminé (Rien à synchroniser)", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
                                 else -> {
-                                    Toast.makeText(this@MainActivity, "Module $action ouvert", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "Module $action", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -509,6 +526,8 @@ class MainActivity : ComponentActivity() {
                 deviceUuid = deviceUuid,
                 errorMessage = errorMessage,
                 isLoading = isLoading,
+                currentLanguage = currentLanguage,
+                onLanguageChange = { handleLanguageChange(it) },
                 onLoginClick = { code, pin ->
                     isLoading = true
                     errorMessage = null

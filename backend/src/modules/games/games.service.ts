@@ -94,34 +94,47 @@ export class GamesService {
   }
 
   async update(id: string, dto: UpdateGameDto, adminId?: string) {
-    const existing = await this.prisma.game.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException('Jeu introuvable');
+    try {
+      const existing = await this.prisma.game.findUnique({ where: { id } });
+      if (!existing) {
+        throw new NotFoundException('Jeu introuvable');
+      }
+
+      const drawFrequency = dto.drawFrequency ? String(dto.drawFrequency).slice(0, 50) : undefined;
+
+      const updated = await this.prisma.game.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          status: dto.status,
+          minBetAmount: dto.minBetAmount,
+          maxBetAmount: dto.maxBetAmount,
+          gameRules: dto.gameRules ? dto.gameRules : undefined,
+          drawFrequency,
+          defaultCommission: dto.defaultCommission,
+        },
+      });
+
+      await this.auditService.log({
+        userId: adminId,
+        action: 'GAME_UPDATED',
+        resource: `Game:${id}`,
+        oldPayload: existing,
+        newPayload: updated,
+      });
+
+      return {
+        ...updated,
+        minBetAmount: Number(updated.minBetAmount),
+        maxBetAmount: Number(updated.maxBetAmount),
+        defaultCommission: Number(updated.defaultCommission),
+      };
+    } catch (err: any) {
+      this.logger.error(`Erreur mise à jour jeu ${id}: ${err.message}`, err.stack);
+      if (err instanceof NotFoundException) throw err;
+      throw new BadRequestException(err.message || 'Impossible de mettre à jour le jeu');
     }
-
-    const updated = await this.prisma.game.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        status: dto.status,
-        minBetAmount: dto.minBetAmount,
-        maxBetAmount: dto.maxBetAmount,
-        gameRules: dto.gameRules ? dto.gameRules : undefined,
-        drawFrequency: dto.drawFrequency,
-        defaultCommission: dto.defaultCommission,
-      },
-    });
-
-    await this.auditService.log({
-      userId: adminId,
-      action: 'GAME_UPDATED',
-      resource: `Game:${id}`,
-      oldPayload: existing,
-      newPayload: updated,
-    });
-
-    return updated;
   }
 
   // ----------------------------------------------------

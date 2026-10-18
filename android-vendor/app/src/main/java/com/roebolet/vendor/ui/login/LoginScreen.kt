@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.ui.theme.*
+import com.roebolet.vendor.util.AppLanguage
 
 @Composable
 fun LoginScreen(
@@ -26,10 +27,13 @@ fun LoginScreen(
     deviceUuid: String,
     errorMessage: String?,
     isLoading: Boolean,
+    currentLanguage: AppLanguage = AppLanguage.CREOLE,
+    onLanguageChange: (AppLanguage) -> Unit = {},
     onLoginClick: (vendorCode: String, pin: String) -> Unit
 ) {
     var vendorCode by remember { mutableStateOf(initialVendorCode.ifEmpty { "VEND-001" }) }
     var pin by remember { mutableStateOf("") }
+    val isHt = currentLanguage == AppLanguage.CREOLE
 
     Column(
         modifier = Modifier
@@ -39,16 +43,50 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        // Barre supérieure : Sélecteur de Langue (Kreyòl / Français)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Surface(
+                color = RoeCard,
+                shape = RoundedCornerShape(10.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                modifier = Modifier.clickable {
+                    val next = if (isHt) AppLanguage.FRENCH else AppLanguage.CREOLE
+                    onLanguageChange(next)
+                }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = if (isHt) "🇭🇹 Kreyòl" else "🇫🇷 Français",
+                        color = RoeGold,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isHt) "• Chanje" else "• Changer",
+                        color = RoeTextMuted,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+
         // En-tête de Marque avec Logo Officiel
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 10.dp)
+            modifier = Modifier.padding(top = 4.dp)
         ) {
             Image(
                 painter = painterResource(id = com.roebolet.vendor.R.drawable.app_logo),
                 contentDescription = "Logo ROE",
                 modifier = Modifier
-                    .size(68.dp)
+                    .size(64.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .border(1.dp, RoeGold.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             )
@@ -56,12 +94,12 @@ fun LoginScreen(
             Text(
                 text = "ROE BOLET",
                 color = RoeGold,
-                fontSize = 26.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 2.sp
             )
             Text(
-                text = "TERMINAL DE VENTE OFFICIEL",
+                text = if (isHt) "TÈMINAL VANT OFISYÈL" else "TERMINAL DE VENTE OFFICIEL",
                 color = RoeTextMuted,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
@@ -74,7 +112,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = vendorCode,
                 onValueChange = { vendorCode = it.uppercase() },
-                label = { Text("ID VENDEUR", color = RoeTextMuted, fontSize = 11.sp) },
+                label = { Text(if (isHt) "KÒD VANDÈ" else "ID VENDEUR", color = RoeTextMuted, fontSize = 11.sp) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RoeGold,

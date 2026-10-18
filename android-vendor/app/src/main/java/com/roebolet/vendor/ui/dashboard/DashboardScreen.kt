@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.ui.theme.*
+import com.roebolet.vendor.util.AppLanguage
 
 @Composable
 fun DashboardScreen(
@@ -28,9 +29,13 @@ fun DashboardScreen(
     balance: Double,
     isOnline: Boolean,
     pendingSyncCount: Int = 0,
+    currentLanguage: AppLanguage = AppLanguage.CREOLE,
+    onLanguageChange: (AppLanguage) -> Unit = {},
     onMenuClick: (String) -> Unit,
     onLogoutClick: () -> Unit
 ) {
+    val isHt = currentLanguage == AppLanguage.CREOLE
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -70,7 +75,7 @@ fun DashboardScreen(
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "$pendingSyncCount en attente",
+                                text = if (isHt) "$pendingSyncCount an pant" else "$pendingSyncCount en attente",
                                 color = RoeWarning,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -87,13 +92,13 @@ fun DashboardScreen(
                 )
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // Ventes Totales & Bouton Contrôle
                 Surface(
                     color = RoeCard,
                     shape = RoundedCornerShape(10.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
-                    modifier = Modifier.clickable { onMenuClick("CONTRÔLE") }
+                    modifier = Modifier.clickable { onMenuClick("CONTROL") }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -102,7 +107,7 @@ fun DashboardScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "VENTES",
+                                text = if (isHt) "VANT YO" else "VENTES",
                                 color = RoeTextMuted,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
@@ -121,13 +126,37 @@ fun DashboardScreen(
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "KONTWÒL",
+                                text = if (isHt) "KONTWÒL" else "CONTRÔLE",
                                 color = RoeBackground,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Black,
                                 modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                             )
                         }
+                    }
+                }
+
+                // Bouton Changement Rapide de Langue (HT / FR)
+                Surface(
+                    color = RoeCard,
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                    modifier = Modifier.clickable {
+                        val next = if (isHt) AppLanguage.FRENCH else AppLanguage.CREOLE
+                        onLanguageChange(next)
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (isHt) "🇭🇹 HT" else "🇫🇷 FR",
+                            color = RoeGold,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
                     }
                 }
 
@@ -142,7 +171,7 @@ fun DashboardScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Lock,
-                        contentDescription = "Verrouiller",
+                        contentDescription = if (isHt) "Fèmen Sesyon" else "Verrouiller",
                         tint = RoeTextMuted,
                         modifier = Modifier.size(18.dp)
                     )
@@ -159,7 +188,7 @@ fun DashboardScreen(
                 .height(72.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(RoeGold)
-                .clickable { onMenuClick("VENTE") }
+                .clickable { onMenuClick("SELL") }
                 .padding(horizontal = 20.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -177,14 +206,14 @@ fun DashboardScreen(
                     )
                     Column {
                         Text(
-                            text = "NOUVELLE VENTE",
+                            text = if (isHt) "NOUVO VANT" else "NOUVELLE VENTE",
                             color = RoeBackground,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = "Émettre un ticket de bolet",
+                            text = if (isHt) "Fè yon fich bòlèt" else "Émettre un ticket de bolet",
                             color = RoeBackground.copy(alpha = 0.75f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -204,13 +233,13 @@ fun DashboardScreen(
 
         // Grille des 7 autres boutons (Exigés en Section 6)
         val menuItems = listOf(
-            MenuItem("VÉRIFIER TICKET", Icons.Default.QrCodeScanner, RoePurple),
-            MenuItem("TICKETS", Icons.Default.Receipt, Color.White),
-            MenuItem("RÉSULTATS", Icons.Default.EmojiEvents, RoeGold),
-            MenuItem("CONTRÔLE", Icons.Default.PointOfSale, RoeGold),
-            MenuItem("HISTORIQUE", Icons.Default.History, Color.White),
-            MenuItem("SYNCHRO", Icons.Default.Sync, RoeTextMuted),
-            MenuItem("PARAMÈTRES", Icons.Default.Settings, RoeTextMuted),
+            MenuItem(if (isHt) "VERIFYE FICH" else "VÉRIFIER TICKET", Icons.Default.QrCodeScanner, RoePurple, "VERIFY_TICKET"),
+            MenuItem(if (isHt) "FICH YO" else "TICKETS", Icons.Default.Receipt, Color.White, "TICKETS"),
+            MenuItem(if (isHt) "REZILTA" else "RÉSULTATS", Icons.Default.EmojiEvents, RoeGold, "RESULTS"),
+            MenuItem(if (isHt) "KONTWÒL" else "CONTRÔLE", Icons.Default.PointOfSale, RoeGold, "CONTROL"),
+            MenuItem(if (isHt) "ISTORIK" else "HISTORIQUE", Icons.Default.History, Color.White, "HISTORY"),
+            MenuItem(if (isHt) "SENKWO" else "SYNCHRO", Icons.Default.Sync, RoeTextMuted, "SYNC"),
+            MenuItem(if (isHt) "PARAMÈT" else "PARAMÈTRES", Icons.Default.Settings, RoeTextMuted, "SETTINGS"),
         )
 
         Column(
@@ -242,7 +271,8 @@ fun DashboardScreen(
 data class MenuItem(
     val title: String,
     val icon: ImageVector,
-    val accentColor: Color
+    val accentColor: Color,
+    val actionId: String = ""
 )
 
 @Composable
@@ -257,7 +287,7 @@ fun DashboardItem(
             .clip(RoundedCornerShape(16.dp))
             .background(RoeCard)
             .border(1.dp, RoeBorder, RoundedCornerShape(16.dp))
-            .clickable { onClick(item.title) }
+            .clickable { onClick(if (item.actionId.isNotEmpty()) item.actionId else item.title) }
             .padding(10.dp),
         contentAlignment = Alignment.Center
     ) {
