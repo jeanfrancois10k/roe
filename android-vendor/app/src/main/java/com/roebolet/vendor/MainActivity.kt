@@ -174,19 +174,36 @@ class MainActivity : ComponentActivity() {
                 "Votre session a expiré. Veuillez vous reconnecter avec votre code et PIN."
         }
 
-        fun fetchSalesReport(period: String = selectedReportPeriod) {
+        fun fetchSalesReport(
+            period: String = selectedReportPeriod,
+            startDate: String? = null,
+            endDate: String? = null,
+            drawId: String? = null
+        ) {
             selectedReportPeriod = period
             lifecycleScope.launch {
                 isLoadingReport = true
                 reportError = null
                 try {
                     var token = prefs.getAccessToken() ?: return@launch
-                    var res = apiService.getSalesReport("Bearer $token", period = period)
+                    var res = apiService.getSalesReport(
+                        "Bearer $token",
+                        period = period,
+                        startDate = startDate,
+                        endDate = endDate,
+                        drawId = drawId
+                    )
                     if (res.code() == 401) {
                         val refreshed = attemptTokenRefresh()
                         if (refreshed != null) {
                             token = refreshed
-                            res = apiService.getSalesReport("Bearer $token", period = period)
+                            res = apiService.getSalesReport(
+                                "Bearer $token",
+                                period = period,
+                                startDate = startDate,
+                                endDate = endDate,
+                                drawId = drawId
+                            )
                         } else {
                             onSessionExpired()
                             return@launch
@@ -745,6 +762,11 @@ class MainActivity : ComponentActivity() {
                         currentLanguage = currentLanguage,
                         vendorCode = vendorCode,
                         vendorName = vendorName,
+                        lotteryLogoUrl = prefs.getLotteryLogoUrl(),
+                        lotteryName = prefs.getLotteryName(),
+                        onFilterChange = { period, start, end, drawId ->
+                            fetchSalesReport(period, start, end, drawId)
+                        },
                         onPeriodChange = { newPeriod -> fetchSalesReport(newPeriod) },
                         onRefreshClick = { fetchSalesReport(selectedReportPeriod) },
                         onBackClick = { currentScreen = "DASHBOARD" }

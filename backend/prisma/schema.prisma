@@ -221,6 +221,8 @@ model Draw {
 
   winningResults  Json?          @db.JsonB
   validationHash  String?        @db.VarChar(255) // Signature SHA-256 scellée de validation
+  sessionName     String?        @db.VarChar(20)  // MIDI ou SOIR
+  blockedReason   String?        @db.VarChar(255) // Raison du blocage éventuel (ex: En attente des résultats précédents)
 
   tickets         Ticket[]
   blockedNumbers  BlockedNumber[]

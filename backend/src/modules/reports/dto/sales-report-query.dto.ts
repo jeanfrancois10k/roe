@@ -1,9 +1,9 @@
-import { IsOptional, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class SalesReportQueryDto {
   @IsOptional()
-  @IsIn(['day', 'week', 'month'], { message: "La période doit être 'day', 'week' ou 'month'" })
-  period?: 'day' | 'week' | 'month' = 'day';
+  @IsString()
+  period?: string = 'day';
 
   @IsOptional()
   @IsString()
@@ -11,5 +11,21 @@ export class SalesReportQueryDto {
 
   @IsOptional()
   @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
   vendorId?: string;
+
+  @IsOptional()
+  @IsString()
+  drawId?: string;
+
+  @IsOptional()
+  @IsString()
+  includeWinningTickets?: string;
 }

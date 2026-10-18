@@ -80,7 +80,10 @@ interface RoeApiService {
     @GET("api/v1/reports/sales")
     suspend fun getSalesReport(
         @retrofit2.http.Header("Authorization") authHeader: String,
-        @retrofit2.http.Query("period") period: String = "day",
+        @retrofit2.http.Query("period") period: String? = "day",
+        @retrofit2.http.Query("startDate") startDate: String? = null,
+        @retrofit2.http.Query("endDate") endDate: String? = null,
+        @retrofit2.http.Query("drawId") drawId: String? = null,
         @retrofit2.http.Query("date") date: String? = null,
         @retrofit2.http.Query("vendorId") vendorId: String? = null
     ): Response<SalesReportResponse>

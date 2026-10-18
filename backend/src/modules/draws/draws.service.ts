@@ -34,58 +34,136 @@ export interface LotteryDefinition {
 
 export const OFFICIAL_LOTTERIES: LotteryDefinition[] = [
   {
-    code: 'BOLET_NY',
-    name: 'Bolet New York (NY)',
-    description: 'Loterie traditionnelle New York - Midi (02:30 PM) et Soir (10:30 PM)',
-    drawFrequency: '02:30 PM & 10:30 PM',
+    code: 'BOLET_CHI',
+    name: 'Bolet Chicago (CHI)',
+    description: 'Loterie traditionnelle Chicago - Midi (01:38 PM) et Soir (10:18 PM)',
+    drawFrequency: '01:38 PM & 10:18 PM',
     schedules: [
-      { name: 'Midi', closeHour: 14, closeMinute: 15, drawHour: 14, drawMinute: 30 },
-      { name: 'Soir', closeHour: 22, closeMinute: 20, drawHour: 22, drawMinute: 30 },
+      { name: 'Midi', closeHour: 13, closeMinute: 38, drawHour: 13, drawMinute: 45 },
+      { name: 'Soir', closeHour: 22, closeMinute: 18, drawHour: 22, drawMinute: 30 },
     ],
   },
   {
     code: 'BOLET_FL',
     name: 'Bolet Florida (FL)',
-    description: 'Loterie traditionnelle Florida - Midi (01:30 PM) et Soir (09:45 PM)',
-    drawFrequency: '01:30 PM & 09:45 PM',
+    description: 'Loterie traditionnelle Florida - Midi (01:28 PM) et Soir (09:43 PM)',
+    drawFrequency: '01:28 PM & 09:43 PM',
     schedules: [
-      { name: 'Midi', closeHour: 13, closeMinute: 15, drawHour: 13, drawMinute: 30 },
-      { name: 'Soir', closeHour: 21, closeMinute: 30, drawHour: 21, drawMinute: 45 },
+      { name: 'Midi', closeHour: 13, closeMinute: 28, drawHour: 13, drawMinute: 35 },
+      { name: 'Soir', closeHour: 21, closeMinute: 43, drawHour: 21, drawMinute: 50 },
     ],
   },
   {
     code: 'BOLET_GA',
     name: 'Bolet Géorgie (GA)',
-    description: 'Loterie traditionnelle Géorgie - Midi (12:29 PM), Soir (06:59 PM) et Nuit (11:34 PM)',
-    drawFrequency: '12:29 PM, 06:59 PM & 11:34 PM',
+    description: 'Loterie traditionnelle Géorgie - Midi (12:27 PM) et Soir (06:57 PM)',
+    drawFrequency: '12:27 PM & 06:57 PM',
     schedules: [
-      { name: 'Midi', closeHour: 12, closeMinute: 15, drawHour: 12, drawMinute: 29 },
-      { name: 'Soir', closeHour: 18, closeMinute: 45, drawHour: 18, drawMinute: 59 },
-      { name: 'Nuit', closeHour: 23, closeMinute: 15, drawHour: 23, drawMinute: 34 },
+      { name: 'Midi', closeHour: 12, closeMinute: 27, drawHour: 12, drawMinute: 35 },
+      { name: 'Soir', closeHour: 18, closeMinute: 57, drawHour: 19, drawMinute: 5 },
     ],
   },
   {
-    code: 'BOLET_TX',
-    name: 'Bolet Texas (TX)',
-    description: 'Loterie traditionnelle Texas - Midi (01:27 PM), Soir (07:00 PM) et Nuit (11:12 PM)',
-    drawFrequency: '01:27 PM, 07:00 PM & 11:12 PM',
+    code: 'BOLET_NY',
+    name: 'Bolet New York (NY)',
+    description: 'Loterie traditionnelle New York - Midi (02:28 PM) et Soir (10:28 PM)',
+    drawFrequency: '02:28 PM & 10:28 PM',
     schedules: [
-      { name: 'Midi', closeHour: 13, closeMinute: 15, drawHour: 13, drawMinute: 27 },
-      { name: 'Soir', closeHour: 18, closeMinute: 45, drawHour: 19, drawMinute: 0 },
-      { name: 'Nuit', closeHour: 23, closeMinute: 0, drawHour: 23, drawMinute: 12 },
+      { name: 'Midi', closeHour: 14, closeMinute: 28, drawHour: 14, drawMinute: 35 },
+      { name: 'Soir', closeHour: 22, closeMinute: 28, drawHour: 22, drawMinute: 35 },
     ],
   },
   {
     code: 'BOLET_TN',
     name: 'Bolet Tennessee (TN)',
-    description: 'Loterie traditionnelle Tennessee - Midi (01:28 PM) et Soir (07:28 PM)',
-    drawFrequency: '01:28 PM & 07:28 PM',
+    description: 'Loterie traditionnelle Tennessee - Midi (10:09 AM) et Soir (07:09 PM)',
+    drawFrequency: '10:09 AM & 07:09 PM',
     schedules: [
-      { name: 'Midi', closeHour: 13, closeMinute: 15, drawHour: 13, drawMinute: 28 },
-      { name: 'Soir', closeHour: 19, closeMinute: 15, drawHour: 19, drawMinute: 28 },
+      { name: 'Midi', closeHour: 10, closeMinute: 9, drawHour: 10, drawMinute: 15 },
+      { name: 'Soir', closeHour: 19, closeMinute: 9, drawHour: 19, drawMinute: 15 },
+    ],
+  },
+  {
+    code: 'BOLET_TX',
+    name: 'Bolet Texas Early (TX)',
+    description: 'Loterie traditionnelle Texas Early - Midi (10:58 AM) et Soir (06:58 PM)',
+    drawFrequency: '10:58 AM & 06:58 PM',
+    schedules: [
+      { name: 'Midi', closeHour: 10, closeMinute: 58, drawHour: 11, drawMinute: 5 },
+      { name: 'Soir', closeHour: 18, closeMinute: 58, drawHour: 19, drawMinute: 5 },
     ],
   },
 ];
+
+/**
+ * Extraction des composantes de date et heure civiles dans le fuseau America/Port-au-Prince
+ */
+export function getHaitiDateParts(date: Date = new Date()) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Port-au-Prince',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  });
+  const parts = Object.fromEntries(
+    dtf
+      .formatToParts(date)
+      .filter((p) => p.type !== 'literal')
+      .map((p) => [p.type, parseInt(p.value, 10)]),
+  );
+  return {
+    year: parts.year,
+    month: parts.month - 1, // 0-indexed
+    day: parts.day,
+    hour: parts.hour === 24 ? 0 : parts.hour,
+    minute: parts.minute,
+    second: parts.second,
+  };
+}
+
+/**
+ * Création d'une date Date (UTC standard) correspondant exactement à une heure/minute en heure d'Haïti
+ */
+export function createHaitiDate(
+  year: number,
+  month: number, // 0-indexed
+  day: number,
+  hour: number,
+  minute: number,
+  second = 0,
+): Date {
+  const approxUtc = new Date(Date.UTC(year, month, day, hour, minute, second));
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Port-au-Prince',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  });
+  const parts = Object.fromEntries(
+    dtf
+      .formatToParts(approxUtc)
+      .filter((p) => p.type !== 'literal')
+      .map((p) => [p.type, parseInt(p.value, 10)]),
+  );
+  const haitiAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour === 24 ? 0 : parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  const offsetMs = haitiAsUtc - approxUtc.getTime();
+  return new Date(approxUtc.getTime() - offsetMs);
+}
 
 @Injectable()
 export class DrawsService implements OnModuleInit, OnModuleDestroy {
@@ -113,8 +191,6 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Initialisation des loteries différée : ${err.message}`);
     }
 
-    // Le cycle récurrent d'arrière-plan ne doit tourner que sur serveur permanent,
-    // jamais en environnement Serverless (Vercel) qui gèle l'exécution et coupe les sockets.
     if (!process.env.VERCEL) {
       this.timer = setInterval(async () => {
         try {
@@ -134,39 +210,21 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   isMidiDraw(salesClosingAt: Date | string): boolean {
-    const d = new Date(salesClosingAt);
-    const hourStr = d.toLocaleTimeString('en-US', {
-      timeZone: 'America/Port-au-Prince',
-      hour12: false,
-      hour: '2-digit',
-    });
-    const hour = parseInt(hourStr, 10);
-    return hour >= 10 && hour <= 15;
+    const parts = getHaitiDateParts(new Date(salesClosingAt));
+    return parts.hour < 16;
   }
 
   isSoirDraw(salesClosingAt: Date | string): boolean {
-    const d = new Date(salesClosingAt);
-    const hourStr = d.toLocaleTimeString('en-US', {
-      timeZone: 'America/Port-au-Prince',
-      hour12: false,
-      hour: '2-digit',
-    });
-    const hour = parseInt(hourStr, 10);
-    return hour >= 16 || hour < 4;
+    const parts = getHaitiDateParts(new Date(salesClosingAt));
+    return parts.hour >= 16;
   }
 
   getHaitiHour(date: Date = new Date()): number {
-    const str = date.toLocaleTimeString('en-US', {
-      timeZone: 'America/Port-au-Prince',
-      hour12: false,
-      hour: '2-digit',
-    });
-    const h = parseInt(str, 10);
-    return isNaN(h) ? date.getHours() : h;
+    return getHaitiDateParts(date).hour;
   }
 
   /**
-   * Assure que les 5 loteries officielles (NY, FL, GA, TX, TN) existent en base
+   * Assure que les 6 loteries officielles (CHI, FL, GA, NY, TN, TX) existent en base
    */
   async ensureDefaultLotteries() {
     const defaultRules = {
@@ -212,109 +270,180 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         },
       });
     }
-    this.logger.log('✅ 5 Loteries officielles synchronisées : NY, FL, GA, TX, TN');
+    this.logger.log('✅ 6 Loteries officielles synchronisées : CHI, FL, GA, NY, TN, TX');
   }
 
   /**
-   * Moteur Automatique : Clôture à l'heure exacte et ouverture des sessions
+   * Moteur Automatique : Clôture à l'heure exacte et ouverture conditionnelle des sessions
+   * RÈGLES CONFIRMÉES :
+   * 1. Clôture automatique à l'instant précis (salesClosingAt <= now) côté serveur.
+   * 2. Indépendance totale : chaque loterie a son propre cycle.
+   * 3. Réouverture conditionnelle : une prochaine session ne peut ouvrir que si :
+   *    a) L'heure de vente autorisée est atteinte (07h00 AM Haïti pour Midi).
+   *    b) La session précédente dont elle dépend a ses résultats PUBLIÉS et VALIDÉS (PUBLISHED).
+   *    c) Le jeu est actif et le moment présent est avant la clôture.
+   *    d) Si les résultats précédents sont en attente, la session reste SCHEDULED avec blockedReason explicite.
    */
   async autoProcessDraws() {
     try {
       const now = new Date();
 
-    // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
-    const expiredDraws = await this.prisma.draw.findMany({
-      where: {
-        status: DrawStatus.OPEN,
-        salesClosingAt: { lte: now },
-      },
-      include: { game: { select: { code: true, name: true } } },
-    });
-
-    for (const draw of expiredDraws) {
-      await this.prisma.draw.update({
-        where: { id: draw.id },
-        data: { status: DrawStatus.CLOSED },
+      // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
+      const expiredDraws = await this.prisma.draw.findMany({
+        where: {
+          status: DrawStatus.OPEN,
+          salesClosingAt: { lte: now },
+        },
+        include: { game: { select: { code: true, name: true } } },
       });
 
-      if (this.realtimeGateway?.server) {
-        this.realtimeGateway.server.emit('draw:closed', {
-          drawId: draw.id,
-          drawNumber: draw.drawNumber,
-          gameCode: draw.game.code,
-          timestamp: new Date().toISOString(),
-          autoClosed: true,
+      for (const draw of expiredDraws) {
+        await this.prisma.draw.update({
+          where: { id: draw.id },
+          data: { status: DrawStatus.CLOSED },
         });
+
+        if (this.realtimeGateway?.server) {
+          this.realtimeGateway.server.emit('draw:closed', {
+            drawId: draw.id,
+            drawNumber: draw.drawNumber,
+            gameCode: draw.game.code,
+            timestamp: new Date().toISOString(),
+            autoClosed: true,
+          });
+        }
+
+        await this.auditService.log({
+          action: 'DRAW_AUTO_CLOSED',
+          resource: `Draw:${draw.id}`,
+          newPayload: {
+            drawNumber: draw.drawNumber,
+            gameCode: draw.game.code,
+            closedAt: now.toISOString(),
+          },
+        });
+
+        this.logger.log(
+          `⏰ Clôture automatique des ventes : Tirage N°${draw.drawNumber} (${draw.game.name})`,
+        );
       }
 
-      await this.auditService.log({
-        action: 'DRAW_AUTO_CLOSED',
-        resource: `Draw:${draw.id}`,
-        newPayload: {
-          drawNumber: draw.drawNumber,
-          gameCode: draw.game.code,
-          closedAt: now.toISOString(),
-        },
-      });
+      const haitiNow = getHaitiDateParts(now);
 
-      this.logger.log(`⏰ Clôture automatique des ventes : Tirage N°${draw.drawNumber} (${draw.game.name})`);
-    }
-
-    const haitiHour = this.getHaitiHour(now);
-
-    // 2. Vérification et création / ouverture automatique pour les jeux actifs
-    for (const lotto of OFFICIAL_LOTTERIES) {
-      const game = await this.prisma.game.findUnique({ where: { code: lotto.code } });
-      if (!game || game.status !== 'ACTIVE') continue;
-
-      // Déverrouiller tout tirage SCHEDULED restant pour ce jeu en OPEN
-      await this.prisma.draw.updateMany({
-        where: {
-          gameId: game.id,
-          status: DrawStatus.SCHEDULED,
-          salesClosingAt: { gt: now },
-        },
-        data: { status: DrawStatus.OPEN },
-      });
-
-      // Vérifier s'il y a déjà un tirage OPEN dont salesClosingAt > now
-      const openDraw = await this.prisma.draw.findFirst({
-        where: {
-          gameId: game.id,
-          status: DrawStatus.OPEN,
-          salesClosingAt: { gt: now },
-        },
-      });
-
-      // Si aucun tirage n'est actuellement ouvert pour ce jeu, planifier et ouvrir immédiatement la prochaine session
-      if (!openDraw) {
-        let targetClose: Date | null = null;
-        let targetDraw: Date | null = null;
+      // 2. Traitement indépendant par loterie
+      for (const lotto of OFFICIAL_LOTTERIES) {
+        const game = await this.prisma.game.findUnique({ where: { code: lotto.code } });
+        if (!game || game.status !== 'ACTIVE') continue;
 
         const effectiveSchedules =
-          Array.isArray((game.gameRules as any)?.schedules) && (game.gameRules as any).schedules.length > 0
+          Array.isArray((game.gameRules as any)?.schedules) &&
+          (game.gameRules as any).schedules.length > 0
             ? (game.gameRules as any).schedules
             : lotto.schedules;
 
-        for (const s of effectiveSchedules) {
-          const cClose = new Date(now.getFullYear(), now.getMonth(), now.getDate(), s.closeHour, s.closeMinute, 0);
-          const cDraw = new Date(now.getFullYear(), now.getMonth(), now.getDate(), s.drawHour, s.drawMinute, 0);
+        // Identifier la session cible du jour (ou de demain)
+        let targetSchedule: any = null;
+        let targetClose: Date | null = null;
+        let targetDraw: Date | null = null;
+        let isTargetTomorrow = false;
 
-          if (cClose > now) {
-            targetClose = cClose;
-            targetDraw = cDraw;
+        for (const s of effectiveSchedules) {
+          const candidateClose = createHaitiDate(
+            haitiNow.year,
+            haitiNow.month,
+            haitiNow.day,
+            s.closeHour,
+            s.closeMinute,
+            0,
+          );
+          const candidateDraw = createHaitiDate(
+            haitiNow.year,
+            haitiNow.month,
+            haitiNow.day,
+            s.drawHour,
+            s.drawMinute,
+            0,
+          );
+
+          if (candidateClose > now) {
+            targetSchedule = s;
+            targetClose = candidateClose;
+            targetDraw = candidateDraw;
             break;
           }
         }
 
-        // Si toutes les sessions du jour sont terminées, ouvrir la 1ère session de demain
         if (!targetClose) {
+          isTargetTomorrow = true;
           const firstSched = effectiveSchedules[0];
-          targetClose = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, firstSched.closeHour, firstSched.closeMinute, 0);
-          targetDraw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, firstSched.drawHour, firstSched.drawMinute, 0);
+          targetSchedule = firstSched;
+          targetClose = createHaitiDate(
+            haitiNow.year,
+            haitiNow.month,
+            haitiNow.day + 1,
+            firstSched.closeHour,
+            firstSched.closeMinute,
+            0,
+          );
+          targetDraw = createHaitiDate(
+            haitiNow.year,
+            haitiNow.month,
+            haitiNow.day + 1,
+            firstSched.drawHour,
+            firstSched.drawMinute,
+            0,
+          );
         }
 
-        // Vérifier s'il existe déjà un tirage en base pour cette heure de clôture
+        const sessionName = (
+          targetSchedule?.name || (this.isMidiDraw(targetClose) ? 'Midi' : 'Soir')
+        ).toUpperCase();
+
+        // 3. Détermination de la dépendance à la session précédente
+        const previousDraw = await this.prisma.draw.findFirst({
+          where: {
+            gameId: game.id,
+            salesClosingAt: { lt: targetClose },
+          },
+          orderBy: { salesClosingAt: 'desc' },
+        });
+
+        let previousResultsPublished = true;
+        let blockReason: string | null = null;
+
+        if (previousDraw) {
+          if (previousDraw.status !== DrawStatus.PUBLISHED) {
+            previousResultsPublished = false;
+            const prevSession = previousDraw.sessionName || (this.isMidiDraw(previousDraw.salesClosingAt) ? 'Midi' : 'Soir');
+            blockReason = `En attente de la publication des résultats officiels de la session précédente (${prevSession} N°${previousDraw.drawNumber})`;
+          }
+        }
+
+        // Vérification de la fenêtre horaire autorisée pour la session Midi (07h00 du matin heure d'Haïti)
+        let openingTimeReached = true;
+        if (sessionName === 'MIDI') {
+          const targetDay = isTargetTomorrow ? haitiNow.day + 1 : haitiNow.day;
+          const morningOpenTime = createHaitiDate(
+            haitiNow.year,
+            haitiNow.month,
+            targetDay,
+            7,
+            0,
+            0,
+          );
+          if (now < morningOpenTime) {
+            openingTimeReached = false;
+            blockReason = blockReason || 'Les ventes de la session Midi débutent à 07h00 AM (heure d’Haïti).';
+          }
+        }
+
+        const isEligibleToOpen =
+          previousResultsPublished &&
+          openingTimeReached &&
+          now < targetClose &&
+          game.status === 'ACTIVE';
+
+        // 4. Synchronisation du tirage en base
         const existingDraw = await this.prisma.draw.findFirst({
           where: {
             gameId: game.id,
@@ -323,14 +452,42 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         });
 
         if (existingDraw) {
-          if (existingDraw.status !== DrawStatus.OPEN) {
+          if (isEligibleToOpen && existingDraw.status !== DrawStatus.OPEN) {
             await this.prisma.draw.update({
               where: { id: existingDraw.id },
-              data: { status: DrawStatus.OPEN },
+              data: {
+                status: DrawStatus.OPEN,
+                sessionName,
+                blockedReason: null,
+              },
             });
-            this.logger.log(`🔓 Activation immédiate session N°${existingDraw.drawNumber} (${game.name})`);
+
+            if (this.realtimeGateway?.server) {
+              this.realtimeGateway.server.emit('draw:opened', {
+                drawId: existingDraw.id,
+                drawNumber: existingDraw.drawNumber,
+                gameCode: game.code,
+                session: sessionName,
+                timestamp: new Date().toISOString(),
+                salesClosingAt: targetClose.toISOString(),
+              });
+            }
+            this.logger.log(
+              `🔓 Ouverture des ventes : Tirage N°${existingDraw.drawNumber} (${game.name} - ${sessionName})`,
+            );
+          } else if (!isEligibleToOpen && existingDraw.status !== DrawStatus.CLOSED && existingDraw.status !== DrawStatus.PUBLISHED) {
+            // Maintien ou remise en SCHEDULED avec la raison du blocage
+            await this.prisma.draw.update({
+              where: { id: existingDraw.id },
+              data: {
+                status: DrawStatus.SCHEDULED,
+                sessionName,
+                blockedReason: blockReason,
+              },
+            });
           }
         } else {
+          // Création du prochain tirage
           const maxDraw = await this.prisma.draw.aggregate({
             where: { gameId: game.id },
             _max: { drawNumber: true },
@@ -343,26 +500,30 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
               drawNumber: nextDrawNum,
               scheduledAt: targetDraw,
               salesClosingAt: targetClose,
-              status: DrawStatus.OPEN, // Toujours OUVERT immédiatement dès que le précédent est clôturé
+              status: isEligibleToOpen ? DrawStatus.OPEN : DrawStatus.SCHEDULED,
+              sessionName,
+              blockedReason: isEligibleToOpen ? null : blockReason,
             },
             include: { game: { select: { code: true, name: true } } },
           });
 
-          if (this.realtimeGateway?.server) {
+          if (isEligibleToOpen && this.realtimeGateway?.server) {
             this.realtimeGateway.server.emit('draw:opened', {
               drawId: newDraw.id,
               drawNumber: newDraw.drawNumber,
               gameCode: newDraw.game.code,
+              session: sessionName,
               timestamp: new Date().toISOString(),
               salesClosingAt: targetClose.toISOString(),
               autoScheduled: true,
             });
           }
 
-          this.logger.log(`✨ Nouveau tirage N°${newDraw.drawNumber} pour ${game.name} OUVERT jusqu'à ${targetClose.toLocaleTimeString()}`);
+          this.logger.log(
+            `✨ Tirage N°${newDraw.drawNumber} (${game.name} - ${sessionName}) créé : Statut [${newDraw.status}]${blockReason ? ` | Blocage: ${blockReason}` : ''}`,
+          );
         }
       }
-    }
     } catch (err: any) {
       this.logger.warn(`[autoProcessDraws] Avertissement base de données : ${err.message}`);
     }
@@ -822,6 +983,11 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(
       `Tirage N°${publishedDraw.drawNumber} publié (${publishedDraw.game.name}). ${tickets.length} tickets analysés, ${totalWinners} gagnants ($${totalWonAmount.toFixed(2)} à payer).`,
     );
+
+    // Déblocage et ouverture immédiats de la prochaine session dépendante
+    await this.autoProcessDraws().catch((err) => {
+      this.logger.warn(`Post-publish autoProcessDraws: ${err.message}`);
+    });
 
     return {
       ...publishedDraw,

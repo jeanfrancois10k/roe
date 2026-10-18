@@ -164,30 +164,34 @@ export default function DrawsPage() {
       schedules = customSchedules;
     } else {
       const defaultSchedules: Record<string, { closeHour: number; closeMinute: number }[]> = {
-        BOLET_NY: [
-          { closeHour: 12, closeMinute: 20 },
-          { closeHour: 19, closeMinute: 20 },
+        BOLET_CHI: [
+          { closeHour: 13, closeMinute: 38 },
+          { closeHour: 22, closeMinute: 18 },
         ],
         BOLET_FL: [
-          { closeHour: 13, closeMinute: 20 },
-          { closeHour: 21, closeMinute: 20 },
+          { closeHour: 13, closeMinute: 28 },
+          { closeHour: 21, closeMinute: 43 },
         ],
         BOLET_GA: [
-          { closeHour: 12, closeMinute: 20 },
-          { closeHour: 18, closeMinute: 50 },
+          { closeHour: 12, closeMinute: 27 },
+          { closeHour: 18, closeMinute: 57 },
         ],
-        BOLET_TX: [
-          { closeHour: 12, closeMinute: 15 },
-          { closeHour: 22, closeMinute: 0 },
+        BOLET_NY: [
+          { closeHour: 14, closeMinute: 28 },
+          { closeHour: 22, closeMinute: 28 },
         ],
         BOLET_TN: [
-          { closeHour: 12, closeMinute: 15 },
-          { closeHour: 18, closeMinute: 15 },
+          { closeHour: 10, closeMinute: 9 },
+          { closeHour: 19, closeMinute: 9 },
+        ],
+        BOLET_TX: [
+          { closeHour: 10, closeMinute: 58 },
+          { closeHour: 18, closeMinute: 58 },
         ],
       };
       schedules = defaultSchedules[game.code] || [
-        { closeHour: 12, closeMinute: 30 },
-        { closeHour: 19, closeMinute: 30 },
+        { closeHour: 13, closeMinute: 0 },
+        { closeHour: 21, closeMinute: 0 },
       ];
     }
 
@@ -239,13 +243,14 @@ export default function DrawsPage() {
     }
   };
 
-  // Informations officielles des horaires des loteries certifiées
+  // Informations officielles des horaires des loteries certifiées (Heure d'Haïti)
   const LOTTERY_SCHEDULE_INFO: Record<string, { midiClose: string; midiDraw: string; soirClose: string; soirDraw: string }> = {
-    BOLET_NY: { midiClose: '14:15', midiDraw: '14:30 (02:30 PM)', soirClose: '22:20', soirDraw: '22:30 (10:30 PM)' },
-    BOLET_FL: { midiClose: '13:15', midiDraw: '13:30 (01:30 PM)', soirClose: '21:30', soirDraw: '21:45 (09:45 PM)' },
-    BOLET_GA: { midiClose: '12:15', midiDraw: '12:29 (12:29 PM)', soirClose: '18:45', soirDraw: '18:59 (06:59 PM)' },
-    BOLET_TX: { midiClose: '13:15', midiDraw: '13:27 (01:27 PM)', soirClose: '18:45', soirDraw: '19:00 (07:00 PM)' },
-    BOLET_TN: { midiClose: '13:15', midiDraw: '13:28 (01:28 PM)', soirClose: '19:15', soirDraw: '19:28 (07:28 PM)' },
+    BOLET_CHI: { midiClose: '13:38', midiDraw: '13:45 (01:45 PM)', soirClose: '22:18', soirDraw: '22:30 (10:30 PM)' },
+    BOLET_FL: { midiClose: '13:28', midiDraw: '13:35 (01:35 PM)', soirClose: '21:43', soirDraw: '21:50 (09:50 PM)' },
+    BOLET_GA: { midiClose: '12:27', midiDraw: '12:35 (12:35 PM)', soirClose: '18:57', soirDraw: '19:05 (07:05 PM)' },
+    BOLET_NY: { midiClose: '14:28', midiDraw: '14:35 (02:35 PM)', soirClose: '22:28', soirDraw: '22:35 (10:35 PM)' },
+    BOLET_TN: { midiClose: '10:09', midiDraw: '10:15 (10:15 AM)', soirClose: '19:09', soirDraw: '19:15 (07:15 PM)' },
+    BOLET_TX: { midiClose: '10:58', midiDraw: '11:05 (11:05 AM)', soirClose: '18:58', soirDraw: '19:05 (07:05 PM)' },
   };
 
   // Ouverture du modal de modification des horaires et multiplicateurs d'une loterie

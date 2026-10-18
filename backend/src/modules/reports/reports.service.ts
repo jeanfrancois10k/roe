@@ -9,34 +9,82 @@ export class ReportsService {
 
   async getSalesReport(query: SalesReportQueryDto, forcedVendorId?: string, isAdmin = false) {
     const period = query.period || 'day';
-    const targetDate = query.date ? new Date(query.date) : new Date();
-
     let startDate: Date;
     let endDate: Date;
 
-    if (period === 'day') {
-      startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
-      endDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
-    } else if (period === 'week') {
-      // Début de semaine (Lundi)
-      const dayOfWeek = targetDate.getDay();
-      const diffToMonday = (dayOfWeek + 6) % 7;
-      startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() - diffToMonday, 0, 0, 0, 0);
-      endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 6, 23, 59, 59, 999);
+    if (query.startDate) {
+      // Plage personnalisée choisie par l'utilisateur (entre plusieurs dates)
+      const startClean = query.startDate.split('T')[0];
+      const startParts = startClean.split('-').map(Number);
+      startDate = new Date(startParts[0], startParts[1] - 1, startParts[2], 0, 0, 0, 0);
+
+      if (query.endDate) {
+        const endClean = query.endDate.split('T')[0];
+        const endParts = endClean.split('-').map(Number);
+        endDate = new Date(endParts[0], endParts[1] - 1, endParts[2], 23, 59, 59, 999);
+      } else {
+        endDate = new Date(startParts[0], startParts[1] - 1, startParts[2], 23, 59, 59, 999);
+      }
     } else {
-      // Mois complet
-      startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1, 0, 0, 0, 0);
-      endDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59, 999);
+      const targetDate = query.date ? new Date(query.date) : new Date();
+      if (period === 'day') {
+        startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
+        endDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+      } else if (period === 'week') {
+        // Début de semaine (Lundi)
+        const dayOfWeek = targetDate.getDay();
+        const diffToMonday = (dayOfWeek + 6) % 7;
+        startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() - diffToMonday, 0, 0, 0, 0);
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 6, 23, 59, 59, 999);
+      } else {
+        // Mois complet
+        startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1, 0, 0, 0, 0);
+        endDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59, 999);
+      }
     }
 
     const effectiveVendorId = forcedVendorId || (isAdmin ? query.vendorId : undefined);
     const vendorFilter = effectiveVendorId ? { vendorId: effectiveVendorId } : {};
+    const drawFilter = query.drawId && query.drawId !== 'ALL' && query.drawId !== '' ? { drawId: query.drawId } : {};
+
+    // Informations Vendeur & Taux de Commission
+    let vendorCode = '';
+    let vendorFullName = '';
+    let vendorCommissionRate = 8.0;
+
+    if (effectiveVendorId) {
+      const vendorRecord = await this.prisma.vendor.findUnique({
+        where: { id: effectiveVendorId },
+        select: { vendorCode: true, fullName: true, defaultCommissionRate: true },
+      });
+      if (vendorRecord) {
+        vendorCode = vendorRecord.vendorCode || '';
+        vendorFullName = vendorRecord.fullName || '';
+        if (vendorRecord.defaultCommissionRate != null) {
+          vendorCommissionRate = Number(vendorRecord.defaultCommissionRate);
+        }
+      }
+    }
+
+    // Paramètres système (Nom de la borlette, Logo, Devise)
+    const [nameSetting, logoSetting, phoneSetting, currencySetting] = await Promise.all([
+      this.prisma.systemSetting.findUnique({ where: { key: 'LOTTERY_NAME' } }),
+      this.prisma.systemSetting.findUnique({ where: { key: 'LOTTERY_LOGO_URL' } }),
+      this.prisma.systemSetting.findUnique({ where: { key: 'LOTTERY_PHONE' } }),
+      this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } }),
+    ]);
+
+    const lotteryName = nameSetting?.value || 'TOTAL CENTER LOTO';
+    const lotteryLogoUrl = logoSetting?.value || '';
+    const lotteryPhone = phoneSetting?.value || '';
+    const currency = currencySetting?.value || 'HTG';
 
     // 1. Métriques Globales
-    const [salesAgg, winnerAgg, prizesPaidAgg, rawTickets] = await Promise.all([
+    const [salesAgg, winnerAgg, prizesPaidAgg, rawTickets, winningTickets] = await Promise.all([
       this.prisma.ticket.aggregate({
         where: {
           ...vendorFilter,
+          ...drawFilter,
           createdAt: { gte: startDate, lte: endDate },
           status: TicketStatus.CONFIRMED,
         },
@@ -46,6 +94,7 @@ export class ReportsService {
       this.prisma.ticket.aggregate({
         where: {
           ...vendorFilter,
+          ...drawFilter,
           createdAt: { gte: startDate, lte: endDate },
           status: TicketStatus.CONFIRMED,
           isWinner: true,
@@ -56,6 +105,7 @@ export class ReportsService {
       this.prisma.ticket.aggregate({
         where: {
           ...(effectiveVendorId ? { paidByVendorId: effectiveVendorId } : {}),
+          ...drawFilter,
           paidAt: { gte: startDate, lte: endDate },
           payoutStatus: TicketPayoutStatus.PAID,
         },
@@ -65,6 +115,7 @@ export class ReportsService {
       this.prisma.ticket.findMany({
         where: {
           ...vendorFilter,
+          ...drawFilter,
           createdAt: { gte: startDate, lte: endDate },
           status: TicketStatus.CONFIRMED,
         },
@@ -99,6 +150,30 @@ export class ReportsService {
           },
         },
       }),
+      this.prisma.ticket.findMany({
+        where: {
+          ...vendorFilter,
+          ...drawFilter,
+          createdAt: { gte: startDate, lte: endDate },
+          status: TicketStatus.CONFIRMED,
+          isWinner: true,
+        },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          ticketNumber: true,
+          createdAt: true,
+          totalAmount: true,
+          wonAmount: true,
+          payoutStatus: true,
+          draw: {
+            select: {
+              drawNumber: true,
+              game: { select: { name: true, code: true } },
+            },
+          },
+        },
+      }),
     ]);
 
     const totalSales = Number(salesAgg._sum.totalAmount || 0);
@@ -108,6 +183,11 @@ export class ReportsService {
     const prizesPaid = Number(prizesPaidAgg._sum.wonAmount || 0);
     const prizesPaidCount = prizesPaidAgg._count._all || 0;
     const netRevenue = Number((totalSales - prizesPaid).toFixed(2));
+
+    // Calculs conformes au ticket thermique officiel Borlette
+    const commission = Number((totalSales * (vendorCommissionRate / 100.0)).toFixed(2));
+    const balanceCash = Number((totalSales - prizesPaid).toFixed(2)); // Ventes - Pertes
+    const balanceTotale = Number((balanceCash - commission).toFixed(2)); // Balance Cash - Commission
 
     // 2. Répartition Par Tirage (byDraw)
     const drawMap = new Map<string, {
@@ -194,14 +274,31 @@ export class ReportsService {
       byVendor = Array.from(vendorMap.values()).sort((a, b) => b.totalSales - a.totalSales);
     }
 
-    const currencySetting = await this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } });
-    const currency = currencySetting?.value || 'HTG';
+    // 4. Formatage Liste Tickets Gagnants (Reçu Thermique Photo 1)
+    const formattedWinningTickets = winningTickets.map((t) => ({
+      ticketNumber: t.ticketNumber,
+      createdAt: t.createdAt.toISOString(),
+      totalAmount: Number(t.totalAmount),
+      wonAmount: Number(t.wonAmount),
+      payoutStatus: t.payoutStatus === TicketPayoutStatus.PAID ? 'P' : 'NP',
+      drawName: t.draw ? `${t.draw.game?.name || ''} #${t.draw.drawNumber}` : 'Tirage',
+    }));
 
     return {
       period,
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       currency,
+      lottery: {
+        name: lotteryName,
+        logoUrl: lotteryLogoUrl,
+        phone: lotteryPhone,
+      },
+      vendor: {
+        code: vendorCode,
+        name: vendorFullName,
+        commissionRate: vendorCommissionRate,
+      },
       global: {
         totalSales,
         ticketsCount,
@@ -210,9 +307,21 @@ export class ReportsService {
         prizesPaid,
         prizesPaidCount,
         netRevenue,
+        // Champs thermiques
+        nombreFichesVendues: ticketsCount,
+        nombreFichesGagnantes: winningTicketsCount,
+        ventesTotal: totalSales,
+        ventesCash: totalSales,
+        ventesMoncash: 0.0,
+        paiementsPertes: prizesPaid,
+        balanceCash,
+        commission,
+        commissionRate: vendorCommissionRate,
+        balanceTotale,
       },
       byDraw,
       byVendor,
+      winningTickets: formattedWinningTickets,
     };
   }
 }

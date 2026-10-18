@@ -192,7 +192,9 @@ data class OpenDrawItem(
     @SerializedName("status") val status: String,
     @SerializedName("salesClosingAt") val salesClosingAt: String,
     @SerializedName("scheduledAt") val scheduledAt: String,
-    @SerializedName("game") val game: OpenDrawGame
+    @SerializedName("game") val game: OpenDrawGame,
+    @SerializedName("sessionName") val sessionName: String? = null,
+    @SerializedName("blockedReason") val blockedReason: String? = null
 )
 
 data class DrawResultItem(
@@ -267,14 +269,38 @@ data class ControlSummaryResponse(
     @SerializedName("currency") val currency: String = "HTG"
 )
 
+data class WinningTicketReportItem(
+    @SerializedName("ticketNumber") val ticketNumber: String,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("totalAmount") val totalAmount: Double,
+    @SerializedName("wonAmount") val wonAmount: Double,
+    @SerializedName("payoutStatus") val payoutStatus: String, // "P" (Peye) ou "NP" (Non peye)
+    @SerializedName("drawName") val drawName: String? = null
+)
+
+data class ReportLotteryInfo(
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("logoUrl") val logoUrl: String? = null,
+    @SerializedName("phone") val phone: String? = null
+)
+
+data class ReportVendorInfo(
+    @SerializedName("code") val code: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("commissionRate") val commissionRate: Double? = 8.0
+)
+
 data class SalesReportResponse(
     @SerializedName("period") val period: String,
     @SerializedName("startDate") val startDate: String,
     @SerializedName("endDate") val endDate: String,
     @SerializedName("currency") val currency: String = "HTG",
+    @SerializedName("lottery") val lottery: ReportLotteryInfo? = null,
+    @SerializedName("vendor") val vendor: ReportVendorInfo? = null,
     @SerializedName("global") val global: SalesReportGlobal,
     @SerializedName("byDraw") val byDraw: List<DrawSalesReportItem>,
-    @SerializedName("byVendor") val byVendor: List<VendorSalesReportItem>? = null
+    @SerializedName("byVendor") val byVendor: List<VendorSalesReportItem>? = null,
+    @SerializedName("winningTickets") val winningTickets: List<WinningTicketReportItem>? = null
 )
 
 data class SalesReportGlobal(
@@ -284,7 +310,18 @@ data class SalesReportGlobal(
     @SerializedName("totalWonAmount") val totalWonAmount: Double,
     @SerializedName("prizesPaid") val prizesPaid: Double,
     @SerializedName("prizesPaidCount") val prizesPaidCount: Int,
-    @SerializedName("netRevenue") val netRevenue: Double
+    @SerializedName("netRevenue") val netRevenue: Double,
+    // Métriques reçus thermiques Total Center
+    @SerializedName("nombreFichesVendues") val nombreFichesVendues: Int = ticketsCount,
+    @SerializedName("nombreFichesGagnantes") val nombreFichesGagnantes: Int = winningTicketsCount,
+    @SerializedName("ventesTotal") val ventesTotal: Double = totalSales,
+    @SerializedName("ventesCash") val ventesCash: Double = totalSales,
+    @SerializedName("ventesMoncash") val ventesMoncash: Double = 0.0,
+    @SerializedName("paiementsPertes") val paiementsPertes: Double = prizesPaid,
+    @SerializedName("balanceCash") val balanceCash: Double = (totalSales - prizesPaid),
+    @SerializedName("commission") val commission: Double = 0.0,
+    @SerializedName("commissionRate") val commissionRate: Double = 8.0,
+    @SerializedName("balanceTotale") val balanceTotale: Double = (totalSales - prizesPaid)
 )
 
 data class DrawSalesReportItem(

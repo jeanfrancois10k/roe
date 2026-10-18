@@ -160,9 +160,17 @@ describe('TicketsService (Règles Critiques & Sécurité Transactionnelle)', () 
     prismaMock.ticket.aggregate.mockResolvedValue({ _sum: { totalAmount: 0 } });
 
     // En mode Borlette standard : solde à 0 et découvert à 0 -> la vente réussit jusqu'au plafond journalier
-    prismaMock.$queryRaw.mockResolvedValue([
-      { currentBalance: 0, creditLimit: 0 },
-    ]);
+    prismaMock.$queryRaw.mockImplementation((...args: any[]) => {
+      const str = JSON.stringify(args);
+      if (str.includes('Draw')) {
+        return Promise.resolve([
+          { id: 'd-1', status: DrawStatus.OPEN, salesClosingAt: new Date(Date.now() + 60 * 60 * 1000) },
+        ]);
+      }
+      return Promise.resolve([
+        { currentBalance: 0, creditLimit: 0 },
+      ]);
+    });
     prismaMock.vendor.update.mockResolvedValue({ id: 'v-1', currentBalance: -10 } as any);
     prismaMock.transaction.create.mockResolvedValue({ id: 'tx-1' } as any);
     prismaMock.ticket.create.mockResolvedValue({

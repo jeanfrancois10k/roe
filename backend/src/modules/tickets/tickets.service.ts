@@ -141,7 +141,7 @@ export class TicketsService {
       );
     }
 
-    // RÈGLE 5.1 : Contrôle strict des sessions Midi (07h00 - 13h00) vs Soir
+    // RÈGLE 5.1 : Horaires autorisés de vente de la journée (à partir de 07h00 en heure d'Haïti)
     const haitiHourStr = now.toLocaleTimeString('en-US', {
       timeZone: 'America/Port-au-Prince',
       hour12: false,
@@ -149,23 +149,9 @@ export class TicketsService {
     });
     const haitiHour = parseInt(haitiHourStr, 10);
 
-    const drawClosingHaitiHourStr = new Date(draw.salesClosingAt).toLocaleTimeString('en-US', {
-      timeZone: 'America/Port-au-Prince',
-      hour12: false,
-      hour: '2-digit',
-    });
-    const drawClosingHaitiHour = parseInt(drawClosingHaitiHourStr, 10);
-    const isSoirDraw = drawClosingHaitiHour >= 16 || drawClosingHaitiHour < 4;
-
     if (haitiHour < 7) {
       throw new BadRequestException(
-        'Vente rejetée : Les ventes de la journée débutent à 07h00 du matin.',
-      );
-    }
-
-    if (haitiHour >= 7 && haitiHour < 13 && isSoirDraw) {
-      throw new BadRequestException(
-        'Vente rejetée : Entre 07h00 et 13h00, c’est le tirage Midi. Vous ne pouvez pas vendre pour le tirage du Soir pendant la session Midi.',
+        'Vente rejetée : Les ventes de la journée débutent à 07h00 du matin (heure d’Haïti).',
       );
     }
 
@@ -264,6 +250,25 @@ export class TicketsService {
 
     // RÈGLE 9 & 10 : TRANSACTION ATOMIQUE AVEC LOCK PESSIMISTE POSTGRESQL
     return await this.prisma.$transaction(async (tx) => {
+      // Arbitrage strict sous transaction : re-vérification du tirage et de l'heure exacte de validation
+      const [lockedDraw] = await tx.$queryRaw<Array<{ id: string; status: string; salesClosingAt: Date }>>`
+        SELECT "id", "status", "salesClosingAt" 
+        FROM "Draw" 
+        WHERE "id" = ${dto.drawId}::uuid 
+        FOR SHARE
+      `;
+
+      if (!lockedDraw || lockedDraw.status !== DrawStatus.OPEN) {
+        throw new BadRequestException('Vente rejetée : les ventes pour ce tirage ne sont pas ouvertes.');
+      }
+
+      const txExecutionTime = new Date();
+      if (txExecutionTime >= new Date(lockedDraw.salesClosingAt)) {
+        throw new BadRequestException(
+          `Vente rejetée : heure limite de clôture atteinte ou dépassée (${new Date(lockedDraw.salesClosingAt).toLocaleTimeString()}).`,
+        );
+      }
+
       // Locking pessimiste sur la ligne du vendeur
       const [lockedVendor] = await tx.$queryRaw<Array<{ currentBalance: any; creditLimit: any }>>`
         SELECT "currentBalance", "creditLimit" 

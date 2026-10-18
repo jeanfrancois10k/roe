@@ -88,6 +88,97 @@ object TicketReceiptUtil {
             null
         }
     }
+
+    /**
+     * Formate le rapport de vente thermique (Photo 2)
+     */
+    fun formatThermalSalesReportText(
+        lotteryName: String,
+        vendorCode: String,
+        startDate: String,
+        endDate: String,
+        drawName: String = "Tous les tirages",
+        global: com.roebolet.vendor.data.api.SalesReportGlobal
+    ): String {
+        val now = java.text.SimpleDateFormat("HH:mm - dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+        val startFormatted = formatDateDisplay(startDate)
+        val endFormatted = formatDateDisplay(endDate)
+
+        return """
+            ${lotteryName.uppercase()}*****
+
+            Données MAJ : $now
+            Rapo du $startFormatted au $endFormatted
+            $drawName
+            Banque : $vendorCode
+            ================================
+            Nombre fiches vendues :
+            ${global.nombreFichesVendues}
+            --------------------------------
+            Nombre fiches gagnantes :
+            ${global.nombreFichesGagnantes}
+            ================================
+            Vant :
+            Total : ${String.format("%.0f", global.ventesTotal)}
+            Cash : ${String.format("%.0f", global.ventesCash)}
+            Moncash : ${String.format("%.0f", global.ventesMoncash)}
+            --------------------------------
+            Paiements pet :
+            ${String.format("%.0f", global.paiementsPertes)}
+            --------------------------------
+            Balance cash
+            (ventes - pertes)
+            ${String.format("%.0f", global.balanceCash)}
+            --------------------------------
+            Commission :
+            ${String.format("%.0f", global.commission)}
+            --------------------------------
+            Balance totale
+            (balance cash - commission)
+            ${String.format("%.0f", global.balanceTotale)}
+            ================================
+        """.trimIndent()
+    }
+
+    /**
+     * Formate le rapport de fiches gagnantes thermique (Photo 1)
+     */
+    fun formatThermalWinningTicketsText(
+        lotteryName: String,
+        vendorCode: String,
+        drawName: String = "tous tirages",
+        winningTickets: List<com.roebolet.vendor.data.api.WinningTicketReportItem>
+    ): String {
+        val now = java.text.SimpleDateFormat("HH:mm - dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+        val sb = StringBuilder()
+        sb.append("${lotteryName.uppercase()}*****\n\n")
+        sb.append("$now\n")
+        sb.append("Tirage : $drawName\n")
+        sb.append("Banque : $vendorCode\n\n")
+        sb.append("Tickets gagnants ($drawName)\n")
+        sb.append("--------------------------------\n")
+        if (winningTickets.isEmpty()) {
+            sb.append("Aucun ticket gagnant enregistré.\n")
+        } else {
+            for (t in winningTickets) {
+                val datePart = t.createdAt.take(16).replace("T", " ")
+                sb.append("${t.ticketNumber} $datePart\n")
+                sb.append("Mise ${String.format("%.0f", t.totalAmount)} Gen ${String.format("%.0f", t.wonAmount)} ${t.payoutStatus}\n")
+                sb.append("--------------------------------\n")
+            }
+        }
+        return sb.toString()
+    }
+
+    fun formatDateDisplay(isoOrDate: String): String {
+        return try {
+            val clean = isoOrDate.take(10)
+            val parts = clean.split("-")
+            if (parts.size == 3) "${parts[2]}/${parts[1]}/${parts[0]}" else clean
+        } catch (_: Exception) {
+            isoOrDate
+        }
+    }
 }
 
 /**
