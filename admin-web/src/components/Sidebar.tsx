@@ -13,6 +13,7 @@ import {
   LogOut,
   X,
   Smartphone,
+  BarChart3,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -33,11 +34,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const navItems: NavItem[] = [
     { name: 'Tableau de bord', href: '/', icon: LayoutDashboard },
+    { name: 'Rapports des Ventes', href: '/reports', icon: BarChart3 },
     { name: 'Vendeurs & POS', href: '/vendors', icon: Users },
     { name: 'Jeux & Tirages', href: '/draws', icon: Dices },
     { name: 'Piste d’Audit', href: '/audit', icon: ShieldAlert },
     { name: 'Transactions Ledger', href: '/#ledger', icon: ReceiptText },
-    { name: 'Télécharger APK POS', href: '/download', icon: Smartphone, badge: 'v1.0' },
+    { name: 'Télécharger APK POS', href: '/download', icon: Smartphone, badge: 'v1.0.3' },
   ];
 
   const handleLogout = () => {

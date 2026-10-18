@@ -248,3 +248,48 @@ data class ControlSummaryResponse(
     @SerializedName("currentBalance") val currentBalance: Double,
     @SerializedName("currency") val currency: String = "HTG"
 )
+
+data class SalesReportResponse(
+    @SerializedName("period") val period: String,
+    @SerializedName("startDate") val startDate: String,
+    @SerializedName("endDate") val endDate: String,
+    @SerializedName("currency") val currency: String = "HTG",
+    @SerializedName("global") val global: SalesReportGlobal,
+    @SerializedName("byDraw") val byDraw: List<DrawSalesReportItem>,
+    @SerializedName("byVendor") val byVendor: List<VendorSalesReportItem>? = null
+)
+
+data class SalesReportGlobal(
+    @SerializedName("totalSales") val totalSales: Double,
+    @SerializedName("ticketsCount") val ticketsCount: Int,
+    @SerializedName("winningTicketsCount") val winningTicketsCount: Int,
+    @SerializedName("totalWonAmount") val totalWonAmount: Double,
+    @SerializedName("prizesPaid") val prizesPaid: Double,
+    @SerializedName("prizesPaidCount") val prizesPaidCount: Int,
+    @SerializedName("netRevenue") val netRevenue: Double
+)
+
+data class DrawSalesReportItem(
+    @SerializedName("drawId") val drawId: String,
+    @SerializedName("drawNumber") val drawNumber: Int,
+    @SerializedName("scheduledAt") val scheduledAt: String,
+    @SerializedName("gameId") val gameId: String,
+    @SerializedName("gameName") val gameName: String,
+    @SerializedName("gameCode") val gameCode: String,
+    @SerializedName("ticketsCount") val ticketsCount: Int,
+    @SerializedName("totalSales") val totalSales: Double,
+    @SerializedName("winningTicketsCount") val winningTicketsCount: Int,
+    @SerializedName("wonAmount") val wonAmount: Double
+)
+
+data class VendorSalesReportItem(
+    @SerializedName("vendorId") val vendorId: String,
+    @SerializedName("vendorCode") val vendorCode: String,
+    @SerializedName("vendorName") val vendorName: String,
+    @SerializedName("currentBalance") val currentBalance: Double,
+    @SerializedName("ticketsCount") val ticketsCount: Int,
+    @SerializedName("totalSales") val totalSales: Double,
+    @SerializedName("winningTicketsCount") val winningTicketsCount: Int,
+    @SerializedName("wonAmount") val wonAmount: Double
+)
+

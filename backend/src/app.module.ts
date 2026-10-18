@@ -16,6 +16,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { HealthModule } from './modules/health/health.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 import { AppController } from './app.controller';
@@ -43,6 +44,7 @@ import { AppController } from './app.controller';
     SyncModule,
     HealthModule,
     SettingsModule,
+    ReportsModule,
   ],
   providers: [
     {

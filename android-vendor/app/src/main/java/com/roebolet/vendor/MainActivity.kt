@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.roebolet.vendor.data.api.*
 import com.roebolet.vendor.data.local.PreferencesManager
 import com.roebolet.vendor.data.network.NetworkMonitor
@@ -16,6 +17,7 @@ import com.roebolet.vendor.ui.control.ControlScreen
 import com.roebolet.vendor.ui.dashboard.DashboardScreen
 import com.roebolet.vendor.ui.login.LoginScreen
 import com.roebolet.vendor.ui.results.ResultsScreen
+import com.roebolet.vendor.ui.reports.SalesReportScreen
 import com.roebolet.vendor.ui.sell.SellTicketScreen
 import com.roebolet.vendor.ui.settings.SettingsScreen
 import com.roebolet.vendor.ui.tickets.TicketsListScreen
@@ -138,7 +140,34 @@ class MainActivity : ComponentActivity() {
         var isLoadingControl by remember { mutableStateOf(false) }
         var controlError by remember { mutableStateOf<String?>(null) }
 
+        // État Rapport des Ventes
+        var salesReport by remember { mutableStateOf<SalesReportResponse?>(null) }
+        var selectedReportPeriod by remember { mutableStateOf("day") }
+        var isLoadingReport by remember { mutableStateOf(false) }
+        var reportError by remember { mutableStateOf<String?>(null) }
+
         val deviceUuid = remember { prefs.getOrCreateDeviceUuid() }
+
+        fun fetchSalesReport(period: String = selectedReportPeriod) {
+            selectedReportPeriod = period
+            lifecycleScope.launch {
+                isLoadingReport = true
+                reportError = null
+                try {
+                    val token = prefs.getAccessToken() ?: return@launch
+                    val res = apiService.getSalesReport("Bearer $token", period = period)
+                    if (res.isSuccessful && res.body() != null) {
+                        salesReport = res.body()
+                    } else {
+                        reportError = "Erreur chargement rapport (HTTP ${res.code()})"
+                    }
+                } catch (e: Exception) {
+                    reportError = "Erreur réseau : ${e.localizedMessage ?: "Rapport indisponible"}"
+                } finally {
+                    isLoadingReport = false
+                }
+            }
+        }
 
         fun fetchControlSummary() {
             lifecycleScope.launch {
@@ -343,6 +372,9 @@ class MainActivity : ComponentActivity() {
                         errorMessage = sellTicketError,
                         soldTicketResults = soldTicketResults,
                         currentLanguage = currentLanguage,
+                        vendorCode = vendorCode,
+                        vendorName = vendorName,
+                        deviceUuid = deviceUuid,
                         initialTicketToReplay = replayTicket,
                         onResetReplay = { replayTicket = null },
                         onBackClick = {
@@ -520,6 +552,21 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                "REPORTS", "RAPÒ", "RAPÒ VANT", "RAPPORTS" -> {
+                    SalesReportScreen(
+                        report = salesReport,
+                        isLoading = isLoadingReport,
+                        errorMessage = reportError,
+                        selectedPeriod = selectedReportPeriod,
+                        currentLanguage = currentLanguage,
+                        vendorCode = vendorCode,
+                        vendorName = vendorName,
+                        onPeriodChange = { newPeriod -> fetchSalesReport(newPeriod) },
+                        onRefreshClick = { fetchSalesReport(selectedReportPeriod) },
+                        onBackClick = { currentScreen = "DASHBOARD" }
+                    )
+                }
+
                 "BALANCE_DETAILS" -> {
                     BalanceScreen(
                         vendorCode = vendorCode,
@@ -581,6 +628,10 @@ class MainActivity : ComponentActivity() {
                                 "CONTROL", "CONTRÔLE", "SOLDE", "KONTWÒL" -> {
                                     currentScreen = "CONTROL"
                                     fetchControlSummary()
+                                }
+                                "REPORTS", "RAPÒ", "RAPÒ VANT", "RAPPORTS" -> {
+                                    currentScreen = "REPORTS"
+                                    fetchSalesReport("day")
                                 }
                                 "SETTINGS", "PARAMÈTRES", "PARAMÈT" -> {
                                     currentScreen = "SETTINGS"

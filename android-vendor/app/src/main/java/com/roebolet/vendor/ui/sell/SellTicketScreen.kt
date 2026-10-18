@@ -65,6 +65,9 @@ fun SellTicketScreen(
     errorMessage: String?,
     soldTicketResults: List<SellTicketResponse>?,
     currentLanguage: AppLanguage = AppLanguage.CREOLE,
+    vendorCode: String = "",
+    vendorName: String = "",
+    deviceUuid: String = "",
     initialTicketToReplay: VendorTicketItem? = null,
     onResetReplay: () -> Unit = {},
     onBackClick: () -> Unit,
@@ -79,6 +82,7 @@ fun SellTicketScreen(
     var selectedDrawIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDrawPicker by remember { mutableStateOf(false) }
     var showOptionsMenu by remember { mutableStateOf(false) }
+    var showPreValidationPreview by remember { mutableStateOf(false) }
 
     // Initialiser la sélection avec le premier tirage ouvert par défaut
     LaunchedEffect(openDraws) {
@@ -339,7 +343,7 @@ fun SellTicketScreen(
                         )
                     }
 
-                    // Bouton ✓ (Valider et Imprimer la fiche)
+                    // Bouton ✓ (Aperçu et Validation de la fiche)
                     IconButton(
                         onClick = {
                             val validGrids = getAllValidGrids()
@@ -348,7 +352,7 @@ fun SellTicketScreen(
                             } else if (selectedDraws.isEmpty()) {
                                 Toast.makeText(context, if (isCreole) "Chwazi omwen yon tiraj ouvè" else "Choisissez au moins un tirage ouvert", Toast.LENGTH_SHORT).show()
                             } else {
-                                onSubmitTicket(selectedDraws, validGrids)
+                                showPreValidationPreview = true
                             }
                         },
                         enabled = !isSubmitting,
@@ -766,7 +770,7 @@ fun SellTicketScreen(
                             } else if (selectedDraws.isEmpty()) {
                                 Toast.makeText(context, if (isCreole) "Chwazi omwen yon tiraj ouvè" else "Choisissez au moins un tirage ouvert", Toast.LENGTH_SHORT).show()
                             } else {
-                                onSubmitTicket(selectedDraws, validGrids)
+                                showPreValidationPreview = true
                             }
                         },
                         enabled = allGrids.isNotEmpty() && !isSubmitting,
@@ -963,6 +967,202 @@ fun SellTicketScreen(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(if (isCreole) "FÈ YON LÒT FICH" else "FAIRE UN AUTRE TICKET", color = Color.White, fontWeight = FontWeight.Black)
+                }
+            }
+        )
+    }
+
+    // MODAL APERÇU AVANT VALIDATION & IMPRESSION (Pre-validation Preview)
+    if (showPreValidationPreview) {
+        val validGrids = getAllValidGrids()
+        AlertDialog(
+            onDismissRequest = { showPreValidationPreview = false },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = Strings.t("pre_validation_preview", currentLanguage),
+                            color = TopBarPurple,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = Strings.t("verify_numbers_amounts", currentLanguage),
+                            color = Color.Gray,
+                            fontSize = 11.sp
+                        )
+                    }
+                    IconButton(onClick = { showPreValidationPreview = false }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = Color.Gray)
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "ROE BOLET OFISYÈL", color = TopBarPurple, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (vendorName.isNotEmpty() || vendorCode.isNotEmpty()) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Vandè :", color = Color(0xFF616161), fontSize = 11.sp)
+                            Text(text = if (vendorName.isNotEmpty()) "$vendorCode - $vendorName" else vendorCode, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    if (deviceUuid.isNotEmpty()) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Tèminal :", color = Color(0xFF616161), fontSize = 11.sp)
+                            Text(text = deviceUuid.take(16), color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+
+                    // Tirages sélectionnés
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "Tiraj (${selectedDraws.size}) :", color = Color(0xFF616161), fontSize = 11.sp)
+                        Text(
+                            text = selectedDraws.joinToString(", ") { it.game.name },
+                            color = TopBarPurple,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.fillMaxWidth(0.7f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = TopBarPurple, thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Tableau des numéros joués
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "JEU", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.2f))
+                        Text(text = "NIMEWO", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.5f), textAlign = TextAlign.Center)
+                        Text(text = "OPSYON", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.2f), textAlign = TextAlign.Center)
+                        Text(text = "MONTAN", color = Color(0xFF757575), fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1.2f), textAlign = TextAlign.End)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    validGrids.forEach { g ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = g.gameType ?: "BORLETTE",
+                                color = Color(0xFF424242),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1.2f)
+                            )
+                            Text(
+                                text = g.numbers.joinToString("-"),
+                                color = Color.Black,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.weight(1.5f),
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = g.option ?: if (g.isGratis == true) "GRATIS" else "TOUT",
+                                color = if (g.isGratis == true) Color(0xFF2E7D32) else Color(0xFF616161),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1.2f),
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "${String.format("%.2f", g.betAmount)} G",
+                                color = Color.Black,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.weight(1.2f),
+                                textAlign = TextAlign.End
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = TopBarPurple, thickness = 1.5.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Total général
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "TOTAL À PAYER :", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${String.format("%.2f", grandTotalAmount)} HTG",
+                                color = TopBarPurple,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            if (selectedDraws.size > 1) {
+                                Text(
+                                    text = "${String.format("%.2f", unitTotalAmount)} G x ${selectedDraws.size} tiraj",
+                                    color = Color.Gray,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPreValidationPreview = false
+                        onSubmitTicket(selectedDraws, validGrids)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = Strings.t("confirm_and_print", currentLanguage),
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp
+                    )
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showPreValidationPreview = false },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = Strings.t("modify_ticket", currentLanguage),
+                        color = Color(0xFF616161),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
                 }
             }
         )

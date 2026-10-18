@@ -76,6 +76,25 @@ object Strings {
             "multi_draws_select" -> if (ht) "Chwazi Tiraj (Ou ka chwazi plizyè)" else "Choisir les tirages (Multi-sélection)"
             "selected_draws_count" -> if (ht) "tiraj chwazi" else "tirage(s) sélectionné(s)"
 
+            // Pre-validation Preview
+            "pre_validation_preview" -> if (ht) "APÈSI AVAN ENPRESYON" else "APERÇU AVANT IMPRESSION"
+            "confirm_and_print" -> if (ht) "KONFIME & ENPRIME" else "CONFIRMER & IMPRIMER"
+            "modify_ticket" -> if (ht) "MODIFYE" else "MODIFIER"
+            "verify_numbers_amounts" -> if (ht) "Verifye nimewo ak montan yo avan ou valide" else "Vérifiez les numéros et montants avant de confirmer"
+
+            // Reports
+            "sales_reports" -> if (ht) "RAPÒ VANT" else "RAPPORTS DES VENTES"
+            "today" -> if (ht) "Jòdi a" else "Aujourd'hui"
+            "this_week" -> if (ht) "Semèn sa a" else "Cette Semaine"
+            "this_month" -> if (ht) "Mwa sa a" else "Ce Mois"
+            "sales_by_draw" -> if (ht) "VANT PA TIRAJ" else "VENTES PAR TIRAGE"
+            "global_summary" -> if (ht) "REZIME JENERAL" else "RÉSUMÉ GLOBAL"
+            "tickets_sold" -> if (ht) "Fich ki vann" else "Tickets vendus"
+            "total_sold_amount" -> if (ht) "Total Lajan Vann" else "Montant total vendu"
+            "winning_tickets" -> if (ht) "Fich ki genyen" else "Tickets gagnants"
+            "prizes_paid" -> if (ht) "Lòt peye" else "Gains payés"
+            "net_sales" -> if (ht) "Vant Nèt" else "Vente Nette"
+
             else -> key
         }
     }
