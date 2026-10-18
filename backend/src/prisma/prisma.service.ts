@@ -9,6 +9,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$connect();
       this.logger.log('Connexion PostgreSQL établie avec succès.');
+
+      // Auto-synchronisation des colonnes de production pour Vercel / Cloud DB
+      try {
+        await this.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "sessionName" VARCHAR(20);`);
+        await this.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "blockedReason" VARCHAR(255);`);
+      } catch (colErr: any) {
+        this.logger.warn(`Auto-migration colonnes Draw : ${colErr.message}`);
+      }
     } catch (error: any) {
       this.logger.warn(`Échec de la connexion PostgreSQL initiale : ${error.message}`);
       // En environnement Serverless, ne pas bloquer l'initialisation du serveur;

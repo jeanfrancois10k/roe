@@ -51,6 +51,7 @@ describe('Étape 7 : Suite Complète de Validation du Cycle de Vie des Tirages &
         findMany: jest.fn().mockResolvedValue([]),
       },
       $queryRaw: jest.fn(),
+      $executeRawUnsafe: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn((callback) => callback(prismaMock)),
     };
 

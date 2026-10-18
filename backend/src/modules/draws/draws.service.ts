@@ -288,6 +288,10 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     try {
       const now = new Date();
 
+      // Sécurité cloud (Vercel Serverless) : synchronisation immédiate des colonnes si base distante non migrée
+      await this.prisma.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "sessionName" VARCHAR(20);`).catch(() => {});
+      await this.prisma.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "blockedReason" VARCHAR(255);`).catch(() => {});
+
       // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
       const expiredDraws = await this.prisma.draw.findMany({
         where: {

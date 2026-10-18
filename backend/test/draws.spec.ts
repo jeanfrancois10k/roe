@@ -142,6 +142,7 @@ describe('Phase 7: Tirages, Résultats & Évaluation des Gains', () => {
           update: jest.fn(),
           count: jest.fn(),
         },
+        $executeRawUnsafe: jest.fn().mockResolvedValue(1),
       };
 
       auditMock = {
