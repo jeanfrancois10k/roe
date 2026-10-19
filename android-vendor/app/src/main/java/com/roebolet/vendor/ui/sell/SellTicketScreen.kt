@@ -2136,6 +2136,20 @@ fun CombinationEngineDialog(
     val drawMultiplier = selectedDraws.size.coerceAtLeast(1)
     val grandTotal = unitSubtotal * drawMultiplier
 
+    val dialogTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color(0xFF0F172A),
+        unfocusedTextColor = Color(0xFF0F172A),
+        focusedContainerColor = Color.White,
+        unfocusedContainerColor = Color.White,
+        cursorColor = TopBarPurple,
+        focusedBorderColor = TopBarPurple,
+        unfocusedBorderColor = Color(0xFF94A3B8),
+        focusedLabelColor = TopBarPurple,
+        unfocusedLabelColor = Color(0xFF475569),
+        focusedPlaceholderColor = Color(0xFF94A3B8),
+        unfocusedPlaceholderColor = Color(0xFF94A3B8)
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -2191,12 +2205,14 @@ fun CombinationEngineDialog(
                             OutlinedTextField(
                                 value = sourcesInput,
                                 onValueChange = { sourcesInput = it },
-                                placeholder = { Text("Eg: 02 20 22", fontSize = 12.sp) },
+                                placeholder = { Text("Eg: 02 20 22", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
                                 singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = TopBarPurple,
-                                    unfocusedBorderColor = Color(0xFFCBD5E1)
+                                textStyle = TextStyle(
+                                    color = Color(0xFF0F172A),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
                                 ),
+                                colors = dialogTextFieldColors,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp)
                             )
@@ -2350,8 +2366,14 @@ fun CombinationEngineDialog(
                                         OutlinedTextField(
                                             value = loto3PrefixInput,
                                             onValueChange = { loto3PrefixInput = it.filter { c -> c.isDigit() }.take(1) },
-                                            label = { Text("Prefiks Loto 3", fontSize = 10.sp) },
+                                            label = { Text("Prefiks Loto 3", fontSize = 10.sp, color = Color(0xFF475569)) },
                                             singleLine = true,
+                                            textStyle = TextStyle(
+                                                color = Color(0xFF0F172A),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            colors = dialogTextFieldColors,
                                             modifier = Modifier.weight(1f),
                                             shape = RoundedCornerShape(6.dp)
                                         )
@@ -2360,8 +2382,14 @@ fun CombinationEngineDialog(
                                         OutlinedTextField(
                                             value = loto5PrefixInput,
                                             onValueChange = { loto5PrefixInput = it.filter { c -> c.isDigit() }.take(1) },
-                                            label = { Text("Prefiks Loto 5", fontSize = 10.sp) },
+                                            label = { Text("Prefiks Loto 5", fontSize = 10.sp, color = Color(0xFF475569)) },
                                             singleLine = true,
+                                            textStyle = TextStyle(
+                                                color = Color(0xFF0F172A),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            colors = dialogTextFieldColors,
                                             modifier = Modifier.weight(1f),
                                             shape = RoundedCornerShape(6.dp)
                                         )
@@ -2415,8 +2443,14 @@ fun CombinationEngineDialog(
                                         OutlinedTextField(
                                             value = unitBetInput,
                                             onValueChange = { unitBetInput = it.filter { c -> c.isDigit() || c == '.' } },
-                                            label = { Text(if (isCreole) "Montan pou chak jwèt (HTG)" else "Montant unitaire (HTG)", fontSize = 10.sp) },
+                                            label = { Text(if (isCreole) "Montan pou chak jwèt (HTG)" else "Montant unitaire (HTG)", fontSize = 10.sp, color = Color(0xFF475569)) },
                                             singleLine = true,
+                                            textStyle = TextStyle(
+                                                color = Color(0xFF0F172A),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            colors = dialogTextFieldColors,
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(6.dp)
                                         )
@@ -2459,8 +2493,14 @@ fun CombinationEngineDialog(
                                         OutlinedTextField(
                                             value = distributedBudgetInput,
                                             onValueChange = { distributedBudgetInput = it.filter { c -> c.isDigit() || c == '.' } },
-                                            label = { Text(if (isCreole) "Bidjè total pou tout konbinezon yo (HTG)" else "Budget global total (HTG)", fontSize = 10.sp) },
+                                            label = { Text(if (isCreole) "Bidjè total pou tout konbinezon yo (HTG)" else "Budget global total (HTG)", fontSize = 10.sp, color = Color(0xFF475569)) },
                                             singleLine = true,
+                                            textStyle = TextStyle(
+                                                color = Color(0xFF0F172A),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            colors = dialogTextFieldColors,
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(6.dp)
                                         )
