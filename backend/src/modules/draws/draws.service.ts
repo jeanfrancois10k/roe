@@ -249,12 +249,22 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     };
 
     for (const lotto of OFFICIAL_LOTTERIES) {
+      const existing = await this.prisma.game.findUnique({ where: { code: lotto.code } });
+      const currentRules = (existing?.gameRules as any) || defaultRules;
+      const updatedRules = {
+        ...currentRules,
+        ...defaultRules,
+        schedules: lotto.schedules,
+      };
+
       await this.prisma.game.upsert({
         where: { code: lotto.code },
         update: {
           name: lotto.name,
           description: lotto.description,
+          drawFrequency: lotto.drawFrequency,
           status: 'ACTIVE',
+          gameRules: updatedRules,
         },
         create: {
           code: lotto.code,
@@ -266,11 +276,11 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           maxBetAmount: 2500.0,
           currency: 'HTG' as any,
           defaultCommission: 5.0,
-          gameRules: defaultRules,
+          gameRules: updatedRules,
         },
       });
     }
-    this.logger.log('✅ 6 Loteries officielles synchronisées : CHI, FL, GA, NY, TN, TX');
+    this.logger.log('✅ 6 Loteries officielles synchronisées avec horaires stricts : CHI, FL, GA, NY, TN, TX');
   }
 
   /**
@@ -278,11 +288,10 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * RÈGLES CONFIRMÉES :
    * 1. Clôture automatique à l'instant précis (salesClosingAt <= now) côté serveur.
    * 2. Indépendance totale : chaque loterie a son propre cycle.
-   * 3. Réouverture conditionnelle : une prochaine session ne peut ouvrir que si :
-   *    a) L'heure de vente autorisée est atteinte (07h00 AM Haïti pour Midi).
-   *    b) La session précédente dont elle dépend a ses résultats PUBLIÉS et VALIDÉS (PUBLISHED).
-   *    c) Le jeu est actif et le moment présent est avant la clôture.
-   *    d) Si les résultats précédents sont en attente, la session reste SCHEDULED avec blockedReason explicite.
+   * 3. Réouverture conditionnelle :
+   *    a) La session du SOIR dépend de la publication et validation des résultats du MIDI de la même journée.
+   *    b) La session du MIDI s'ouvre à 07h00 AM (heure d’Haïti) pour le nouveau cycle journalier.
+   *    c) Toutes les heures sont interprétées strictement dans le fuseau America/Port-au-Prince.
    */
   async autoProcessDraws() {
     try {
@@ -291,6 +300,9 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       // Sécurité cloud (Vercel Serverless) : synchronisation immédiate des colonnes si base distante non migrée
       await this.prisma.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "sessionName" VARCHAR(20);`).catch(() => {});
       await this.prisma.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "blockedReason" VARCHAR(255);`).catch(() => {});
+
+      // Synchroniser les 6 loteries officielles et leurs horaires stricts
+      await this.ensureDefaultLotteries().catch(() => {});
 
       // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
       const expiredDraws = await this.prisma.draw.findMany({
@@ -339,11 +351,8 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         const game = await this.prisma.game.findUnique({ where: { code: lotto.code } });
         if (!game || game.status !== 'ACTIVE') continue;
 
-        const effectiveSchedules =
-          Array.isArray((game.gameRules as any)?.schedules) &&
-          (game.gameRules as any).schedules.length > 0
-            ? (game.gameRules as any).schedules
-            : lotto.schedules;
+        // Toujours utiliser les horaires officiels confirmés
+        const effectiveSchedules = lotto.schedules;
 
         // Identifier la session cible du jour (ou de demain)
         let targetSchedule: any = null;
@@ -416,7 +425,23 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         let blockReason: string | null = null;
 
         if (previousDraw) {
-          if (previousDraw.status !== DrawStatus.PUBLISHED) {
+          const prevParts = getHaitiDateParts(previousDraw.salesClosingAt);
+          const targetParts = getHaitiDateParts(targetClose);
+          const isSameDay =
+            prevParts.year === targetParts.year &&
+            prevParts.month === targetParts.month &&
+            prevParts.day === targetParts.day;
+
+          // Si le tirage précédent est d'une journée antérieure et qu'il était resté OPEN, le fermer immédiatement
+          if (previousDraw.status === DrawStatus.OPEN && (!isSameDay || previousDraw.salesClosingAt <= now)) {
+            await this.prisma.draw.update({
+              where: { id: previousDraw.id },
+              data: { status: DrawStatus.CLOSED },
+            });
+          }
+
+          // Dépendance métier : La session SOIR dépend des résultats validés de la session MIDI de la même journée
+          if (isSameDay && sessionName === 'SOIR' && previousDraw.status !== DrawStatus.PUBLISHED) {
             previousResultsPublished = false;
             const prevSession = previousDraw.sessionName || (this.isMidiDraw(previousDraw.salesClosingAt) ? 'Midi' : 'Soir');
             blockReason = `En attente de la publication des résultats officiels de la session précédente (${prevSession} N°${previousDraw.drawNumber})`;
@@ -447,21 +472,33 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           now < targetClose &&
           game.status === 'ACTIVE';
 
-        // 4. Synchronisation du tirage en base
+        // 4. Synchronisation du tirage en base (par date du jour et nom de session)
+        const targetParts = getHaitiDateParts(targetClose);
+        const dayStartHaiti = createHaitiDate(targetParts.year, targetParts.month, targetParts.day, 0, 0, 0);
+        const dayEndHaiti = createHaitiDate(targetParts.year, targetParts.month, targetParts.day, 23, 59, 59);
+
         const existingDraw = await this.prisma.draw.findFirst({
           where: {
             gameId: game.id,
-            salesClosingAt: targetClose,
+            sessionName,
+            salesClosingAt: { gte: dayStartHaiti, lte: dayEndHaiti },
           },
+          orderBy: { salesClosingAt: 'desc' },
         });
 
         if (existingDraw) {
-          if (isEligibleToOpen && existingDraw.status !== DrawStatus.OPEN) {
+          const shouldUpdateTimes =
+            existingDraw.salesClosingAt.getTime() !== targetClose.getTime() ||
+            existingDraw.scheduledAt.getTime() !== targetDraw.getTime();
+
+          if (isEligibleToOpen && existingDraw.status !== DrawStatus.OPEN && existingDraw.status !== DrawStatus.CLOSED && existingDraw.status !== DrawStatus.PUBLISHED) {
             await this.prisma.draw.update({
               where: { id: existingDraw.id },
               data: {
                 status: DrawStatus.OPEN,
                 sessionName,
+                salesClosingAt: targetClose,
+                scheduledAt: targetDraw,
                 blockedReason: null,
               },
             });
@@ -477,10 +514,21 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
               });
             }
             this.logger.log(
-              `🔓 Ouverture des ventes : Tirage N°${existingDraw.drawNumber} (${game.name} - ${sessionName})`,
+              `🔓 Ouverture des ventes : Tirage N°${existingDraw.drawNumber} (${game.name} - ${sessionName}) [Fermeture: ${targetClose.toISOString()}]`,
             );
+          } else if (shouldUpdateTimes && (existingDraw.status === DrawStatus.OPEN || existingDraw.status === DrawStatus.SCHEDULED)) {
+            await this.prisma.draw.update({
+              where: { id: existingDraw.id },
+              data: {
+                salesClosingAt: targetClose,
+                scheduledAt: targetDraw,
+                sessionName,
+                blockedReason: isEligibleToOpen ? null : blockReason,
+                ...(isEligibleToOpen && existingDraw.status === DrawStatus.SCHEDULED ? { status: DrawStatus.OPEN } : {}),
+              },
+            });
           } else if (!isEligibleToOpen && existingDraw.status !== DrawStatus.CLOSED && existingDraw.status !== DrawStatus.PUBLISHED) {
-            // Maintien ou remise en SCHEDULED avec la raison du blocage
+            // Maintien en SCHEDULED avec la raison du blocage
             await this.prisma.draw.update({
               where: { id: existingDraw.id },
               data: {
