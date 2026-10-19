@@ -185,6 +185,10 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    if (process.env.VERCEL) {
+      return;
+    }
+
     try {
       await this.ensureDefaultLotteries();
       await this.autoProcessDraws();
@@ -192,15 +196,13 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Initialisation des loteries différée : ${err.message}`);
     }
 
-    if (!process.env.VERCEL) {
-      this.timer = setInterval(async () => {
-        try {
-          await this.autoProcessDraws();
-        } catch (err: any) {
-          this.logger.warn(`Cycle autoProcessDraws : ${err.message}`);
-        }
-      }, 30000);
-    }
+    this.timer = setInterval(async () => {
+      try {
+        await this.autoProcessDraws();
+      } catch (err: any) {
+        this.logger.warn(`Cycle autoProcessDraws : ${err.message}`);
+      }
+    }, 30000);
   }
 
   onModuleDestroy() {
