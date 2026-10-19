@@ -167,6 +167,7 @@ export function createHaitiDate(
 
 @Injectable()
 export class DrawsService implements OnModuleInit, OnModuleDestroy {
+  private static defaultLotteriesEnsured = false;
   private readonly logger = new Logger(DrawsService.name);
   private readonly validationSecret: string;
   private timer: NodeJS.Timeout | null = null;
@@ -227,6 +228,9 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * Assure que les 6 loteries officielles (CHI, FL, GA, NY, TN, TX) existent en base
    */
   async ensureDefaultLotteries() {
+    if (DrawsService.defaultLotteriesEnsured) {
+      return;
+    }
     const defaultRules = {
       borlette: {
         firstPrizeMultiplier: 50,
@@ -280,6 +284,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         },
       });
     }
+    DrawsService.defaultLotteriesEnsured = true;
     this.logger.log('✅ 6 Loteries officielles synchronisées avec horaires stricts : CHI, FL, GA, NY, TN, TX');
   }
 
@@ -297,12 +302,10 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     try {
       const now = new Date();
 
-      // Sécurité cloud (Vercel Serverless) : synchronisation immédiate des colonnes si base distante non migrée
-      await this.prisma.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "sessionName" VARCHAR(20);`).catch(() => {});
-      await this.prisma.$executeRawUnsafe(`ALTER TABLE "Draw" ADD COLUMN IF NOT EXISTS "blockedReason" VARCHAR(255);`).catch(() => {});
-
-      // Synchroniser les 6 loteries officielles et leurs horaires stricts
-      await this.ensureDefaultLotteries().catch(() => {});
+      // Synchroniser les 6 loteries officielles si nécessaire
+      if (!DrawsService.defaultLotteriesEnsured) {
+        await this.ensureDefaultLotteries().catch(() => {});
+      }
 
       // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
       const expiredDraws = await this.prisma.draw.findMany({
@@ -347,9 +350,17 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       const haitiNow = getHaitiDateParts(now);
 
       // 2. Traitement indépendant par loterie
+      const activeGames = await this.prisma.game.findMany({
+        where: {
+          code: { in: OFFICIAL_LOTTERIES.map((l) => l.code) },
+          status: 'ACTIVE',
+        },
+      });
+      const gamesByCode = new Map(activeGames.map((g) => [g.code, g]));
+
       for (const lotto of OFFICIAL_LOTTERIES) {
-        const game = await this.prisma.game.findUnique({ where: { code: lotto.code } });
-        if (!game || game.status !== 'ACTIVE') continue;
+        const game = gamesByCode.get(lotto.code);
+        if (!game) continue;
 
         // Toujours utiliser les horaires officiels confirmés
         const effectiveSchedules = lotto.schedules;
@@ -480,7 +491,10 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
         const existingDraw = await this.prisma.draw.findFirst({
           where: {
             gameId: game.id,
-            sessionName,
+            OR: [
+              { sessionName },
+              { sessionName: null },
+            ],
             salesClosingAt: { gte: dayStartHaiti, lte: dayEndHaiti },
           },
           orderBy: { salesClosingAt: 'desc' },
@@ -642,9 +656,6 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async debugStatus() {
-    await this.autoProcessDraws().catch((err) => {
-      this.logger.error(`Erreur autoProcessDraws : ${err.message}`);
-    });
     const now = new Date();
     const haiti = getHaitiDateParts(now);
     const open = await this.prisma.draw.findMany({
@@ -666,13 +677,14 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       take: 20,
     });
     return {
-      commit: 'b9fa0cb-v3',
+      commit: 'b9fa0cb-v5-fast',
       serverNowUtc: now.toISOString(),
       haitiNow: haiti,
       openCount: open.length,
       openDraws: open.map((d) => ({
         num: d.drawNumber,
         game: d.game.name,
+        code: d.game.code,
         session: d.sessionName,
         status: d.status,
         closingUtc: d.salesClosingAt.toISOString(),
@@ -680,6 +692,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       recentDraws: allRecent.map((d) => ({
         num: d.drawNumber,
         game: d.game.name,
+        code: d.game.code,
         session: d.sessionName,
         status: d.status,
         closingUtc: d.salesClosingAt.toISOString(),
@@ -689,10 +702,6 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getOpenDraws(gameId?: string) {
-    // Exécuter autoProcessDraws pour garantir que les tirages clôturés sont passés
-    // et que le prochain tirage de chaque loterie est immédiatement ouvert !
-    await this.autoProcessDraws().catch(() => {});
-
     const now = new Date();
     const where: any = {
       status: DrawStatus.OPEN,
@@ -700,13 +709,27 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     };
     if (gameId) where.gameId = gameId;
 
-    return this.prisma.draw.findMany({
+    let openDraws = await this.prisma.draw.findMany({
       where,
       include: {
         game: { select: { id: true, code: true, name: true, minBetAmount: true, maxBetAmount: true } },
       },
       orderBy: { salesClosingAt: 'asc' },
     });
+
+    // Si moins de 6 tirages ouverts sont disponibles, actualiser l'état
+    if (openDraws.length < 6) {
+      await this.autoProcessDraws().catch(() => {});
+      openDraws = await this.prisma.draw.findMany({
+        where,
+        include: {
+          game: { select: { id: true, code: true, name: true, minBetAmount: true, maxBetAmount: true } },
+        },
+        orderBy: { salesClosingAt: 'asc' },
+      });
+    }
+
+    return openDraws;
   }
 
   async findAll(gameId?: string, status?: DrawStatus, page = 1, limit = 20) {
