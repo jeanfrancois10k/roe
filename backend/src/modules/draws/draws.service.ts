@@ -491,7 +491,12 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
             existingDraw.salesClosingAt.getTime() !== targetClose.getTime() ||
             existingDraw.scheduledAt.getTime() !== targetDraw.getTime();
 
-          if (isEligibleToOpen && existingDraw.status !== DrawStatus.OPEN && existingDraw.status !== DrawStatus.CLOSED && existingDraw.status !== DrawStatus.PUBLISHED) {
+          const canBeOpened =
+            existingDraw.salesClosingAt > now &&
+            existingDraw.status !== DrawStatus.PUBLISHED &&
+            (!existingDraw.winningResults || Object.keys(existingDraw.winningResults as any).length === 0);
+
+          if (isEligibleToOpen && existingDraw.status !== DrawStatus.OPEN && canBeOpened) {
             await this.prisma.draw.update({
               where: { id: existingDraw.id },
               data: {
@@ -634,6 +639,53 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Nouveau tirage planifié : N°${draw.drawNumber} pour ${draw.game.name}`);
 
     return draw;
+  }
+
+  async debugStatus() {
+    await this.autoProcessDraws().catch((err) => {
+      this.logger.error(`Erreur autoProcessDraws : ${err.message}`);
+    });
+    const now = new Date();
+    const haiti = getHaitiDateParts(now);
+    const open = await this.prisma.draw.findMany({
+      where: {
+        status: DrawStatus.OPEN,
+        salesClosingAt: { gt: now },
+      },
+      include: { game: true },
+      orderBy: { salesClosingAt: 'asc' },
+    });
+    const allRecent = await this.prisma.draw.findMany({
+      where: {
+        salesClosingAt: {
+          gte: new Date(Date.now() - 36 * 3600 * 1000),
+        },
+      },
+      include: { game: true },
+      orderBy: { salesClosingAt: 'desc' },
+      take: 20,
+    });
+    return {
+      commit: 'b9fa0cb-v3',
+      serverNowUtc: now.toISOString(),
+      haitiNow: haiti,
+      openCount: open.length,
+      openDraws: open.map((d) => ({
+        num: d.drawNumber,
+        game: d.game.name,
+        session: d.sessionName,
+        status: d.status,
+        closingUtc: d.salesClosingAt.toISOString(),
+      })),
+      recentDraws: allRecent.map((d) => ({
+        num: d.drawNumber,
+        game: d.game.name,
+        session: d.sessionName,
+        status: d.status,
+        closingUtc: d.salesClosingAt.toISOString(),
+        blockedReason: d.blockedReason,
+      })),
+    };
   }
 
   async getOpenDraws(gameId?: string) {

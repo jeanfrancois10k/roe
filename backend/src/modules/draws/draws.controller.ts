@@ -24,6 +24,12 @@ export class DrawsController {
   constructor(private readonly drawsService: DrawsService) {}
 
   @Public()
+  @Get('debug/status')
+  async debugStatus() {
+    return this.drawsService.debugStatus();
+  }
+
+  @Public()
   @Get('open')
   async getOpenDraws(@Query('gameId') gameId?: string) {
     return this.drawsService.getOpenDraws(gameId);
