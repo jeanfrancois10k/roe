@@ -76,6 +76,38 @@ object TicketReceiptUtil {
     }
 
     /**
+     * Formate le libellé du jeu sur le ticket de caisse (ex: Loto 4, Mariage, Borlette, etc.)
+     * Corrige l'affichage où Loto 4 affichait 'Borlette' à tort.
+     */
+    fun formatGameLabel(gameType: String?, numbers: List<String>? = null): String {
+        val gt = (gameType ?: "").uppercase().trim()
+        val firstNum = numbers?.firstOrNull()?.filter { it.isDigit() } ?: ""
+        return when {
+            gt.contains("MAR") -> "Mariage"
+            gt in listOf("LOTO4", "LOTTO4", "LOT4", "L4") -> "Loto 4"
+            gt in listOf("LOTO3", "LOTTO3", "LOT3", "L3") -> "Loto 3"
+            gt in listOf("LOTO5", "LOTTO5", "LOT5", "L5") -> "Loto 5"
+            numbers?.size == 2 -> "Mariage"
+            firstNum.length == 4 -> "Loto 4"
+            firstNum.length == 5 -> "Loto 5"
+            firstNum.length == 3 -> "Loto 3"
+            gt in listOf("BORLETTE", "BOLET", "BOR") -> "Borlette"
+            else -> if (firstNum.length == 4) "Loto 4" else "Borlette"
+        }
+    }
+
+    /**
+     * Formate les numéros de la grille avec le bon séparateur :
+     * 'X' pour Mariage (ex: 02X20 au lieu de 02*20 ou 02-20)
+     * '-' pour les autres jeux si multiples numéros
+     */
+    fun formatGridNumbers(gameType: String?, numbers: List<String>): String {
+        val isMarriage = (gameType ?: "").uppercase().contains("MAR") || numbers.size == 2
+        val separator = if (isMarriage) "X" else "-"
+        return numbers.joinToString(separator).replace("*", "X").replace("x", "X")
+    }
+
+    /**
      * Décode une chaîne Base64 en ImageBitmap pour Jetpack Compose
      */
     fun decodeBase64Bitmap(base64Str: String): ImageBitmap? {

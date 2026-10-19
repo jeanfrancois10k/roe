@@ -385,8 +385,9 @@ fun TicketsListScreen(
                                                 color = Color(0xFF2C3246),
                                                 shape = RoundedCornerShape(4.dp)
                                             ) {
+                                                val numText = TicketReceiptUtil.formatGridNumbers(grid.gameType, grid.numbers)
                                                 Text(
-                                                    text = "${grid.numbers.joinToString("-")} (${grid.betAmount.toInt()}G)",
+                                                    text = "$numText (${grid.betAmount.toInt()}G)",
                                                     color = Color(0xFFB0B7C3),
                                                     fontSize = 10.sp,
                                                     fontFamily = FontFamily.Monospace,
@@ -627,15 +628,17 @@ fun TicketsListScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val gameLabel = TicketReceiptUtil.formatGameLabel(g.gameType, g.numbers)
+                                val formattedNumbers = TicketReceiptUtil.formatGridNumbers(g.gameType, g.numbers)
                                 Text(
-                                    text = g.gameType ?: "BORLETTE",
+                                    text = gameLabel,
                                     color = Color(0xFF424242),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1.2f)
                                 )
                                 Text(
-                                    text = g.numbers.joinToString("-"),
+                                    text = formattedNumbers,
                                     color = Color.Black,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Black,
@@ -904,14 +907,8 @@ fun TicketsListScreen(
                     val gratisGrids = grids.filter { it.isGratis == true }
 
                     regularGrids.forEach { g ->
-                        val gameLabel = when ((g.gameType ?: "BORLETTE").uppercase()) {
-                            "MARIAGE", "MAR" -> "Mariage"
-                            "LOTTO3", "L3" -> "Lotto 3"
-                            "LOTTO4", "L4" -> "Lotto 4"
-                            "LOTTO5", "L5" -> "Lotto 5"
-                            else -> "Borlette"
-                        }
-                        val separator = if (g.gameType?.contains("MAR", true) == true) "*" else "-"
+                        val gameLabel = TicketReceiptUtil.formatGameLabel(g.gameType, g.numbers)
+                        val formattedNumbers = TicketReceiptUtil.formatGridNumbers(g.gameType, g.numbers)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -920,7 +917,7 @@ fun TicketsListScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "$gameLabel  ${g.numbers.joinToString(separator)}",
+                                text = "$gameLabel  $formattedNumbers",
                                 color = Color.Black,
                                 fontSize = 12.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -945,6 +942,7 @@ fun TicketsListScreen(
                             fontSize = 11.sp
                         )
                         gratisGrids.forEach { g ->
+                            val formattedGratis = TicketReceiptUtil.formatGridNumbers("MARIAGE", g.numbers)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -953,7 +951,7 @@ fun TicketsListScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Mariage  ${g.numbers.joinToString("*")}",
+                                    text = "Mariage  $formattedGratis",
                                     color = Color(0xFF616161),
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace
