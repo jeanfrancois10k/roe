@@ -193,14 +193,46 @@ export class DrawEvaluatorService {
           description = `Lòt 4 Gagnant (${playedNum4}) [${matchedOp}] - ${mult}x`;
         }
       }
-      // 5. Lòt 5 (1 numéro de 5 chiffres)
+      // 5. Lòt 5 (1 numéro de 5 chiffres avec Options 1, 2, 3, Tout)
       else if (cleanNumbers.length === 1 && cleanNumbers[0].length === 5) {
         const playedNum5 = cleanNumbers[0];
-        const comb5 = (firstLot3 || '') + secondLot2;
-        if (comb5 && playedNum5 === comb5) {
+        const comb5Op1 = (firstLot3 || '') + (secondLot2 || '');
+        const comb5Op2 = (firstLot3 || '') + (thirdLot2 || '');
+        const comb5Op3 = (firstLot3 ? firstLot3.substring(0, 1) + (secondLot2 || '') : '') + (thirdLot2 || '');
+
+        let isLoto5Win = false;
+        let matchedOp = '';
+
+        if (option === 'OP1' || option === 'OPTION1' || option === '1') {
+          if (playedNum5 === comb5Op1) {
+            isLoto5Win = true;
+            matchedOp = 'Op 1 (1e-2e)';
+          }
+        } else if (option === 'OP2' || option === 'OPTION2' || option === '2') {
+          if (playedNum5 === comb5Op2) {
+            isLoto5Win = true;
+            matchedOp = 'Op 2 (1e-3e)';
+          }
+        } else if (option === 'OP3' || option === 'OPTION3' || option === '3') {
+          if (playedNum5 === comb5Op3 || playedNum5 === comb5Op1 || playedNum5 === comb5Op2) {
+            isLoto5Win = true;
+            matchedOp = 'Op 3';
+          }
+        } else {
+          // Option TOUT : gagne sur l'une des combinaisons
+          if (playedNum5 === comb5Op1) {
+            isLoto5Win = true;
+            matchedOp = 'Op 1';
+          } else if (playedNum5 === comb5Op2) {
+            isLoto5Win = true;
+            matchedOp = 'Op 2';
+          }
+        }
+
+        if (isLoto5Win) {
           const mult = multipliers.lot5 ?? 25000;
           gridWon = betAmount * mult;
-          description = `Lòt 5 Gagnant (${playedNum5}) - ${mult}x`;
+          description = `Lòt 5 Gagnant (${playedNum5}) [${matchedOp}] - ${mult}x`;
         }
       }
 
