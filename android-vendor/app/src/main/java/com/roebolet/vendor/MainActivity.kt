@@ -25,11 +25,14 @@ import com.roebolet.vendor.ui.verify.VerifyTicketScreen
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.roebolet.vendor.util.OtaUpdateManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -161,6 +164,9 @@ class MainActivity : ComponentActivity() {
         // État Mise à jour de l'application (OTA)
         var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
         var showUpdateDialog by remember { mutableStateOf(false) }
+        var isDownloadingUpdate by remember { mutableStateOf(false) }
+        var downloadProgress by remember { mutableStateOf(0) }
+        var downloadStatusText by remember { mutableStateOf("") }
 
         // État Contrôle Journalier & Règlement
         var controlSummary by remember { mutableStateOf<ControlSummaryResponse?>(null) }
@@ -975,11 +981,12 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        // Dialogue modal de mise à jour Over-The-Air (OTA)
+        // Dialogue modal de mise à jour Over-The-Air (OTA) avec installation automatique directe
         if (showUpdateDialog && updateInfo != null) {
             val info = updateInfo!!
+            val isCreole = currentLanguage == com.roebolet.vendor.util.AppLanguage.CREOLE
             AlertDialog(
-                onDismissRequest = { if (!info.isMandatory) showUpdateDialog = false },
+                onDismissRequest = { if (!info.isMandatory && !isDownloadingUpdate) showUpdateDialog = false },
                 containerColor = RoeSurface,
                 title = {
                     Row(
@@ -988,7 +995,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Icon(Icons.Default.Info, contentDescription = null, tint = RoeGold)
                         Text(
-                            text = "Mise à jour disponible (${info.latestVersionName})",
+                            text = if (isCreole) "Mizajou disponib (${info.latestVersionName})" else "Mise à jour disponible (${info.latestVersionName})",
                             color = Color.White,
                             fontWeight = FontWeight.Black,
                             fontSize = 16.sp
@@ -999,40 +1006,86 @@ class MainActivity : ComponentActivity() {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(text = info.changelog, color = Color.White, fontSize = 13.sp)
                         Text(
-                            text = "Une nouvelle version officielle est disponible. Cliquez sur le bouton ci-dessous pour l'installer directement sur ce terminal.",
+                            text = if (isCreole)
+                                "Yon nouvo vèsyon ofisyèl pare. Klike anba a pou telechaje ak enstale l otomatikman sou tèminal la."
+                            else
+                                "Une nouvelle version officielle est disponible. Cliquez ci-dessous pour la télécharger et l'installer automatiquement.",
                             color = RoeTextMuted,
                             fontSize = 11.sp
                         )
+
+                        if (isDownloadingUpdate) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { downloadProgress / 100f },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = RoeGold,
+                                trackColor = RoeCard
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = downloadStatusText,
+                                color = RoeGold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
-                            try {
-                                val intent = android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse(info.apkUrl)
+                            if (isDownloadingUpdate) return@Button
+                            isDownloadingUpdate = true
+                            downloadProgress = 0
+                            downloadStatusText = if (isCreole) "Koneksyon ap fèt..." else "Connexion en cours..."
+                            lifecycleScope.launch {
+                                OtaUpdateManager.downloadAndInstallApk(
+                                    activity = this@MainActivity,
+                                    apkUrl = info.apkUrl,
+                                    onProgress = { percent, msg ->
+                                        downloadProgress = percent
+                                        downloadStatusText = msg
+                                    },
+                                    onError = { err ->
+                                        isDownloadingUpdate = false
+                                        Toast.makeText(this@MainActivity, err, Toast.LENGTH_LONG).show()
+                                    }
                                 )
-                                startActivity(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(this@MainActivity, "Erreur : ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         },
+                        enabled = !isDownloadingUpdate,
                         colors = ButtonDefaults.buttonColors(containerColor = RoeGold),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text(
-                            text = "METTRE À JOUR MAINTENANT",
-                            color = RoeBackground,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 12.sp
-                        )
+                        if (isDownloadingUpdate) {
+                            CircularProgressIndicator(color = RoeBackground, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "$downloadProgress %",
+                                color = RoeBackground,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 12.sp
+                            )
+                        } else {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, tint = RoeBackground, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isCreole) "TELECHAJE AK ENSTALE" else "TÉLÉCHARGER ET INSTALLER",
+                                color = RoeBackground,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 },
-                dismissButton = if (!info.isMandatory) {
+                dismissButton = if (!info.isMandatory && !isDownloadingUpdate) {
                     {
                         TextButton(onClick = { showUpdateDialog = false }) {
-                            Text("Plus tard", color = RoeTextMuted)
+                            Text(if (isCreole) "Pita" else "Plus tard", color = RoeTextMuted)
                         }
                     }
                 } else null
