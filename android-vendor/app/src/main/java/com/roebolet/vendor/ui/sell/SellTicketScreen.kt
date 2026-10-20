@@ -405,8 +405,7 @@ fun SellTicketScreen(
         selectedDraws.isEmpty() -> if (isCreole) "Chwazi Tiraj" else "Choisir Tirage"
         selectedDraws.size == 1 -> {
             val d = selectedDraws.first()
-            val period = d.sessionName?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(d.game.name, d.scheduledAt, d.sessionName)
-            "${d.game.name} ($period)"
+            TicketReceiptUtil.formatShortDrawName(d.game.name, d.game.code, d.scheduledAt, d.sessionName)
         }
         else -> if (isCreole) "${selectedDraws.size} Tiraj chwazi" else "${selectedDraws.size} Tirages sélectionnés"
     }
@@ -697,17 +696,17 @@ fun SellTicketScreen(
                             if (isSelected) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = TopBarPurple, modifier = Modifier.size(13.dp))
                             }
-                            val drawPeriod = draw.sessionName?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(draw.game.name, draw.scheduledAt, draw.sessionName)
-                            val cleanGameName = draw.game.name
-                                .replace(Regex("(?i)\\s*\\(midi\\s*&\\s*soir\\)"), "")
-                                .replace(Regex("(?i)\\s*\\(midi\\)"), "")
-                                .replace(Regex("(?i)\\s*\\(soir\\)"), "")
-                                .trim()
+                            val shortDrawTitle = TicketReceiptUtil.formatShortDrawName(
+                                draw.game.name,
+                                draw.game.code,
+                                draw.scheduledAt,
+                                draw.sessionName
+                            )
                             Text(
-                                text = "$cleanGameName ($drawPeriod #${draw.drawNumber})",
+                                text = shortDrawTitle,
                                 color = if (isSelected) TopBarPurple else Color.White,
                                 fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
                             )
                         }
                     }
@@ -1234,14 +1233,18 @@ fun SellTicketScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
+                                            val shortName = TicketReceiptUtil.formatShortDrawName(
+                                                draw.game.name,
+                                                draw.game.code,
+                                                draw.scheduledAt,
+                                                draw.sessionName
+                                            )
                                             Text(
-                                                text = draw.game.name,
+                                                text = shortName,
                                                 fontWeight = FontWeight.Black,
                                                 fontSize = 15.sp,
                                                 color = if (isChecked) Color(0xFF1E3A8A) else Color(0xFF0F172A)
                                             )
-                                            val period = draw.sessionName?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(draw.game.name, draw.scheduledAt, draw.sessionName)
-                                            DrawPeriodBadge(period = period)
                                         }
                                         Spacer(modifier = Modifier.height(3.dp))
                                         val closingHaiti = TicketReceiptUtil.formatHaitiTimeOnly(draw.salesClosingAt)

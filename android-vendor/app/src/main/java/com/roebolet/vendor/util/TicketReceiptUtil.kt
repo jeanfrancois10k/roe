@@ -104,8 +104,43 @@ object TicketReceiptUtil {
     }
 
     /**
-     * Formate le nom d'affichage propre du tirage avec la mention MIDI ou SOIR
-     * Ex: "BOLET NEW YORK - MIDI" ou "BOLET FLORIDA - SOIR (#102)"
+     * Extrait l'abréviation officielle de la loterie (ex: FL, NY, GA, TX, TN, CHI)
+     */
+    fun getShortGameCode(gameName: String?, gameCode: String? = null): String {
+        val gc = (gameCode ?: "").uppercase()
+        val gn = (gameName ?: "").uppercase()
+        return when {
+            gc.contains("FL") || gn.contains("FLORIDA") || gn.contains("(FL)") -> "FL"
+            gc.contains("NY") || gn.contains("NEW YORK") || gn.contains("(NY)") -> "NY"
+            gc.contains("GA") || gn.contains("GEORGIE") || gn.contains("GÉORGIE") || gn.contains("(GA)") -> "GA"
+            gc.contains("TX") || gn.contains("TEXAS") || gn.contains("(TX)") -> "TX"
+            gc.contains("TN") || gn.contains("TENNESSEE") || gn.contains("(TN)") -> "TN"
+            gc.contains("CHI") || gn.contains("CHICAGO") || gn.contains("(CHI)") -> "CHI"
+            else -> {
+                val match = Regex("\\(([A-Za-z0-9]+)\\)").find(gn)
+                match?.groupValues?.get(1)?.uppercase() ?: gn.replace(Regex("(?i)bolet|borlette"), "").trim().take(4).uppercase()
+            }
+        }
+    }
+
+    /**
+     * Formate le nom court standard officiel demandé :
+     * "Borlette FL SOIR", "Borlette FL MIDI", "Borlette NY SOIR", etc.
+     */
+    fun formatShortDrawName(
+        gameName: String?,
+        gameCode: String? = null,
+        scheduledAt: String? = null,
+        sessionName: String? = null
+    ): String {
+        val code = getShortGameCode(gameName, gameCode)
+        val period = getDrawPeriod(gameName, scheduledAt, sessionName)
+        return "Borlette $code $period"
+    }
+
+    /**
+     * Formate le nom d'affichage propre du tirage :
+     * Ex: "Borlette FL SOIR" ou "Borlette NY MIDI"
      */
     fun formatDrawDisplayName(
         gameName: String?,
@@ -113,16 +148,7 @@ object TicketReceiptUtil {
         scheduledAt: String? = null,
         sessionName: String? = null
     ): String {
-        val baseName = (gameName ?: "TIRAJ OFISYÈL")
-            .replace(Regex("(?i)\\s*\\(midi\\s*&\\s*soir\\)"), "")
-            .replace(Regex("(?i)\\s*\\(midi\\)"), "")
-            .replace(Regex("(?i)\\s*\\(soir\\)"), "")
-            .trim()
-            .uppercase()
-
-        val period = getDrawPeriod(gameName, scheduledAt, sessionName)
-        val drawNumStr = if (drawNumber != null && drawNumber.toString().isNotEmpty()) " (#$drawNumber)" else ""
-        return "$baseName - $period$drawNumStr"
+        return formatShortDrawName(gameName, null, scheduledAt, sessionName)
     }
 
     /**
