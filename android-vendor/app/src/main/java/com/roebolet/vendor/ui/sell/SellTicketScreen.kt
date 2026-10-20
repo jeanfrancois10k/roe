@@ -1175,7 +1175,10 @@ fun SellTicketScreen(
                         )
                     }
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1202,75 +1205,82 @@ fun SellTicketScreen(
                             )
                         }
 
-                        openDraws.forEach { draw ->
-                            val isChecked = selectedDrawIds.contains(draw.id)
-                            Surface(
-                                color = if (isChecked) Color(0xFFEFF6FF) else Color(0xFFF8FAFC),
-                                shape = RoundedCornerShape(10.dp),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    width = if (isChecked) 2.dp else 1.dp,
-                                    color = if (isChecked) Color(0xFF2563EB) else Color(0xFFCBD5E1)
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        selectedDrawIds = if (isChecked) {
-                                            if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
-                                        } else {
-                                            selectedDrawIds + draw.id
-                                        }
-                                    }
-                            ) {
-                                Row(
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 380.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(openDraws, key = { it.id }) { draw ->
+                                val isChecked = selectedDrawIds.contains(draw.id)
+                                Surface(
+                                    color = if (isChecked) Color(0xFFEFF6FF) else Color(0xFFF8FAFC),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        width = if (isChecked) 2.dp else 1.dp,
+                                        color = if (isChecked) Color(0xFF2563EB) else Color(0xFFCBD5E1)
+                                    ),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .clickable {
+                                            selectedDrawIds = if (isChecked) {
+                                                if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
+                                            } else {
+                                                selectedDrawIds + draw.id
+                                            }
+                                        }
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            val shortName = TicketReceiptUtil.formatShortDrawName(
-                                                draw.game.name,
-                                                draw.game.code,
-                                                draw.scheduledAt,
-                                                draw.sessionName
-                                            )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                val shortName = TicketReceiptUtil.formatShortDrawName(
+                                                    draw.game.name,
+                                                    draw.game.code,
+                                                    draw.scheduledAt,
+                                                    draw.sessionName
+                                                )
+                                                Text(
+                                                    text = shortName,
+                                                    fontWeight = FontWeight.Black,
+                                                    fontSize = 15.sp,
+                                                    color = if (isChecked) Color(0xFF1E3A8A) else Color(0xFF0F172A)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            val closingHaiti = TicketReceiptUtil.formatHaitiTimeOnly(draw.salesClosingAt)
                                             Text(
-                                                text = shortName,
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 15.sp,
-                                                color = if (isChecked) Color(0xFF1E3A8A) else Color(0xFF0F172A)
+                                                text = "Tiraj N° ${draw.drawNumber} • Fèmen a : $closingHaiti",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isChecked) Color(0xFF2563EB) else Color(0xFF475569)
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(3.dp))
-                                        val closingHaiti = TicketReceiptUtil.formatHaitiTimeOnly(draw.salesClosingAt)
-                                        Text(
-                                            text = "Tiraj N° ${draw.drawNumber} • Fèmen a : $closingHaiti",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isChecked) Color(0xFF2563EB) else Color(0xFF475569)
+
+                                        Checkbox(
+                                            checked = isChecked,
+                                            onCheckedChange = { checked ->
+                                                selectedDrawIds = if (checked) {
+                                                    selectedDrawIds + draw.id
+                                                } else {
+                                                    if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
+                                                }
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = Color(0xFF2563EB),
+                                                uncheckedColor = Color(0xFF94A3B8),
+                                                checkmarkColor = Color.White
+                                            )
                                         )
                                     }
-
-                                    Checkbox(
-                                        checked = isChecked,
-                                        onCheckedChange = { checked ->
-                                            selectedDrawIds = if (checked) {
-                                                selectedDrawIds + draw.id
-                                            } else {
-                                                if (selectedDrawIds.size > 1) selectedDrawIds - draw.id else selectedDrawIds
-                                            }
-                                        },
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = Color(0xFF2563EB),
-                                            uncheckedColor = Color(0xFF94A3B8),
-                                            checkmarkColor = Color.White
-                                        )
-                                    )
                                 }
                             }
                         }
