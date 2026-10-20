@@ -125,5 +125,15 @@ class PreferencesManager(context: Context) {
     fun getLotteryProvider(): String = prefs.getString("lottery_provider", "ROE-TECH") ?: "ROE-TECH"
     fun getLotteryMariageGratis(): String = prefs.getString("lottery_mariage_gratis", "MARYAJ GRATIS 1500 GDES") ?: "MARYAJ GRATIS 1500 GDES"
     fun getLotteryLogoUrl(): String = prefs.getString("lottery_logo_url", "") ?: ""
+
+    fun getDefaultBetAmount(): Double = prefs.getFloat("default_bet_amount", 50f).toDouble()
+    fun setDefaultBetAmount(amount: Double) {
+        prefs.edit().putFloat("default_bet_amount", amount.toFloat()).apply()
+    }
+
+    fun isAutoApplyDefaultAmount(): Boolean = prefs.getBoolean("auto_apply_default_amount", false)
+    fun setAutoApplyDefaultAmount(enabled: Boolean) {
+        prefs.edit().putBoolean("auto_apply_default_amount", enabled).apply()
+    }
 }
 

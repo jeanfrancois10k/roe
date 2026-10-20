@@ -107,6 +107,26 @@ object Strings {
             "reprint_success" -> if (ht) "Fich la voye nan enprimant lan avèk siksè !" else "Ticket réimprimé avec succès !"
             "ticket_loaded_for_modification" -> if (ht) "Fich la chaje ! Ou ka modifye nimewo yo kounye a." else "Ticket chargé ! Vous pouvez modifier les numéros."
 
+            // Smart Vendor Sales Experience
+            "amount_for_all" -> if (ht) "Montan pou tout" else "Montant pour tous"
+            "apply_all" -> if (ht) "Aplike pou tout" else "Appliquer à tous"
+            "apply_current_tab" -> if (ht) "Onglè sa a sèlman" else "Cet onglet uniquement"
+            "apply_all_tabs" -> if (ht) "Tout onglè yo" else "Tous les onglets"
+            "generate_pairs" -> if (ht) "Jenere 10 Pè yo" else "Générer les 10 paires"
+            "generate_pairs_sub" -> if (ht) "00, 11, 22, 33, 44, 55, 66, 77, 88, 99" else "00, 11, 22, 33, 44, 55, 66, 77, 88, 99"
+            "missing_amount_title" -> if (ht) "Atansyon : Montan Manke" else "Attention : Montants manquants"
+            "missing_amount_desc" -> if (ht) "Gen kèk nimewo ki pa gen montan. Chwazi sa ou vle fè :" else "Certains numéros saisis n'ont pas de montant :"
+            "apply_default_amount" -> if (ht) "Aplike montan pa defo" else "Appliquer le montant par défaut"
+            "default_amount_config" -> if (ht) "Montan pa defo" else "Montant par défaut"
+            "auto_apply_default" -> if (ht) "Toujou aplike montan pa defo sou nimewo san montan" else "Toujours appliquer le montant par défaut"
+            "correct_manually" -> if (ht) "Koreksyon manyèl" else "Corriger manuellement"
+            "invalid_number_title" -> if (ht) "Nimewo Envalid" else "Numéros invalides"
+            "duplicate_warning_title" -> if (ht) "Nimewo ki repete" else "Numéros en double"
+            "smart_review_title" -> if (ht) "VERIFIKASYON FICH LA" else "VÉRIFICATION DU BORDEREAU"
+            "numbers_verified" -> if (ht) "Tout nimewo yo kòrèk e valide" else "Tous les numéros sont valides"
+            "total_bets" -> if (ht) "Total Miz" else "Total des Mises"
+            "add_more_lines" -> if (ht) "+ Ajoute plis liy" else "+ Ajouter plus de lignes"
+
             else -> key
         }
     }
