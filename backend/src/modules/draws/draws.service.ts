@@ -185,10 +185,6 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    if (process.env.VERCEL) {
-      return;
-    }
-
     try {
       await this.ensureDefaultLotteries();
       await this.autoProcessDraws();
@@ -196,13 +192,15 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Initialisation des loteries différée : ${err.message}`);
     }
 
-    this.timer = setInterval(async () => {
-      try {
-        await this.autoProcessDraws();
-      } catch (err: any) {
-        this.logger.warn(`Cycle autoProcessDraws : ${err.message}`);
-      }
-    }, 30000);
+    if (!process.env.VERCEL) {
+      this.timer = setInterval(async () => {
+        try {
+          await this.autoProcessDraws();
+        } catch (err: any) {
+          this.logger.warn(`Cycle autoProcessDraws : ${err.message}`);
+        }
+      }, 30000);
+    }
   }
 
   onModuleDestroy() {
@@ -254,37 +252,43 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       },
     };
 
-    for (const lotto of OFFICIAL_LOTTERIES) {
-      const existing = await this.prisma.game.findUnique({ where: { code: lotto.code } });
-      const currentRules = (existing?.gameRules as any) || defaultRules;
-      const updatedRules = {
-        ...currentRules,
-        ...defaultRules,
-        schedules: lotto.schedules,
-      };
+    const count = await this.prisma.game.count({
+      where: { code: { in: OFFICIAL_LOTTERIES.map((l) => l.code) } },
+    });
 
-      await this.prisma.game.upsert({
-        where: { code: lotto.code },
-        update: {
-          name: lotto.name,
-          description: lotto.description,
-          drawFrequency: lotto.drawFrequency,
-          status: 'ACTIVE',
-          gameRules: updatedRules,
-        },
-        create: {
-          code: lotto.code,
-          name: lotto.name,
-          description: lotto.description,
-          drawFrequency: lotto.drawFrequency,
-          status: 'ACTIVE',
-          minBetAmount: 5.0,
-          maxBetAmount: 2500.0,
-          currency: 'HTG' as any,
-          defaultCommission: 5.0,
-          gameRules: updatedRules,
-        },
-      });
+    if (count < OFFICIAL_LOTTERIES.length) {
+      for (const lotto of OFFICIAL_LOTTERIES) {
+        const existing = await this.prisma.game.findUnique({ where: { code: lotto.code } });
+        const currentRules = (existing?.gameRules as any) || defaultRules;
+        const updatedRules = {
+          ...currentRules,
+          ...defaultRules,
+          schedules: lotto.schedules,
+        };
+
+        await this.prisma.game.upsert({
+          where: { code: lotto.code },
+          update: {
+            name: lotto.name,
+            description: lotto.description,
+            drawFrequency: lotto.drawFrequency,
+            status: 'ACTIVE',
+            gameRules: updatedRules,
+          },
+          create: {
+            code: lotto.code,
+            name: lotto.name,
+            description: lotto.description,
+            drawFrequency: lotto.drawFrequency,
+            status: 'ACTIVE',
+            minBetAmount: 5.0,
+            maxBetAmount: 2500.0,
+            currency: 'HTG' as any,
+            defaultCommission: 5.0,
+            gameRules: updatedRules,
+          },
+        });
+      }
     }
     DrawsService.defaultLotteriesEnsured = true;
     this.logger.log('✅ 6 Loteries officielles synchronisées avec horaires stricts : CHI, FL, GA, NY, TN, TX');
@@ -295,10 +299,9 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * RÈGLES CONFIRMÉES :
    * 1. Clôture automatique à l'instant précis (salesClosingAt <= now) côté serveur.
    * 2. Indépendance totale : chaque loterie a son propre cycle.
-   * 3. Réouverture conditionnelle :
-   *    a) La session du SOIR dépend de la publication et validation des résultats du MIDI de la même journée.
-   *    b) La session du MIDI s'ouvre à 07h00 AM (heure d’Haïti) pour le nouveau cycle journalier.
-   *    c) Toutes les heures sont interprétées strictement dans le fuseau America/Port-au-Prince.
+   * 3. Sessions indépendantes : la session Soir s'ouvre pour les ventes dès que son cycle est actif.
+   * 4. Les ventes de la journée débutent à 07h00 AM (heure d’Haïti).
+   * 5. Toutes les heures sont interprétées strictement dans le fuseau America/Port-au-Prince.
    */
   async autoProcessDraws() {
     try {
@@ -315,38 +318,30 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           status: DrawStatus.OPEN,
           salesClosingAt: { lte: now },
         },
-        include: { game: { select: { code: true, name: true } } },
+        select: { id: true, drawNumber: true, game: { select: { code: true, name: true } } },
       });
 
-      for (const draw of expiredDraws) {
-        await this.prisma.draw.update({
-          where: { id: draw.id },
+      if (expiredDraws.length > 0) {
+        await this.prisma.draw.updateMany({
+          where: { id: { in: expiredDraws.map((d) => d.id) } },
           data: { status: DrawStatus.CLOSED },
         });
 
-        if (this.realtimeGateway?.server) {
-          this.realtimeGateway.server.emit('draw:closed', {
-            drawId: draw.id,
-            drawNumber: draw.drawNumber,
-            gameCode: draw.game.code,
-            timestamp: new Date().toISOString(),
-            autoClosed: true,
-          });
+        for (const draw of expiredDraws) {
+          if (this.realtimeGateway?.server) {
+            this.realtimeGateway.server.emit('draw:closed', {
+              drawId: draw.id,
+              drawNumber: draw.drawNumber,
+              gameCode: draw.game.code,
+              timestamp: now.toISOString(),
+              autoClosed: true,
+            });
+          }
+
+          this.logger.log(
+            `⏰ Clôture automatique des ventes : Tirage N°${draw.drawNumber} (${draw.game.name})`,
+          );
         }
-
-        await this.auditService.log({
-          action: 'DRAW_AUTO_CLOSED',
-          resource: `Draw:${draw.id}`,
-          newPayload: {
-            drawNumber: draw.drawNumber,
-            gameCode: draw.game.code,
-            closedAt: now.toISOString(),
-          },
-        });
-
-        this.logger.log(
-          `⏰ Clôture automatique des ventes : Tirage N°${draw.drawNumber} (${draw.game.name})`,
-        );
       }
 
       const haitiNow = getHaitiDateParts(now);
@@ -434,7 +429,6 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           orderBy: { salesClosingAt: 'desc' },
         });
 
-        let previousResultsPublished = true;
         let blockReason: string | null = null;
 
         if (previousDraw) {
@@ -452,35 +446,25 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
               data: { status: DrawStatus.CLOSED },
             });
           }
-
-          // Dépendance métier : La session SOIR dépend des résultats validés de la session MIDI de la même journée
-          if (isSameDay && sessionName === 'SOIR' && previousDraw.status !== DrawStatus.PUBLISHED) {
-            previousResultsPublished = false;
-            const prevSession = previousDraw.sessionName || (this.isMidiDraw(previousDraw.salesClosingAt) ? 'Midi' : 'Soir');
-            blockReason = `En attente de la publication des résultats officiels de la session précédente (${prevSession} N°${previousDraw.drawNumber})`;
-          }
         }
 
-        // Vérification de la fenêtre horaire autorisée pour la session Midi (07h00 du matin heure d'Haïti)
+        // Vérification de la fenêtre horaire autorisée pour les ventes de la journée (07h00 AM heure d'Haïti)
         let openingTimeReached = true;
-        if (sessionName === 'MIDI') {
-          const targetDay = isTargetTomorrow ? haitiNow.day + 1 : haitiNow.day;
-          const morningOpenTime = createHaitiDate(
-            haitiNow.year,
-            haitiNow.month,
-            targetDay,
-            7,
-            0,
-            0,
-          );
-          if (now < morningOpenTime) {
-            openingTimeReached = false;
-            blockReason = blockReason || 'Les ventes de la session Midi débutent à 07h00 AM (heure d’Haïti).';
-          }
+        const targetDay = isTargetTomorrow ? haitiNow.day + 1 : haitiNow.day;
+        const morningOpenTime = createHaitiDate(
+          haitiNow.year,
+          haitiNow.month,
+          targetDay,
+          7,
+          0,
+          0,
+        );
+        if (now < morningOpenTime) {
+          openingTimeReached = false;
+          blockReason = 'Les ventes débutent à 07h00 AM (heure d’Haïti).';
         }
 
         const isEligibleToOpen =
-          previousResultsPublished &&
           openingTimeReached &&
           now < targetClose &&
           game.status === 'ACTIVE';

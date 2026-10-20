@@ -38,7 +38,9 @@ import com.roebolet.vendor.util.Barcode128View
 import com.roebolet.vendor.util.DrawPeriodBadge
 import com.roebolet.vendor.util.LotteryLogoView
 import com.roebolet.vendor.util.Strings
+import com.roebolet.vendor.util.ThermalPrinterService
 import com.roebolet.vendor.util.TicketReceiptUtil
+import kotlinx.coroutines.launch
 
 @Composable
 fun TicketsListScreen(
@@ -64,6 +66,7 @@ fun TicketsListScreen(
     var serverSearchError by remember { mutableStateOf<String?>(null) }
     var serverFoundTicket by remember { mutableStateOf<VendorTicketItem?>(null) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val isCreole = currentLanguage == AppLanguage.CREOLE
 
     val prefs = remember { PreferencesManager(context) }
@@ -1044,8 +1047,13 @@ fun TicketsListScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        val target = reprintTicket
                         reprintTicketTarget = null
-                        Toast.makeText(context, Strings.t("reprint_success", currentLanguage), Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            ThermalPrinterService.printTicket(context, target) { success, msg ->
+                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            }
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
                     shape = RoundedCornerShape(8.dp)

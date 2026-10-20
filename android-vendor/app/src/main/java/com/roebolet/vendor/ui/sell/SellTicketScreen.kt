@@ -59,7 +59,9 @@ import com.roebolet.vendor.util.Barcode128View
 import com.roebolet.vendor.util.DrawPeriodBadge
 import com.roebolet.vendor.util.LotteryLogoView
 import com.roebolet.vendor.util.Strings
+import com.roebolet.vendor.util.ThermalPrinterService
 import com.roebolet.vendor.util.TicketReceiptUtil
+import kotlinx.coroutines.launch
 
 data class LineItem(
     val number: String = "",
@@ -97,8 +99,11 @@ fun SellTicketScreen(
     onSearchTicketByNumber: ((String, (VendorTicketItem?) -> Unit) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val isCreole = currentLanguage == AppLanguage.CREOLE
+
+    var isPrintingReceipt by remember { mutableStateOf(false) }
 
     val prefs = remember { PreferencesManager(context) }
     val lotteryName = prefs.getLotteryName()
@@ -244,6 +249,21 @@ fun SellTicketScreen(
         }
     }
 
+    // Impression automatique dès réception de la confirmation des tickets
+    LaunchedEffect(soldTicketResults) {
+        val results = soldTicketResults
+        if (!results.isNullOrEmpty()) {
+            val prefMac = ThermalPrinterService.getPreferredPrinterMac(context)
+            if (!prefMac.isNullOrEmpty() || ThermalPrinterService.getPairedPrinters(context).isNotEmpty()) {
+                results.forEach { ticket ->
+                    ThermalPrinterService.printTicket(context, ticket) { success, msg ->
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
     fun loadTicketToEdit(ticket: VendorTicketItem) {
         clearAllLines()
         var bIdx = 0
@@ -383,7 +403,11 @@ fun SellTicketScreen(
     val selectedDraws = openDraws.filter { selectedDrawIds.contains(it.id) }
     val lotteryTitle = when {
         selectedDraws.isEmpty() -> if (isCreole) "Chwazi Tiraj" else "Choisir Tirage"
-        selectedDraws.size == 1 -> "${selectedDraws.first().game.name} - Bòlet"
+        selectedDraws.size == 1 -> {
+            val d = selectedDraws.first()
+            val period = d.sessionName ?: TicketReceiptUtil.getDrawPeriod(d.game.name, d.salesClosingAt)
+            "${d.game.name} ($period)"
+        }
         else -> if (isCreole) "${selectedDraws.size} Tiraj chwazi" else "${selectedDraws.size} Tirages sélectionnés"
     }
 
@@ -1133,11 +1157,24 @@ fun SellTicketScreen(
             },
             text = {
                 if (openDraws.isEmpty()) {
-                    Text(
-                        text = if (isCreole) "Pa gen okenn tiraj ki ouvè pou kounye a." else "Aucun tirage ouvert actuellement.",
-                        color = Color(0xFF475569),
-                        fontSize = 13.sp
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (isCreole) "Pa gen okenn tiraj ki ouvè pou kounye a." else "Aucun tirage ouvert actuellement.",
+                            color = Color(0xFF475569),
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (isCreole) "Tiraj yo ouvè chak jou apati 07:00 AM (Lè Ayiti)." else "Les ventes ouvrent chaque jour dès 07:00 AM (Heure d'Haïti).",
+                            color = Color(0xFF64748B),
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
@@ -1193,16 +1230,26 @@ fun SellTicketScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = draw.game.name,
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 15.sp,
+                                                color = if (isChecked) Color(0xFF1E3A8A) else Color(0xFF0F172A)
+                                            )
+                                            val period = draw.sessionName ?: TicketReceiptUtil.getDrawPeriod(draw.game.name, draw.salesClosingAt)
+                                            DrawPeriodBadge(period = period)
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        val closingHaiti = TicketReceiptUtil.formatHaitiTimeOnly(draw.salesClosingAt)
                                         Text(
-                                            text = draw.game.name,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = if (isChecked) Color(0xFF1E3A8A) else Color(0xFF0F172A)
-                                        )
-                                        Text(
-                                            text = "Tiraj N° ${draw.drawNumber} • Clôture : ${(draw.salesClosingAt ?: "").take(16).replace("T", " ")}",
+                                            text = "Tiraj N° ${draw.drawNumber} • Fèmen a : $closingHaiti",
                                             fontSize = 12.sp,
-                                            color = Color(0xFF475569)
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isChecked) Color(0xFF2563EB) else Color(0xFF475569)
                                         )
                                     }
 
@@ -1536,6 +1583,38 @@ fun SellTicketScreen(
                     }
                 }
             },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        if (isPrintingReceipt) return@OutlinedButton
+                        isPrintingReceipt = true
+                        scope.launch {
+                            soldTicketResults.forEach { ticket ->
+                                ThermalPrinterService.printTicket(context, ticket) { success, msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            isPrintingReceipt = false
+                        }
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1E293B)),
+                    border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                ) {
+                    if (isPrintingReceipt) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = TopBarPurple)
+                        Spacer(modifier = Modifier.width(4.dp))
+                    } else {
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp), tint = TopBarPurple)
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = if (isCreole) "ENPRIME" else "IMPRIMER",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1543,8 +1622,7 @@ fun SellTicketScreen(
                         onDismissReceipt()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = TopBarPurple),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))

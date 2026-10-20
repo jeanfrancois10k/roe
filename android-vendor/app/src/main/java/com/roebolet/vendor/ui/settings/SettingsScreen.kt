@@ -1,5 +1,6 @@
 package com.roebolet.vendor.ui.settings
 
+import android.annotation.SuppressLint
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
+import com.roebolet.vendor.util.ThermalPrinterService
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -36,8 +39,18 @@ fun SettingsScreen(
     onSaveServerUrl: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var serverUrlInput by remember { mutableStateOf(currentServerUrl) }
     val isHt = currentLanguage == AppLanguage.CREOLE
+
+    var preferredPrinterName by remember {
+        mutableStateOf(
+            ThermalPrinterService.getPreferredPrinterName(context)
+                ?: if (isHt) "Okenn enprimant chwazi" else "Aucune imprimante choisie"
+        )
+    }
+    var showPrinterPicker by remember { mutableStateOf(false) }
+    var isPrintingTest by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -293,6 +306,35 @@ fun SettingsScreen(
                     Text(if (isHt) "Vèsyon Lojisyèl" else "Version Logiciel", color = RoeTextMuted, fontSize = 12.sp)
                     Text("v1.0.2 (Production Certifiée)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
+
+                HorizontalDivider(color = RoeBorder.copy(alpha = 0.5f))
+
+                // Ligne Enprimant Bluetooth
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(if (isHt) "Enprimant Tèmik (Bluetooth)" else "Imprimante Thermique (Bluetooth)", color = RoeTextMuted, fontSize = 12.sp)
+                        Text(
+                            text = preferredPrinterName,
+                            color = if (preferredPrinterName.contains("Aucune") || preferredPrinterName.contains("Okenn")) RoeWarning else RoeGold,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Button(
+                        onClick = { showPrinterPicker = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = RoeCard),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Text(if (isHt) "Chanje" else "Changer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
@@ -338,16 +380,130 @@ fun SettingsScreen(
         // Bouton de Test Impression Ticket
         Button(
             onClick = {
-                Toast.makeText(context, if (isHt) "Tès enprimant tèmik voye : Enpresyon OK" else "Test d'impression thermique envoyé : Reçu de test OK", Toast.LENGTH_SHORT).show()
+                if (isPrintingTest) return@Button
+                isPrintingTest = true
+                scope.launch {
+                    ThermalPrinterService.printTestReceipt(context) { success, msg ->
+                        isPrintingTest = false
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                    }
+                }
             },
+            enabled = !isPrintingTest,
             colors = ButtonDefaults.buttonColors(containerColor = RoeCard),
             border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
-            Icon(Icons.Default.Print, contentDescription = null, tint = RoeGold)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(if (isHt) "TESTE ENPRIMANT TÈMIK" else "TESTER L'IMPRIMANTE THERMIQUE", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            if (isPrintingTest) {
+                CircularProgressIndicator(color = RoeGold, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isHt) "Enpresyon tès ap fèt..." else "Impression du test en cours...",
+                    color = RoeGold,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                Icon(Icons.Default.Print, contentDescription = null, tint = RoeGold)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isHt) "TESTE ENPRIMANT TÈMIK" else "TESTER L'IMPRIMANTE THERMIQUE",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
+    }
+
+    // Modal de Sélection de l'Imprimante Bluetooth
+    if (showPrinterPicker) {
+        val pairedDevices = remember { ThermalPrinterService.getPairedPrinters(context) }
+        AlertDialog(
+            onDismissRequest = { showPrinterPicker = false },
+            containerColor = RoeSurface,
+            title = {
+                Text(
+                    text = if (isHt) "Chwazi Enprimant Bluetooth" else "Sélectionner l'imprimante Bluetooth",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (pairedDevices.isEmpty()) {
+                        Text(
+                            text = if (isHt)
+                                "Pa gen okenn aparèy Bluetooth ki apparié.\n\nTanpri ale nan Paramèt Bluetooth telefòn lan, apparier enprimant tèmik la (egz: MPT-II, POS-58, PT-210), epi retounen la a."
+                            else
+                                "Aucun appareil Bluetooth appairé trouvé.\n\nVeuillez vous rendre dans les Paramètres Bluetooth d'Android, associer votre imprimante thermique (ex: POS-58, MPT-II), puis revenir ici.",
+                            color = RoeTextMuted,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            text = if (isHt) "Klike sou enprimant ou vle itilize a :" else "Sélectionnez l'imprimante à utiliser :",
+                            color = RoeTextMuted,
+                            fontSize = 12.sp
+                        )
+                        pairedDevices.forEach { dev ->
+                            @SuppressLint("MissingPermission")
+                            val devName = try { dev.name ?: "Appareil Inconnu" } catch (_: Exception) { "Appareil Inconnu" }
+                            val devAddress = dev.address
+                            val isSelected = devAddress == ThermalPrinterService.getPreferredPrinterMac(context)
+
+                            Surface(
+                                color = if (isSelected) RoeGold.copy(alpha = 0.2f) else RoeCard,
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) RoeGold else RoeBorder),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        ThermalPrinterService.setPreferredPrinter(context, devAddress, devName)
+                                        preferredPrinterName = devName
+                                        showPrinterPicker = false
+                                        Toast.makeText(context, if (isHt) "Enprimant $devName chwazi !" else "Imprimante $devName sélectionnée !", Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(devName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(devAddress, color = RoeTextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = RoeGold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (ThermalPrinterService.getPreferredPrinterMac(context) != null) {
+                    TextButton(
+                        onClick = {
+                            ThermalPrinterService.clearPreferredPrinter(context)
+                            preferredPrinterName = if (isHt) "Okenn enprimant chwazi" else "Aucune imprimante choisie"
+                            showPrinterPicker = false
+                            Toast.makeText(context, if (isHt) "Enprimant retire" else "Imprimante désassociée", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text(if (isHt) "Retire Enprimant" else "Désassocier", color = RoeDanger, fontSize = 12.sp)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPrinterPicker = false }) {
+                    Text(if (isHt) "Fèmen" else "Fermer", color = Color.White, fontSize = 12.sp)
+                }
+            }
+        )
     }
 }

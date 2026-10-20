@@ -24,12 +24,36 @@ import java.util.Calendar
 
 object TicketReceiptUtil {
 
+    val HAITI_TIMEZONE: java.util.TimeZone = java.util.TimeZone.getTimeZone("America/Port-au-Prince")
+
     /**
-     * Détermine si un tirage correspond à la session MIDI ou SOIR.
+     * Parse un horodatage ISO (UTC ou local) et le convertit précisément dans le fuseau d'Haïti
+     */
+    fun parseHaitiCalendar(isoString: String?): java.util.Calendar? {
+        if (isoString.isNullOrEmpty()) return null
+        return try {
+            val clean = isoString.take(19).replace(" ", "T")
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+            sdf.timeZone = if (isoString.endsWith("Z") || isoString.contains("+")) {
+                java.util.TimeZone.getTimeZone("UTC")
+            } else {
+                HAITI_TIMEZONE
+            }
+            val date = sdf.parse(clean) ?: return null
+            val cal = java.util.Calendar.getInstance(HAITI_TIMEZONE)
+            cal.time = date
+            cal
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Détermine si un tirage correspond à la session MIDI ou SOIR selon l'heure d'Haïti.
      * Règle Borlette :
      * 1. Analyse du nom du jeu (ex: NY MIDI vs NY SOIR)
-     * 2. Analyse de l'heure programmée (scheduledAt) : avant 16h00 = MIDI, à partir de 16h00 = SOIR
-     * 3. Fallback heure locale actuelle : avant 16h00 = MIDI, après 16h00 = SOIR ("après midi c'est soir")
+     * 2. Analyse de l'heure programmée (scheduledAt) convertie en heure d'Haïti : avant 16h00 = MIDI, à partir de 16h00 = SOIR
+     * 3. Fallback heure actuelle d'Haïti : avant 16h00 = MIDI, à partir de 16h00 = SOIR
      */
     fun getDrawPeriod(gameName: String?, scheduledAt: String? = null): String {
         val upper = (gameName ?: "").uppercase()
@@ -41,21 +65,38 @@ object TicketReceiptUtil {
         }
 
         if (!scheduledAt.isNullOrEmpty()) {
-            try {
-                val hour = when {
-                    scheduledAt.contains("T") -> scheduledAt.substringAfter("T").take(2).toIntOrNull()
-                    scheduledAt.contains(" ") -> scheduledAt.substringAfter(" ").take(2).toIntOrNull()
-                    else -> null
-                }
-                if (hour != null) {
-                    return if (hour < 16) "MIDI" else "SOIR"
-                }
-            } catch (_: Exception) {}
+            val cal = parseHaitiCalendar(scheduledAt)
+            if (cal != null) {
+                val haitiHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                return if (haitiHour < 16) "MIDI" else "SOIR"
+            }
         }
 
-        val cal = Calendar.getInstance()
-        val currentHour = cal.get(Calendar.HOUR_OF_DAY)
+        val cal = java.util.Calendar.getInstance(HAITI_TIMEZONE)
+        val currentHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
         return if (currentHour < 16) "MIDI" else "SOIR"
+    }
+
+    /**
+     * Formate uniquement l'heure de fermeture ou de tirage en heure d'Haïti
+     * Ex: "13:28 (01:28 PM)" ou "21:43 (09:43 PM)"
+     */
+    fun formatHaitiTimeOnly(isoString: String?): String {
+        val cal = parseHaitiCalendar(isoString) ?: return isoString?.take(16)?.replace("T", " ") ?: ""
+        val sdf = java.text.SimpleDateFormat("HH:mm (hh:mm a)", java.util.Locale.US)
+        sdf.timeZone = HAITI_TIMEZONE
+        return sdf.format(cal.time)
+    }
+
+    /**
+     * Formate la date et heure complète en heure civile d'Haïti
+     * Ex: "20/10/2026 21:43"
+     */
+    fun formatHaitiDateTime(isoString: String?): String {
+        val cal = parseHaitiCalendar(isoString) ?: return isoString?.take(16)?.replace("T", " ") ?: ""
+        val sdf = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.US)
+        sdf.timeZone = HAITI_TIMEZONE
+        return sdf.format(cal.time)
     }
 
     /**
