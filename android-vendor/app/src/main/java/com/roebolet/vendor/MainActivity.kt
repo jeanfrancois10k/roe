@@ -50,12 +50,39 @@ class MainActivity : ComponentActivity() {
     private val socketManager = SocketManager.instance
     private val syncManager = com.roebolet.vendor.data.sync.SyncManager.instance
 
+    private val bluetoothPermissionsLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ -> }
+
+    private fun checkAndRequestBluetoothPermissions() {
+        val permissions = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                permissions.add(android.Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            if (checkSelfPermission(android.Manifest.permission.BLUETOOTH_SCAN) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                permissions.add(android.Manifest.permission.BLUETOOTH_SCAN)
+            }
+        } else {
+            if (checkSelfPermission(android.Manifest.permission.BLUETOOTH) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                permissions.add(android.Manifest.permission.BLUETOOTH)
+            }
+            if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                permissions.add(android.Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+        if (permissions.isNotEmpty()) {
+            bluetoothPermissionsLauncher.launch(permissions.toTypedArray())
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         prefs = (application as RoeBoletApp).preferencesManager
         networkMonitor = NetworkMonitor(applicationContext)
         initRetrofit()
+        checkAndRequestBluetoothPermissions()
 
         setContent {
             RoeBoletTheme {

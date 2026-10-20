@@ -584,8 +584,9 @@ fun TicketsListScreen(
                     val rawGameName = previewTicket.game?.get("name")?.toString() ?: "Loterie"
                     val drawNum = previewTicket.draw?.get("drawNumber")?.toString() ?: ""
                     val schedAt = previewTicket.draw?.get("scheduledAt")?.toString() ?: previewTicket.createdAt
-                    val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedAt)
-                    val drawPeriod = TicketReceiptUtil.getDrawPeriod(rawGameName, schedAt)
+                    val session = previewTicket.draw?.get("sessionName")?.toString() ?: previewTicket.draw?.get("session")?.toString()
+                    val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedAt, session)
+                    val drawPeriod = session?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(rawGameName, schedAt, session)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -878,8 +879,9 @@ fun TicketsListScreen(
                     val rawGameName = reprintTicket.game?.get("name")?.toString() ?: "TIRAJ OFISYÈL"
                     val drawNum = reprintTicket.draw?.get("drawNumber")
                     val schedAt = reprintTicket.draw?.get("scheduledAt")?.toString() ?: reprintTicket.createdAt
-                    val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedAt)
-                    val drawPeriod = TicketReceiptUtil.getDrawPeriod(rawGameName, schedAt)
+                    val session = reprintTicket.draw?.get("sessionName")?.toString() ?: reprintTicket.draw?.get("session")?.toString()
+                    val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedAt, session)
+                    val drawPeriod = session?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(rawGameName, schedAt, session)
                     Text(
                         text = drawDisplayName,
                         color = Color.Black,

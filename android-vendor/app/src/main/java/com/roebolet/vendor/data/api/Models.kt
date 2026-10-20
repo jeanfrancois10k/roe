@@ -150,6 +150,7 @@ data class SellTicketResponse(
     @SerializedName("gameName") val gameName: String? = null,
     @SerializedName("drawNumber") val drawNumber: Any? = null,
     @SerializedName("scheduledAt") val scheduledAt: String? = null,
+    @SerializedName("sessionName") val sessionName: String? = null,
     @SerializedName("totalAmount") val rawTotalAmount: Double? = null,
     @SerializedName("status") val status: String? = "CONFIRMED",
     @SerializedName("createdAt") val createdAt: String? = null,

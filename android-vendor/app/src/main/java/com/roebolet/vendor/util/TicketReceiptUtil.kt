@@ -24,21 +24,18 @@ import java.util.Calendar
 
 object TicketReceiptUtil {
 
-    val HAITI_TIMEZONE: java.util.TimeZone = java.util.TimeZone.getTimeZone("America/Port-au-Prince")
+    // Haïti est sur UTC-4 / GMT-4 en période d'heure d'été (EDT)
+    val HAITI_TIMEZONE: java.util.TimeZone = java.util.TimeZone.getTimeZone("GMT-4")
 
     /**
-     * Parse un horodatage ISO (UTC ou local) et le convertit précisément dans le fuseau d'Haïti
+     * Parse un horodatage ISO (UTC) et le convertit précisément dans le fuseau d'Haïti (GMT-4)
      */
     fun parseHaitiCalendar(isoString: String?): java.util.Calendar? {
         if (isoString.isNullOrEmpty()) return null
         return try {
             val clean = isoString.take(19).replace(" ", "T")
             val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-            sdf.timeZone = if (isoString.endsWith("Z") || isoString.contains("+")) {
-                java.util.TimeZone.getTimeZone("UTC")
-            } else {
-                HAITI_TIMEZONE
-            }
+            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
             val date = sdf.parse(clean) ?: return null
             val cal = java.util.Calendar.getInstance(HAITI_TIMEZONE)
             cal.time = date
@@ -51,11 +48,18 @@ object TicketReceiptUtil {
     /**
      * Détermine si un tirage correspond à la session MIDI ou SOIR selon l'heure d'Haïti.
      * Règle Borlette :
-     * 1. Analyse du nom du jeu (ex: NY MIDI vs NY SOIR)
-     * 2. Analyse de l'heure programmée (scheduledAt) convertie en heure d'Haïti : avant 16h00 = MIDI, à partir de 16h00 = SOIR
-     * 3. Fallback heure actuelle d'Haïti : avant 16h00 = MIDI, à partir de 16h00 = SOIR
+     * 1. Priorité au sessionName officiel du serveur ("SOIR" ou "MIDI")
+     * 2. Analyse du nom du jeu (ex: NY MIDI vs NY SOIR)
+     * 3. Analyse de l'heure programmée (scheduledAt) convertie en heure d'Haïti : avant 16h00 = MIDI, à partir de 16h00 = SOIR
+     * 4. Fallback heure actuelle d'Haïti : avant 16h00 = MIDI, à partir de 16h00 = SOIR
      */
-    fun getDrawPeriod(gameName: String?, scheduledAt: String? = null): String {
+    fun getDrawPeriod(gameName: String?, scheduledAt: String? = null, sessionName: String? = null): String {
+        if (!sessionName.isNullOrBlank()) {
+            val s = sessionName.trim().uppercase()
+            if (s.contains("SOIR") || s.contains("EVENING") || s.contains("NUIT") || s.contains("NIGHT")) return "SOIR"
+            if (s.contains("MIDI") || s.contains("MIDDAY") || s.contains("MATIN") || s.contains("DAY")) return "MIDI"
+        }
+
         val upper = (gameName ?: "").uppercase()
         if (upper.contains("SOIR") || upper.contains("EVENING") || upper.contains("NUIT") || upper.contains("NIGHT")) {
             return "SOIR"
@@ -103,7 +107,12 @@ object TicketReceiptUtil {
      * Formate le nom d'affichage propre du tirage avec la mention MIDI ou SOIR
      * Ex: "BOLET NEW YORK - MIDI" ou "BOLET FLORIDA - SOIR (#102)"
      */
-    fun formatDrawDisplayName(gameName: String?, drawNumber: Any? = null, scheduledAt: String? = null): String {
+    fun formatDrawDisplayName(
+        gameName: String?,
+        drawNumber: Any? = null,
+        scheduledAt: String? = null,
+        sessionName: String? = null
+    ): String {
         val baseName = (gameName ?: "TIRAJ OFISYÈL")
             .replace(Regex("(?i)\\s*\\(midi\\s*&\\s*soir\\)"), "")
             .replace(Regex("(?i)\\s*\\(midi\\)"), "")
@@ -111,7 +120,7 @@ object TicketReceiptUtil {
             .trim()
             .uppercase()
 
-        val period = getDrawPeriod(gameName, scheduledAt)
+        val period = getDrawPeriod(gameName, scheduledAt, sessionName)
         val drawNumStr = if (drawNumber != null && drawNumber.toString().isNotEmpty()) " (#$drawNumber)" else ""
         return "$baseName - $period$drawNumStr"
     }

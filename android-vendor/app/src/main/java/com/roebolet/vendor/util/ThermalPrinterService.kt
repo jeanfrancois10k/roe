@@ -107,21 +107,60 @@ object ThermalPrinterService {
         var socket: BluetoothSocket? = null
         try {
             val device = adapter.getRemoteDevice(targetMac)
-            adapter.cancelDiscovery() // Annuler le scan pour optimiser la connexion
+            try { adapter.cancelDiscovery() } catch (_: Exception) {}
 
-            socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-            socket.connect()
+            var connected = false
+            var lastEx: Exception? = null
+
+            // Méthode 1 : SPP RFCOMM standard sécurisé
+            try {
+                socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                socket.connect()
+                connected = true
+            } catch (e: Exception) {
+                lastEx = e
+                try { socket?.close() } catch (_: Exception) {}
+            }
+
+            // Méthode 2 : Insecure RFCOMM (Requis pour POS-58, PT-210, MPT-II, GOOJPRT)
+            if (!connected) {
+                try {
+                    socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+                    socket.connect()
+                    connected = true
+                } catch (e: Exception) {
+                    lastEx = e
+                    try { socket?.close() } catch (_: Exception) {}
+                }
+            }
+
+            // Méthode 3 : Réflexion port série 1 (fallback matériel direct)
+            if (!connected) {
+                try {
+                    val method = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                    socket = method.invoke(device, 1) as BluetoothSocket
+                    socket.connect()
+                    connected = true
+                } catch (e: Exception) {
+                    lastEx = e
+                    try { socket?.close() } catch (_: Exception) {}
+                }
+            }
+
+            if (!connected || socket == null) {
+                throw lastEx ?: Exception("Connexion impossible à l'imprimante Bluetooth.")
+            }
 
             val outStream: OutputStream = socket.outputStream
             outStream.write(bytes)
             outStream.flush()
 
             // Petite temporisation pour que le buffer thermique soit imprimé
-            kotlinx.coroutines.delay(500)
+            kotlinx.coroutines.delay(600)
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(Exception("Erreur connexion imprimante : ${e.localizedMessage ?: "Vérifiez que l'imprimante est allumée."}"))
+            Result.failure(Exception("Erreur imprimante : ${e.localizedMessage ?: "Vérifiez que l'imprimante est allumée et appairée."}"))
         } finally {
             try {
                 socket?.close()
@@ -160,8 +199,9 @@ object ThermalPrinterService {
         val rawGameName = ticket.game?.get("name")?.toString() ?: "TIRAJ OFISYÈL"
         val drawNum = ticket.draw?.get("drawNumber")
         val schedOrCreated = ticket.draw?.get("scheduledAt")?.toString() ?: ticket.createdAt
-        val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedOrCreated)
-        val drawPeriod = TicketReceiptUtil.getDrawPeriod(rawGameName, schedOrCreated)
+        val session = ticket.draw?.get("sessionName")?.toString() ?: ticket.draw?.get("session")?.toString()
+        val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(rawGameName, drawNum, schedOrCreated, session)
+        val drawPeriod = session?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(rawGameName, schedOrCreated, session)
 
         val dateDisplay = TicketReceiptUtil.formatHaitiDateTime(ticket.createdAt)
 
@@ -329,7 +369,8 @@ object ThermalPrinterService {
             game = mapOf("name" to (ticket.gameName ?: "TIRAJ OFISYÈL")),
             draw = mapOf(
                 "drawNumber" to (ticket.drawNumber?.toString() ?: ""),
-                "scheduledAt" to schedOrCreated
+                "scheduledAt" to schedOrCreated,
+                "sessionName" to (ticket.sessionName ?: "")
             ),
             secureChecksum = ticket.secureChecksum,
             playedGrids = ticket.playedGrids

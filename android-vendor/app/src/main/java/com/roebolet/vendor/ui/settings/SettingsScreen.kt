@@ -419,7 +419,7 @@ fun SettingsScreen(
 
     // Modal de Sélection de l'Imprimante Bluetooth
     if (showPrinterPicker) {
-        val pairedDevices = remember { ThermalPrinterService.getPairedPrinters(context) }
+        val pairedDevices = remember(showPrinterPicker) { ThermalPrinterService.getPairedPrinters(context) }
         AlertDialog(
             onDismissRequest = { showPrinterPicker = false },
             containerColor = RoeSurface,

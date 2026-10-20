@@ -368,6 +368,7 @@ export class TicketsService {
         gameName: game.name,
         drawNumber: draw.drawNumber,
         scheduledAt: draw.scheduledAt,
+        sessionName: (draw as any).sessionName,
         totalAmount: Number(createdTicket.totalAmount),
         status: createdTicket.status,
         playedGrids: dto.grids,
