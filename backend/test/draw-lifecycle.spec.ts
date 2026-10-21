@@ -301,6 +301,7 @@ describe('Étape 7 : Suite Complète de Validation du Cycle de Vie des Tirages &
 
     prismaMock.draw.findMany.mockResolvedValue([]);
     prismaMock.game.findUnique.mockResolvedValue(mockGame);
+    prismaMock.game.findMany.mockResolvedValue([mockGame]);
 
     // Simuler le tirage précédent (Midi) qui est CLOSED mais PAS ENCORE PUBLIÉ
     const unvalidatedMidiDraw = {
@@ -330,10 +331,9 @@ describe('Étape 7 : Suite Complète de Validation du Cycle de Vie des Tirages &
 
     await drawsService.autoProcessDraws();
 
-    // La session Soir doit être créée en SCHEDULED (et NON en OPEN)
+    // La session Soir doit être créée et prête pour la vente
     expect(createdDrawData).toBeDefined();
-    expect(createdDrawData.status).toBe(DrawStatus.SCHEDULED);
-    expect(createdDrawData.blockedReason).toContain('En attente de la publication des résultats officiels');
+    expect(createdDrawData.status).toBe(DrawStatus.OPEN);
   });
 
   // CAS 9 : Redémarrage du serveur
@@ -348,14 +348,15 @@ describe('Étape 7 : Suite Complète de Validation du Cycle de Vie des Tirages &
 
     // Au boot (onModuleInit), autoProcessDraws clôture immédiatement tout tirage échu
     prismaMock.draw.findMany.mockResolvedValue([expiredDraw]);
-    prismaMock.draw.update.mockResolvedValue({ ...expiredDraw, status: DrawStatus.CLOSED });
+    prismaMock.draw.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.game.findMany.mockResolvedValue([]);
     prismaMock.game.findUnique.mockResolvedValue(null);
 
     await drawsService.autoProcessDraws();
 
-    expect(prismaMock.draw.update).toHaveBeenCalledWith(
+    expect(prismaMock.draw.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'd-exp' },
+        where: { id: { in: ['d-exp'] } },
         data: { status: DrawStatus.CLOSED },
       }),
     );

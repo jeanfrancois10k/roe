@@ -215,11 +215,31 @@ describe('Phase 11: E2E Full Lottery Lifecycle Simulation (De la vente au paieme
           return Promise.resolve({ id: `audit-${Date.now()}`, ...data });
         }),
       },
-      $queryRaw: jest.fn().mockImplementation(() => {
+      $queryRaw: jest.fn().mockImplementation((strings: any) => {
+        const queryText = Array.isArray(strings) ? strings.join(' ') : String(strings || '');
+        if (queryText.includes('"Draw"')) {
+          return Promise.resolve([
+            {
+              id: storedDraw.id,
+              status: DrawStatus.OPEN,
+              salesClosingAt: new Date(Date.now() + 3600000),
+            },
+          ]);
+        }
+        if (queryText.includes('"Vendor"')) {
+          return Promise.resolve([
+            {
+              id: mockVendor.id,
+              currentBalance: currentVendorBalance,
+              creditLimit: 500.0,
+              vendorCode: 'VEND-001',
+            },
+          ]);
+        }
         // Renvoie l'état courant verrouillé
         return Promise.resolve([
           {
-            id: mockVendor.id,
+            id: storedTicket?.id || mockVendor.id,
             currentBalance: currentVendorBalance,
             creditLimit: 500.0,
             vendorCode: 'VEND-001',
