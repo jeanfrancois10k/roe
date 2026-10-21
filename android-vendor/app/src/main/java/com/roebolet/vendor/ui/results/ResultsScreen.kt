@@ -113,7 +113,7 @@ fun ResultsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(results) { res ->
-                    val period = TicketReceiptUtil.getDrawPeriod(res.gameName, res.scheduledAt ?: res.publishedAt)
+                    val period = TicketReceiptUtil.getDrawPeriod(res.gameName, res.salesClosingAt ?: res.scheduledAt ?: res.publishedAt, res.sessionName)
 
                     Surface(
                         color = RoeSurface,
@@ -134,12 +134,12 @@ fun ResultsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Text(text = "Tirage N° ${res.drawNumber}", color = RoeGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        DrawPeriodBadge(period = period)
+                                        DrawPeriodBadge(period = res.sessionName ?: period)
                                     }
                                 }
 
                                 Text(
-                                    text = res.publishedAt?.take(16)?.replace("T", " ") ?: "Aujourd'hui",
+                                    text = TicketReceiptUtil.formatHaitiDateTime(res.salesClosingAt ?: res.scheduledAt ?: res.publishedAt),
                                     color = RoeTextMuted,
                                     fontSize = 11.sp
                                 )

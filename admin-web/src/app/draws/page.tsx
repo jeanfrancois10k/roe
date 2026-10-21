@@ -652,7 +652,7 @@ export default function DrawsPage() {
                         </span>
                       </h4>
                       <p className="text-xs text-roe-textMuted mt-0.5">
-                        Règle stricte des sessions : Entre 07h00 et 13h00, c'est la session Midi (les ventes Soir sont verrouillées). À partir de 13h00, la session Soir s'ouvre automatiquement.
+                        Règle stricte des sessions : Entre 05h00 et 13h00, c'est la session Midi (les ventes Soir sont verrouillées). À partir de 13h00, la session Soir s'ouvre automatiquement.
                       </p>
                     </div>
                   </div>

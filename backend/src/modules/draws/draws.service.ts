@@ -300,7 +300,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * 1. Clôture automatique à l'instant précis (salesClosingAt <= now) côté serveur.
    * 2. Indépendance totale : chaque loterie a son propre cycle.
    * 3. Sessions indépendantes : la session Soir s'ouvre pour les ventes dès que son cycle est actif.
-   * 4. Les ventes de la journée débutent à 07h00 AM (heure d’Haïti).
+   * 4. Les ventes de la journée débutent à 05h00 AM (heure d’Haïti).
    * 5. Toutes les heures sont interprétées strictement dans le fuseau America/Port-au-Prince.
    */
   async autoProcessDraws() {
@@ -448,20 +448,20 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           }
         }
 
-        // Vérification de la fenêtre horaire autorisée pour les ventes de la journée (07h00 AM heure d'Haïti)
+        // Vérification de la fenêtre horaire autorisée pour les ventes de la journée (05h00 AM heure d'Haïti)
         let openingTimeReached = true;
         const targetDay = isTargetTomorrow ? haitiNow.day + 1 : haitiNow.day;
         const morningOpenTime = createHaitiDate(
           haitiNow.year,
           haitiNow.month,
           targetDay,
-          7,
+          5,
           0,
           0,
         );
         if (now < morningOpenTime) {
           openingTimeReached = false;
-          blockReason = 'Les ventes débutent à 07h00 AM (heure d’Haïti).';
+          blockReason = 'Les ventes débutent à 05h00 AM (heure d’Haïti).';
         }
 
         const isEligibleToOpen =
@@ -1245,13 +1245,13 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * Consultation des résultats du jour pour l'affichage public et les terminaux vendeurs
    */
   async getTodayResults() {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const haitiNow = getHaitiDateParts();
+    const dayStartHaiti = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 0, 0, 0);
 
     const draws = await this.prisma.draw.findMany({
       where: {
         status: DrawStatus.PUBLISHED,
-        publishedAt: { gte: startOfToday },
+        publishedAt: { gte: dayStartHaiti },
       },
       include: {
         game: { select: { id: true, code: true, name: true } },
@@ -1264,7 +1264,9 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       drawNumber: d.drawNumber,
       gameCode: d.game.code,
       gameName: d.game.name,
+      sessionName: d.sessionName,
       scheduledAt: d.scheduledAt,
+      salesClosingAt: d.salesClosingAt,
       publishedAt: d.publishedAt,
       winningResults: d.winningResults,
       validationHash: d.validationHash,

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SalesReportQueryDto } from './dto/sales-report-query.dto';
 import { TicketStatus, TicketPayoutStatus } from '@prisma/client';
+import { createHaitiDate, getHaitiDateParts } from '../draws/draws.service';
 
 @Injectable()
 export class ReportsService {
@@ -16,30 +17,33 @@ export class ReportsService {
       // Plage personnalisée choisie par l'utilisateur (entre plusieurs dates)
       const startClean = query.startDate.split('T')[0];
       const startParts = startClean.split('-').map(Number);
-      startDate = new Date(startParts[0], startParts[1] - 1, startParts[2], 0, 0, 0, 0);
+      startDate = createHaitiDate(startParts[0], startParts[1] - 1, startParts[2], 0, 0, 0);
 
       if (query.endDate) {
         const endClean = query.endDate.split('T')[0];
         const endParts = endClean.split('-').map(Number);
-        endDate = new Date(endParts[0], endParts[1] - 1, endParts[2], 23, 59, 59, 999);
+        endDate = createHaitiDate(endParts[0], endParts[1] - 1, endParts[2], 23, 59, 59);
       } else {
-        endDate = new Date(startParts[0], startParts[1] - 1, startParts[2], 23, 59, 59, 999);
+        endDate = createHaitiDate(startParts[0], startParts[1] - 1, startParts[2], 23, 59, 59);
       }
     } else {
-      const targetDate = query.date ? new Date(query.date) : new Date();
+      const haitiNow = getHaitiDateParts(query.date ? new Date(query.date) : new Date());
       if (period === 'day') {
-        startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
-        endDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+        startDate = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 0, 0, 0);
+        endDate = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 23, 59, 59);
       } else if (period === 'week') {
-        // Début de semaine (Lundi)
-        const dayOfWeek = targetDate.getDay();
+        // Début de semaine (Lundi à Dimanche) en heure d'Haïti
+        const targetHaiti = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 12, 0, 0);
+        const dayOfWeek = targetHaiti.getUTCDay();
         const diffToMonday = (dayOfWeek + 6) % 7;
-        startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() - diffToMonday, 0, 0, 0, 0);
-        endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 6, 23, 59, 59, 999);
+        const mondayDay = haitiNow.day - diffToMonday;
+        startDate = createHaitiDate(haitiNow.year, haitiNow.month, mondayDay, 0, 0, 0);
+        endDate = createHaitiDate(haitiNow.year, haitiNow.month, mondayDay + 6, 23, 59, 59);
       } else {
-        // Mois complet
-        startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1, 0, 0, 0, 0);
-        endDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59, 999);
+        // Mois complet en heure d'Haïti
+        startDate = createHaitiDate(haitiNow.year, haitiNow.month, 1, 0, 0, 0);
+        const nextMonthStart = createHaitiDate(haitiNow.year, haitiNow.month + 1, 1, 0, 0, 0);
+        endDate = new Date(nextMonthStart.getTime() - 1);
       }
     }
 

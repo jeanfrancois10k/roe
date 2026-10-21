@@ -141,7 +141,7 @@ export class TicketsService {
       );
     }
 
-    // RÈGLE 5.1 : Horaires autorisés de vente de la journée (à partir de 07h00 en heure d'Haïti)
+    // RÈGLE 5.1 : Horaires autorisés de vente de la journée (à partir de 05h00 en heure d'Haïti)
     const haitiHourStr = now.toLocaleTimeString('en-US', {
       timeZone: 'America/Port-au-Prince',
       hour12: false,
@@ -149,9 +149,9 @@ export class TicketsService {
     });
     const haitiHour = parseInt(haitiHourStr, 10);
 
-    if (haitiHour < 7) {
+    if (haitiHour < 5) {
       throw new BadRequestException(
-        'Vente rejetée : Les ventes de la journée débutent à 07h00 du matin (heure d’Haïti).',
+        'Vente rejetée : Les ventes de la journée débutent à 05h00 du matin (heure d’Haïti).',
       );
     }
 

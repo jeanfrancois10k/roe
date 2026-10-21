@@ -1620,7 +1620,7 @@ fun SellTicketScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = if (isCreole) "Tiraj yo ouvè chak jou apati 07:00 AM (Lè Ayiti)." else "Les ventes ouvrent chaque jour dès 07:00 AM (Heure d'Haïti).",
+                            text = if (isCreole) "Tiraj yo ouvè chak jou apati 05:00 AM (Lè Ayiti)." else "Les ventes ouvrent chaque jour dès 05:00 AM (Heure d'Haïti).",
                             color = Color(0xFF64748B),
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center

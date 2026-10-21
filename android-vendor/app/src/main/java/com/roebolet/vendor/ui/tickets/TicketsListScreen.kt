@@ -358,10 +358,12 @@ fun TicketsListScreen(
                             ) {
                                 val gameName = ticket.game?.get("name")?.toString() ?: ""
                                 val drawNumber = ticket.draw?.get("drawNumber")?.toString() ?: ""
-                                val drawDesc = if (gameName.isNotEmpty()) "$gameName ($drawNumber)" else ticket.createdAt.take(16).replace("T", " ")
+                                val drawDesc = if (gameName.isNotEmpty()) "$gameName ($drawNumber)" else ""
+                                val dateDesc = TicketReceiptUtil.formatHaitiDateTime(ticket.createdAt)
+                                val combinedDesc = if (drawDesc.isNotEmpty()) "$drawDesc • $dateDesc" else dateDesc
 
                                 Text(
-                                    text = drawDesc,
+                                    text = combinedDesc,
                                     color = RoeTextMuted,
                                     fontSize = 11.sp
                                 )
@@ -572,7 +574,7 @@ fun TicketsListScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(text = "Dat & Lè :", color = Color(0xFF616161), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = previewTicket.createdAt.take(19).replace("T", " "),
+                            text = TicketReceiptUtil.formatHaitiDateTime(previewTicket.createdAt),
                             color = Color.Black,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -859,7 +861,7 @@ fun TicketsListScreen(
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "Dat & Lè: ${reprintTicket.createdAt.take(19).replace("T", " ")}",
+                        text = "Dat & Lè: ${TicketReceiptUtil.formatHaitiDateTime(reprintTicket.createdAt)}",
                         color = Color(0xFF212121),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,

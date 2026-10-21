@@ -125,19 +125,39 @@ fun SalesReportScreen(
                 )
             }
 
-            IconButton(
-                onClick = onRefreshClick,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(RoeSurface)
-                    .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Actualiser",
-                    tint = RoeGold
-                )
+                IconButton(
+                    onClick = { showDateRangeDialog = true },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RoeSurface)
+                        .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Calendrier",
+                        tint = RoeGold
+                    )
+                }
+
+                IconButton(
+                    onClick = onRefreshClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RoeSurface)
+                        .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Actualiser",
+                        tint = RoeGold
+                    )
+                }
             }
         }
 
@@ -282,7 +302,9 @@ fun SalesReportScreen(
             color = RoeCard,
             shape = RoundedCornerShape(8.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showDateRangeDialog = true }
         ) {
             Row(
                 modifier = Modifier
@@ -291,13 +313,22 @@ fun SalesReportScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Rapo du $startDisplay au $endDisplay",
-                    color = RoeGold,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Calendrier",
+                        tint = RoeGold,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Rapo du $startDisplay au $endDisplay",
+                        color = RoeGold,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
                 Text(
                     text = "MAJ: ${nowTimeStr.take(5)}",
                     color = RoeTextMuted,
@@ -453,16 +484,42 @@ fun SalesReportScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                // BALANCE CASH (Ventes - Pertes)
+                                // BALANCE CASH (Ventes - Pertes) -> Gain ou Perte
                                 Surface(
                                     color = Color(0xFF1E2433),
                                     shape = RoundedCornerShape(10.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, RoeGold.copy(alpha = 0.3f)),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (global.balanceCash >= 0) RoeSuccess.copy(alpha = 0.5f) else RoeDanger.copy(alpha = 0.5f)
+                                    ),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(text = "Balance cash (ventes - pertes)", color = RoeTextMuted, fontSize = 10.sp)
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = if (isCreole) "Balans nèt (Gain / Pèt)" else "Balance nette (Gain / Perte)",
+                                                color = RoeTextMuted,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Surface(
+                                                color = if (global.balanceCash >= 0) RoeSuccess.copy(alpha = 0.2f) else RoeDanger.copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (global.balanceCash >= 0) (if (isCreole) "BENEFIS" else "BÉNÉFICE") else (if (isCreole) "PÈT" else "PERTE"),
+                                                    color = if (global.balanceCash >= 0) RoeSuccess else RoeDanger,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = "${String.format("%.0f", global.balanceCash)} HTG",
                                             color = if (global.balanceCash >= 0) RoeSuccess else RoeDanger,
@@ -702,7 +759,29 @@ fun SalesReportScreen(
         }
     }
 
-    // MODAL DIALOG : SÉLECTION DE PLAGE DE DATES (ENTRE PLUSIEURS DATES)
+    // Helper pour afficher le sélecteur de calendrier natif Android
+    val openDatePicker: (String, (String) -> Unit) -> Unit = { initialDateStr, onSelected ->
+        val cal = Calendar.getInstance()
+        try {
+            if (initialDateStr.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+                val parts = initialDateStr.split("-").map { it.toInt() }
+                cal.set(parts[0], parts[1] - 1, parts[2])
+            }
+        } catch (_: Exception) {}
+
+        android.app.DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val formatted = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                onSelected(formatted)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    // MODAL DIALOG : SÉLECTION DE PLAGE DE DATES (ENTRE PLUSIEURS DATES AVEC CALENDRIER)
     if (showDateRangeDialog) {
         Dialog(onDismissRequest = { showDateRangeDialog = false }) {
             Surface(
@@ -712,18 +791,81 @@ fun SalesReportScreen(
                 modifier = Modifier.fillMaxWidth().padding(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isCreole) "Chwazi Peryòd Dat" else "Choisir l'Intervalle de Dates",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = RoeGold,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     Text(
-                        text = if (isCreole) "Chwazi Peryòd Dat (Ant Plizyè Dat)" else "Choisir la Période (Entre plusieurs dates)",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Text(
-                        text = if (isCreole) "Antre dat kòmansman ak dat finisyon pou rapò a" else "Entrez les dates de début et de fin du rapport",
+                        text = if (isCreole) "Klike sou ikòn kalandriye a pou chwazi dat kòmansman ak finisyon" else "Cliquez sur l'icône calendrier pour choisir le début et la fin",
                         color = RoeTextMuted,
                         fontSize = 11.sp,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                        modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
                     )
+
+                    // Raccourcis rapides
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val sdfFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                        val calPresets = Calendar.getInstance()
+
+                        // Aujourd'hui
+                        val todayVal = sdfFormat.format(calPresets.time)
+
+                        // Hier
+                        calPresets.add(Calendar.DAY_OF_MONTH, -1)
+                        val yesterdayVal = sdfFormat.format(calPresets.time)
+
+                        // 7 derniers jours
+                        calPresets.time = Date()
+                        calPresets.add(Calendar.DAY_OF_MONTH, -6)
+                        val last7Val = sdfFormat.format(calPresets.time)
+
+                        listOf(
+                            (if (isCreole) "Jodiya" else "Aujourd'hui") to (todayVal to todayVal),
+                            (if (isCreole) "Yè" else "Hier") to (yesterdayVal to yesterdayVal),
+                            (if (isCreole) "7 jou" else "7 jours") to (last7Val to todayVal)
+                        ).forEach { (label, range) ->
+                            Surface(
+                                color = RoeCard,
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        customStartDate = range.first
+                                        customEndDate = range.second
+                                    }
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = RoeGold,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Text(text = "Date de début (YYYY-MM-DD) :", color = RoeGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
@@ -731,6 +873,17 @@ fun SalesReportScreen(
                         onValueChange = { customStartDate = it },
                         singleLine = true,
                         placeholder = { Text("Ex: 2026-10-16", color = RoeTextMuted) },
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                openDatePicker(customStartDate) { customStartDate = it }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Ouvrir calendrier",
+                                    tint = RoeGold
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -740,7 +893,7 @@ fun SalesReportScreen(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(text = "Date de fin (YYYY-MM-DD) :", color = RoeGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
@@ -748,6 +901,17 @@ fun SalesReportScreen(
                         onValueChange = { customEndDate = it },
                         singleLine = true,
                         placeholder = { Text("Ex: 2026-10-18", color = RoeTextMuted) },
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                openDatePicker(customEndDate) { customEndDate = it }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Ouvrir calendrier",
+                                    tint = RoeGold
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -757,7 +921,7 @@ fun SalesReportScreen(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -780,6 +944,8 @@ fun SalesReportScreen(
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
+                            Icon(Icons.Default.DateRange, contentDescription = null, tint = RoeBackground, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(text = "Afiche Rapò", color = RoeBackground, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
