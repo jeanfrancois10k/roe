@@ -89,6 +89,24 @@ private val LineDividerColor = Color(0xFF9E9E9E)
 private val PlaceholderColor = Color(0xFF9E9E9E)
 private val TextDarkColor = Color(0xFF212121)
 
+private val CommonInputColors: TextFieldColors
+    @Composable
+    get() = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color(0xFF0F172A),
+        unfocusedTextColor = Color(0xFF0F172A),
+        focusedContainerColor = Color.White,
+        unfocusedContainerColor = Color.White,
+        cursorColor = TopBarPurple,
+        focusedBorderColor = TopBarPurple,
+        unfocusedBorderColor = Color(0xFF94A3B8),
+        focusedLabelColor = TopBarPurple,
+        unfocusedLabelColor = Color(0xFF475569),
+        focusedTrailingIconColor = Color(0xFF334155),
+        unfocusedTrailingIconColor = Color(0xFF334155),
+        focusedLeadingIconColor = TopBarPurple,
+        unfocusedLeadingIconColor = Color(0xFF64748B)
+    )
+
 @Composable
 fun SellTicketScreen(
     openDraws: List<OpenDrawItem>,
@@ -1032,13 +1050,13 @@ fun SellTicketScreen(
                             .weight(1f)
                             .height(46.dp),
                         shape = RoundedCornerShape(8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = TopBarPurple,
-                            unfocusedBorderColor = Color(0xFFCBD5E1),
-                            focusedContainerColor = Color(0xFFF8FAFC),
-                            unfocusedContainerColor = Color(0xFFF8FAFC)
-                        ),
-                        textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextDarkColor)
+                        colors = CommonInputColors,
+                        textStyle = TextStyle(
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A),
+                            fontFamily = FontFamily.Monospace
+                        )
                     )
 
                     // Bouton Appliquer
@@ -2553,11 +2571,18 @@ fun SellTicketScreen(
                             tempMissingDefaultAmount = input.filter { it.isDigit() }.take(6)
                         },
                         label = { Text(Strings.t("default_amount_config", currentLanguage)) },
-                        trailingIcon = { Text("HTG", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Gray) },
+                        trailingIcon = { Text("HTG", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF334155)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CommonInputColors,
+                        textStyle = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A),
+                            fontFamily = FontFamily.Monospace
+                        )
                     )
 
                     // Option : activer l'application automatique permanente
@@ -2751,11 +2776,18 @@ fun SellTicketScreen(
                         onValueChange = { input ->
                             tenPairsAmountInput = input.filter { it.isDigit() }.take(6)
                         },
-                        trailingIcon = { Text("HTG", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Gray) },
+                        trailingIcon = { Text("HTG", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E293B)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CommonInputColors,
+                        textStyle = TextStyle(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A),
+                            fontFamily = FontFamily.Monospace
+                        )
                     )
 
                     // Puces rapides de montants
@@ -2851,11 +2883,18 @@ fun SellTicketScreen(
                         onValueChange = { input ->
                             tempDefaultInput = input.filter { it.isDigit() }.take(6)
                         },
-                        trailingIcon = { Text("HTG", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Gray) },
+                        trailingIcon = { Text("HTG", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E293B)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CommonInputColors,
+                        textStyle = TextStyle(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A),
+                            fontFamily = FontFamily.Monospace
+                        )
                     )
                     Row(
                         modifier = Modifier
