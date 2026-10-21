@@ -42,6 +42,7 @@ fun ControlScreen(
     currentLanguage: AppLanguage = AppLanguage.CREOLE,
     onPeriodChange: (String) -> Unit = {},
     onRefreshClick: () -> Unit,
+    onOpenReports: () -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -131,19 +132,39 @@ fun ControlScreen(
                 )
             }
 
-            IconButton(
-                onClick = onRefreshClick,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(RoeSurface)
-                    .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Actualiser",
-                    tint = RoeGold
-                )
+                IconButton(
+                    onClick = onOpenReports,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RoeSurface)
+                        .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Rapport avec calendrier",
+                        tint = RoeGold
+                    )
+                }
+
+                IconButton(
+                    onClick = onRefreshClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RoeSurface)
+                        .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Actualiser",
+                        tint = RoeGold
+                    )
+                }
             }
         }
 

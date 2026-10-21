@@ -10,14 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,6 +47,7 @@ fun TicketsListScreen(
     deviceUuid: String = "",
     onBackClick: () -> Unit,
     onRefreshClick: () -> Unit,
+    onOpenReports: () -> Unit = {},
     onReplayTicket: (VendorTicketItem) -> Unit = {},
     onCancelTicket: (ticketId: String) -> Unit = {},
     onSearchServerTicket: ((String, (VendorTicketItem?) -> Unit) -> Unit)? = null
@@ -142,19 +136,39 @@ fun TicketsListScreen(
                 )
             }
 
-            IconButton(
-                onClick = onRefreshClick,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(RoeSurface)
-                    .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Actualiser",
-                    tint = RoeGold
-                )
+                IconButton(
+                    onClick = onOpenReports,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RoeSurface)
+                        .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = if (isCreole) "Rapò Vant (Kalandriye)" else "Rapports de vente (Calendrier)",
+                        tint = RoeGold
+                    )
+                }
+
+                IconButton(
+                    onClick = onRefreshClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RoeSurface)
+                        .border(1.dp, RoeBorder, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Actualiser",
+                        tint = RoeGold
+                    )
+                }
             }
         }
 
@@ -259,6 +273,66 @@ fun TicketsListScreen(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(8.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Bannière d'accès direct au Rapport des Ventes (avec sélecteur de dates / calendrier)
+        Surface(
+            color = RoeSurface,
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, RoeGold.copy(alpha = 0.5f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenReports() }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        color = RoeGold.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = null,
+                                tint = RoeGold,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = if (isCreole) "RAPÒ VANT (CHWAZI DAT NAN KALANDRIYE)" else "RAPPORT DES VENTES (SÉLECTEUR CALENDRIER)",
+                            color = RoeGold,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = if (isCreole) "Klike la pou wè total vant, benefis, pèt ak kalandriye" else "Consulter ventes, bénéfices, pertes et calendrier",
+                            color = RoeTextMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = RoeGold,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -435,18 +509,61 @@ fun TicketsListScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
+                            // Détection si le tirage est déjà passé
+                            val isDrawPassed = run {
+                                val drawStatus = ticket.draw?.get("status")?.toString()?.uppercase() ?: ""
+                                if (drawStatus in listOf("CLOSED", "DRAWN", "PUBLISHED", "CANCELLED")) return@run true
+                                if (ticket.isWinner || ticket.wonAmount > 0) return@run true
+
+                                val closingStr = ticket.draw?.get("salesClosingAt")?.toString()
+                                    ?: ticket.draw?.get("scheduledAt")?.toString()
+                                if (!closingStr.isNullOrEmpty()) {
+                                    val cal = TicketReceiptUtil.parseHaitiCalendar(closingStr)
+                                    if (cal != null && System.currentTimeMillis() >= cal.timeInMillis) return@run true
+                                }
+
+                                val createdCal = TicketReceiptUtil.parseHaitiCalendar(ticket.createdAt)
+                                if (createdCal != null) {
+                                    val todayHaiti = java.util.Calendar.getInstance(TicketReceiptUtil.HAITI_TIMEZONE)
+                                    val cYear = createdCal.get(java.util.Calendar.YEAR)
+                                    val cDay = createdCal.get(java.util.Calendar.DAY_OF_YEAR)
+                                    val tYear = todayHaiti.get(java.util.Calendar.YEAR)
+                                    val tDay = todayHaiti.get(java.util.Calendar.DAY_OF_YEAR)
+                                    if (cYear < tYear || (cYear == tYear && cDay < tDay)) return@run true
+                                }
+
+                                false
+                            }
+
                             // Boutons d'actions rapides (Réimprimer, Modifier/Rejouer, Annuler)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Bouton Réimprimer
+                                // Bouton Réimprimer : Inactif si le tirage est déjà passé
                                 OutlinedButton(
-                                    onClick = { reprintTicketTarget = ticket },
+                                    onClick = {
+                                        if (isDrawPassed) {
+                                            Toast.makeText(
+                                                context,
+                                                if (isCreole) "Tiraj sa a pase deja. Ou pa ka reenprime fich la." else "Ce tirage est déjà passé. Réimpression non autorisée.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            reprintTicketTarget = ticket
+                                        }
+                                    },
+                                    enabled = !isDrawPassed,
                                     shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color(0xFF38BDF8),
+                                        disabledContentColor = Color(0xFF64748B)
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (!isDrawPassed) Color(0xFF38BDF8).copy(alpha = 0.5f) else Color(0xFF334155)
+                                    ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
@@ -461,39 +578,71 @@ fun TicketsListScreen(
 
                                 Spacer(modifier = Modifier.width(6.dp))
 
-                                // Bouton Rejouer / Modifier
+                                // Bouton Rejouer / Modifier (Reste actif pour rejouer/modifier sur un autre tirage)
                                 OutlinedButton(
-                                    onClick = { onReplayTicket(ticket) },
+                                    onClick = {
+                                        onReplayTicket(ticket)
+                                        Toast.makeText(
+                                            context,
+                                            if (isCreole) "Nimewo fich la chaje ! Chwazi yon tiraj ki ouvè jodi a pou valide." else "Numéros du ticket chargés ! Choisissez un tirage ouvert aujourd'hui pour valider.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    },
                                     shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = RoeGold),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, RoeGold.copy(alpha = 0.5f)),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, RoeGold.copy(alpha = 0.6f)),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp))
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
-                                        text = Strings.t("modify_or_replay", currentLanguage),
+                                        text = if (isDrawPassed) {
+                                            if (isCreole) "REJOUE / NOUVO TIRAJ" else "REJOUER / AUTRE TIRAGE"
+                                        } else {
+                                            Strings.t("modify_or_replay", currentLanguage)
+                                        },
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
 
-                                // Bouton Annuler Vente (Seulement si CONFIRMED)
+                                // Bouton Annuler Vente : Inactif si le tirage est déjà passé
                                 if (ticket.status == "CONFIRMED") {
                                     Spacer(modifier = Modifier.width(6.dp))
                                     OutlinedButton(
-                                        onClick = { ticketToCancel = ticket },
+                                        onClick = {
+                                            if (isDrawPassed) {
+                                                Toast.makeText(
+                                                    context,
+                                                    if (isCreole) "Tiraj la pase deja. Ou pa ka anile fich la." else "Le tirage est déjà passé. Annulation impossible.",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                ticketToCancel = ticket
+                                            }
+                                        },
+                                        enabled = !isDrawPassed,
                                         shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = RoeDanger),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, RoeDanger.copy(alpha = 0.5f)),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = RoeDanger,
+                                            disabledContentColor = Color(0xFF64748B)
+                                        ),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (!isDrawPassed) RoeDanger.copy(alpha = 0.5f) else Color(0xFF334155)
+                                        ),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                         modifier = Modifier.height(32.dp)
                                     ) {
-                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(13.dp))
+                                        Icon(
+                                            imageVector = if (!isDrawPassed) Icons.Default.Delete else Icons.Default.Lock,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(13.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(3.dp))
                                         Text(
-                                            text = Strings.t("cancel_sale", currentLanguage),
+                                            text = if (!isDrawPassed) Strings.t("cancel_sale", currentLanguage) else (if (isCreole) "Tiraj fèmen" else "Tirage passé"),
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold
                                         )

@@ -231,11 +231,12 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Grille des 7 boutons
+        // Grille des 8 boutons
         val menuItems = listOf(
             MenuItem(if (isHt) "VERIFYE FICH" else "VÉRIFIER TICKET", Icons.Default.QrCodeScanner, RoePurple, "VERIFY_TICKET"),
             MenuItem(if (isHt) "FICH YO" else "TICKETS", Icons.Default.Receipt, Color.White, "TICKETS"),
             MenuItem(if (isHt) "REZILTA" else "RÉSULTATS", Icons.Default.EmojiEvents, RoeGold, "RESULTS"),
+            MenuItem(if (isHt) "RAPÒ VANT" else "RAPPORTS", Icons.Default.DateRange, RoeGold, "REPORTS"),
             MenuItem(if (isHt) "KONTWÒL" else "CONTRÔLE", Icons.Default.PointOfSale, RoeGold, "CONTROL"),
             MenuItem(if (isHt) "ISTORIK" else "HISTORIQUE", Icons.Default.History, Color.White, "HISTORY"),
             MenuItem(if (isHt) "SENKWO" else "SYNCHRO", Icons.Default.Sync, RoeTextMuted, "SYNC"),
@@ -252,17 +253,22 @@ fun DashboardScreen(
                 DashboardItem(menuItems[1], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
 
-            // Ligne 2 : Résultats + Contrôle
+            // Ligne 2 : Résultats + Rapports de Vente (avec Calendrier)
             Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[2], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[3], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
 
-            // Ligne 3 : Historique + Synchro + Paramètres
+            // Ligne 3 : Contrôle + Historique
             Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[4], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[5], modifier = Modifier.weight(1f)) { onMenuClick(it) }
+            }
+
+            // Ligne 4 : Synchro + Paramètres
+            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[6], modifier = Modifier.weight(1f)) { onMenuClick(it) }
+                DashboardItem(menuItems[7], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
         }
     }

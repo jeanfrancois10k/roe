@@ -742,6 +742,10 @@ class MainActivity : ComponentActivity() {
                         deviceUuid = deviceUuid,
                         onBackClick = { currentScreen = "DASHBOARD" },
                         onRefreshClick = { fetchVendorTickets() },
+                        onOpenReports = {
+                            currentScreen = "REPORTS"
+                            fetchSalesReport("day")
+                        },
                         onReplayTicket = { ticket ->
                             replayTicket = ticket
                             currentScreen = "SELL_TICKET"
@@ -781,6 +785,10 @@ class MainActivity : ComponentActivity() {
                         onRefreshClick = {
                             fetchControlSummary()
                             fetchSalesReport(selectedReportPeriod)
+                        },
+                        onOpenReports = {
+                            currentScreen = "REPORTS"
+                            fetchSalesReport("day")
                         },
                         onBackClick = { currentScreen = "DASHBOARD" }
                     )
