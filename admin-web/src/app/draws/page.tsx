@@ -411,13 +411,19 @@ export default function DrawsPage() {
 
     try {
       await api.post(`/api/v1/draws/${selectedDrawForResults.id}/results`, {
+        winningResults: {
+          firstPrize: normFirst,
+          secondPrize: normSecond,
+          thirdPrize: normThird,
+        },
         firstPrize: normFirst,
         secondPrize: normSecond,
         thirdPrize: normThird,
+        publishImmediately: true,
       });
 
-      // Publication automatique et calcul immédiat des gains
-      await api.post(`/api/v1/draws/${selectedDrawForResults.id}/publish`);
+      // Publication automatique de secours au cas où publishImmediately n'a pas été exécuté
+      await api.post(`/api/v1/draws/${selectedDrawForResults.id}/publish`).catch(() => {});
 
       setIsResultModalOpen(false);
       setSelectedDrawForResults(null);

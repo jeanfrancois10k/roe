@@ -933,7 +933,6 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * Saisie des résultats officiels d'un tirage
    */
   async setResults(id: string, dto: SetResultsDto, adminId: string) {
-
     const draw = await this.prisma.draw.findUnique({
       where: { id },
       include: { game: true },
@@ -949,6 +948,17 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
+    // Extraction robuste des résultats gagnants (supporte format imbriqué winningResults OU champs directs)
+    const winningResults = dto.winningResults || {
+      firstPrize: dto.firstPrize || '',
+      secondPrize: dto.secondPrize || '',
+      thirdPrize: dto.thirdPrize || '',
+    };
+
+    if (!winningResults.firstPrize || !winningResults.secondPrize || !winningResults.thirdPrize) {
+      throw new BadRequestException('Les résultats gagnants (1er, 2e et 3e lot) sont obligatoires.');
+    }
+
     const drawnAt = new Date();
 
     const updated = await this.prisma.draw.update({
@@ -956,7 +966,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       data: {
         status: DrawStatus.DRAWN,
         drawnAt,
-        winningResults: dto.winningResults as any,
+        winningResults: winningResults as any,
       },
       include: { game: true },
     });
@@ -967,7 +977,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       resource: `Draw:${id}`,
       newPayload: {
         drawNumber: draw.drawNumber,
-        winningResults: dto.winningResults,
+        winningResults: winningResults,
       },
     });
 

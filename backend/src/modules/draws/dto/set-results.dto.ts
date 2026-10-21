@@ -25,10 +25,22 @@ export class WinningResultsDto {
 }
 
 export class SetResultsDto {
+  @IsOptional()
   @ValidateNested()
   @Type(() => WinningResultsDto)
-  @IsNotEmpty({ message: 'Les résultats gagnants sont obligatoires' })
-  winningResults: WinningResultsDto;
+  winningResults?: WinningResultsDto;
+
+  @IsOptional()
+  @IsString({ message: 'Le 1er lot doit être une chaîne de caractères' })
+  firstPrize?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Le 2e lot doit être une chaîne de caractères' })
+  secondPrize?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Le 3e lot doit être une chaîne de caractères' })
+  thirdPrize?: string;
 
   @IsOptional()
   @IsBoolean()
