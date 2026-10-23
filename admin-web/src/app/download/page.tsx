@@ -36,7 +36,7 @@ export default function DownloadAppPage() {
         </div>
 
         <span className="px-3 py-1 rounded-full bg-roe-gold/10 border border-roe-gold/30 text-roe-gold text-xs font-black uppercase tracking-wider mb-3">
-          Version Officielle v1.0.0 (Production)
+          Version Officielle v1.0.3 (Production)
         </span>
 
         <h2 className="text-2xl sm:text-3xl font-black text-white mb-2">
@@ -49,7 +49,7 @@ export default function DownloadAppPage() {
 
         {/* Bouton de Téléchargement Principal */}
         <a
-          href="/download/roe-bolet-vendor.apk"
+          href="/download/roe-bolet-vendor.apk?v=1.0.3"
           download="roe-bolet-vendor.apk"
           className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-roe-gold via-amber-400 to-roe-gold text-roe-bg font-black text-base shadow-xl shadow-roe-gold/25 hover:scale-105 active:scale-95 transition-all mb-4"
         >
@@ -59,7 +59,7 @@ export default function DownloadAppPage() {
 
         <p className="text-[11px] text-roe-textMuted flex items-center gap-1.5">
           <ShieldCheck size={14} className="text-emerald-400" />
-          <span>Fichier APK vérifié & sécurisé (17.6 Mo) • Prêt à l'installation</span>
+          <span>Fichier APK v1.0.3 vérifié & sécurisé (17.7 Mo) • Prêt à l'installation</span>
         </p>
 
         {/* Guide d'installation rapide en 3 étapes */}
