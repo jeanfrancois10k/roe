@@ -1334,4 +1334,53 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       validationHash: d.validationHash,
     }));
   }
+
+  /**
+   * Suppression ou archivage sécurisé d'un tirage par l'Administrateur
+   */
+  async deleteDraw(id: string, adminId: string) {
+    const draw = await this.prisma.draw.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { tickets: true } },
+        game: { select: { name: true } },
+      },
+    });
+
+    if (!draw) {
+      throw new NotFoundException('Tirage introuvable');
+    }
+
+    if (draw._count.tickets > 0) {
+      // Si des tickets ont été émis, on archive en passant le statut à CANCELLED pour préserver l'audit comptable
+      await this.prisma.draw.update({
+        where: { id },
+        data: {
+          status: DrawStatus.CANCELLED,
+          blockedReason: `Archivé par l'administrateur (${adminId})`,
+        },
+      });
+
+      await this.auditService.log({
+        action: 'DRAW_ARCHIVED',
+        resource: `Draw:${id}`,
+        userId: adminId,
+        newPayload: { drawNumber: draw.drawNumber, game: draw.game.name, ticketsCount: draw._count.tickets },
+      });
+
+      return { success: true, message: 'Tirage archivé avec succès (conservé dans l’historique d’audit).' };
+    }
+
+    // Aucun ticket vendu : suppression définitive
+    await this.prisma.draw.delete({ where: { id } });
+
+    await this.auditService.log({
+      action: 'DRAW_DELETED',
+      resource: `Draw:${id}`,
+      userId: adminId,
+      newPayload: { drawNumber: draw.drawNumber, game: draw.game.name },
+    });
+
+    return { success: true, message: 'Tirage supprimé avec succès.' };
+  }
 }

@@ -22,6 +22,8 @@ import {
   Trash2,
   Sliders,
   Check,
+  Edit3,
+  Archive,
 } from 'lucide-react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
@@ -68,8 +70,10 @@ export default function DrawsPage() {
   const [mariageMultiplier, setMariageMultiplier] = useState(1000);
   const [scheduleSaveLoading, setScheduleSaveLoading] = useState(false);
 
-  // Modal de Saisie des Résultats Gagnants
+  // Modal de Saisie & Rectification des Résultats Gagnants
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
+  const [isOverrideMode, setIsOverrideMode] = useState(false);
+  const [drawsSubFilter, setDrawsSubFilter] = useState<'ACTIVE' | 'ARCHIVE' | 'ALL'>('ACTIVE');
   const [selectedDrawForResults, setSelectedDrawForResults] = useState<any>(null);
   const [firstPrize, setFirstPrize] = useState('');
   const [secondPrize, setSecondPrize] = useState('');
@@ -383,7 +387,35 @@ export default function DrawsPage() {
     }
   };
 
-  // Saisie et enregistrement des 3 numéros gagnants
+  // Ouverture du modal de rectification d'un tirage déjà publié
+  const handleOpenOverrideModal = (d: any) => {
+    setIsOverrideMode(true);
+    setSelectedDrawForResults(d);
+    const winning = d.winningResults || {};
+    const f1 = winning.firstPrize || '';
+    const f2 = winning.secondPrize || '';
+    const f3 = winning.thirdPrize || '';
+    setFirstPrize(f1);
+    setSecondPrize(f2);
+    setThirdPrize(f3);
+    setQuickResultInput(`${f1} ${f2} ${f3}`.trim());
+    setActionError(null);
+    setIsResultModalOpen(true);
+  };
+
+  // Suppression ou archivage sécurisé d'un tirage
+  const handleDeleteDraw = async (drawId: string, drawNumber: number) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer ou archiver le tirage #${drawNumber} ?`)) return;
+    try {
+      const res = await api.delete(`/api/v1/draws/${drawId}`);
+      alert(res?.message || 'Tirage supprimé/archivé avec succès.');
+      fetchData();
+    } catch (err: any) {
+      alert(`Erreur suppression tirage : ${err.message}`);
+    }
+  };
+
+  // Saisie et enregistrement des 3 numéros gagnants (Publication ou Rectification)
   const handleSaveResults = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDrawForResults) return;
@@ -409,6 +441,42 @@ export default function DrawsPage() {
     setResultActionLoading(true);
     setActionError(null);
 
+    // MODE RECTIFICATION D'UN TIRAGE DÉJÀ PUBLIÉ
+    if (isOverrideMode) {
+      const confirmOverride = window.confirm(
+        `Confirmez-vous la RECTIFICATION des résultats pour le tirage #${selectedDrawForResults.drawNumber} ?\n\nNouveaux numéros : ${normFirst} - ${normSecond} - ${normThird}\n\nTous les tickets vendus seront recalculés et les gains réévalués automatiquement.`
+      );
+      if (!confirmOverride) {
+        setResultActionLoading(false);
+        return;
+      }
+      try {
+        await api.post(`/api/v1/draws/${selectedDrawForResults.id}/override`, {
+          winningResults: {
+            firstPrize: normFirst,
+            secondPrize: normSecond,
+            thirdPrize: normThird,
+          },
+          justificationReason: "Correction administrateur",
+        });
+        alert('Résultats rectifiés avec succès ! Tous les tickets ont été recalculés.');
+        setIsResultModalOpen(false);
+        setSelectedDrawForResults(null);
+        setIsOverrideMode(false);
+        setFirstPrize('');
+        setSecondPrize('');
+        setThirdPrize('');
+        setQuickResultInput('');
+        fetchData();
+      } catch (err: any) {
+        setActionError(err.message || 'Erreur lors de la rectification des résultats');
+      } finally {
+        setResultActionLoading(false);
+      }
+      return;
+    }
+
+    // MODE PUBLICATION INITIALE
     try {
       await api.post(`/api/v1/draws/${selectedDrawForResults.id}/results`, {
         winningResults: {
@@ -694,10 +762,55 @@ export default function DrawsPage() {
                   </div>
                 </div>
 
+                {/* Sélecteur de sous-onglets : Tirages Actifs vs Archives / Historique */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
+                  <button
+                    onClick={() => setDrawsSubFilter('ACTIVE')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      drawsSubFilter === 'ACTIVE'
+                        ? 'bg-roe-gold text-roe-bg shadow-sm'
+                        : 'bg-roe-surface text-roe-textMuted hover:text-white border border-roe-border/60'
+                    }`}
+                  >
+                    <Clock size={13} />
+                    <span>Tirages en cours / Actifs ({draws.filter((d) => d.status === 'OPEN' || d.status === 'CLOSED').length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setDrawsSubFilter('ARCHIVE')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      drawsSubFilter === 'ARCHIVE'
+                        ? 'bg-roe-gold text-roe-bg shadow-sm'
+                        : 'bg-roe-surface text-roe-textMuted hover:text-white border border-roe-border/60'
+                    }`}
+                  >
+                    <Archive size={13} />
+                    <span>Archives / Historique ({draws.filter((d) => d.status === 'PUBLISHED' || d.status === 'CANCELLED').length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setDrawsSubFilter('ALL')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      drawsSubFilter === 'ALL'
+                        ? 'bg-roe-gold text-roe-bg shadow-sm'
+                        : 'bg-roe-surface text-roe-textMuted hover:text-white border border-roe-border/60'
+                    }`}
+                  >
+                    <span>Tous ({draws.length})</span>
+                  </button>
+                </div>
+
             {/* Vue Cartes Mobile (< md) */}
             <div className="grid grid-cols-1 gap-4 md:hidden">
-              {draws.length > 0 ? (
-                draws.map((d) => {
+              {(() => {
+                const displayedDraws = draws.filter((d) => {
+                  if (drawsSubFilter === 'ACTIVE') return d.status === 'OPEN' || d.status === 'CLOSED';
+                  if (drawsSubFilter === 'ARCHIVE') return d.status === 'PUBLISHED' || d.status === 'CANCELLED';
+                  return true;
+                });
+
+                return displayedDraws.length > 0 ? (
+                  displayedDraws.map((d) => {
                   const isOpen = d.status === 'OPEN';
                   const isClosed = d.status === 'CLOSED';
                   const isPublished = d.status === 'PUBLISHED';
@@ -768,7 +881,7 @@ export default function DrawsPage() {
                       )}
 
                       {/* Actions */}
-                      <div className="pt-2 border-t border-roe-border/50 flex items-center justify-end gap-2">
+                      <div className="pt-2 border-t border-roe-border/50 flex items-center justify-end gap-2 flex-wrap">
                         {!isOpen && d.status !== 'PUBLISHED' && (
                           <button
                             onClick={() => handleOpenDraw(d.id)}
@@ -790,24 +903,51 @@ export default function DrawsPage() {
                         {(isOpen || isClosed) && (
                           <button
                             onClick={() => {
+                              setIsOverrideMode(false);
                               setSelectedDrawForResults(d);
+                              setFirstPrize('');
+                              setSecondPrize('');
+                              setThirdPrize('');
+                              setQuickResultInput('');
                               setIsResultModalOpen(true);
                             }}
                             className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg text-xs font-bold shadow-md flex items-center gap-1"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
-                            <span>Entrer Résultats</span>
+                            <span>Publier Résultats</span>
                           </button>
                         )}
+                        {isPublished && (
+                          <button
+                            onClick={() => handleOpenOverrideModal(d)}
+                            className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center gap-1 shadow-sm"
+                            title="Corriger les numéros gagnants si une erreur a été commise"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Modifier Résultats</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteDraw(d.id, d.drawNumber)}
+                          className="p-1.5 rounded-xl bg-roe-card hover:bg-rose-500/20 text-roe-textMuted hover:text-rose-400 border border-roe-border hover:border-rose-500/30 transition-colors"
+                          title="Supprimer ou archiver ce tirage"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   );
                 })
               ) : (
                 <div className="text-center py-10 text-xs text-roe-textMuted bg-roe-surface rounded-2xl border border-roe-border/60">
-                  Aucun tirage planifié pour le moment.
+                  {drawsSubFilter === 'ACTIVE'
+                    ? 'Aucun tirage actif en attente.'
+                    : drawsSubFilter === 'ARCHIVE'
+                    ? 'Aucun tirage dans les archives.'
+                    : 'Aucun tirage disponible.'}
                 </div>
-              )}
+              );
+            })()}
             </div>
 
             {/* Vue Tableau Desktop (>= md) */}
@@ -824,10 +964,18 @@ export default function DrawsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-roe-border/40">
-                    {draws.length > 0 ? (
-                      draws.map((d) => {
+                    {(() => {
+                      const displayedDraws = draws.filter((d) => {
+                        if (drawsSubFilter === 'ACTIVE') return d.status === 'OPEN' || d.status === 'CLOSED';
+                        if (drawsSubFilter === 'ARCHIVE') return d.status === 'PUBLISHED' || d.status === 'CANCELLED';
+                        return true;
+                      });
+
+                      return displayedDraws.length > 0 ? (
+                        displayedDraws.map((d) => {
                         const isOpen = d.status === 'OPEN';
                         const isClosed = d.status === 'CLOSED';
+                        const isPublished = d.status === 'PUBLISHED';
                         const winning = d.winningResults;
 
                         return (
@@ -896,7 +1044,7 @@ export default function DrawsPage() {
                             </td>
 
                             <td className="p-4 pr-6 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2 flex-wrap">
                                 {!isOpen && d.status !== 'PUBLISHED' && (
                                   <button
                                     onClick={() => handleOpenDraw(d.id)}
@@ -920,15 +1068,37 @@ export default function DrawsPage() {
                                 {(isOpen || isClosed) && (
                                   <button
                                     onClick={() => {
+                                      setIsOverrideMode(false);
                                       setSelectedDrawForResults(d);
+                                      setFirstPrize('');
+                                      setSecondPrize('');
+                                      setThirdPrize('');
+                                      setQuickResultInput('');
                                       setIsResultModalOpen(true);
                                     }}
                                     className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg text-xs font-bold shadow-md hover:scale-105 transition-all flex items-center gap-1.5"
                                   >
                                     <Sparkles className="w-3.5 h-3.5" />
-                                    <span>Entrer Résultats</span>
+                                    <span>Publier Résultats</span>
                                   </button>
                                 )}
+                                {isPublished && (
+                                  <button
+                                    onClick={() => handleOpenOverrideModal(d)}
+                                    className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                                    title="Corriger les numéros gagnants si une erreur a été commise"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                    <span>Modifier Résultats</span>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteDraw(d.id, d.drawNumber)}
+                                  className="p-1.5 rounded-xl bg-roe-card hover:bg-rose-500/20 text-roe-textMuted hover:text-rose-400 border border-roe-border hover:border-rose-500/30 transition-colors"
+                                  title="Supprimer ou archiver ce tirage"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -937,10 +1107,17 @@ export default function DrawsPage() {
                     ) : (
                       <tr>
                         <td colSpan={5} className="text-center py-12 text-sm text-roe-textMuted">
-                          {loading ? 'Chargement des tirages...' : 'Aucun tirage disponible.'}
+                          {loading
+                            ? 'Chargement des tirages...'
+                            : drawsSubFilter === 'ACTIVE'
+                            ? 'Aucun tirage actif en attente.'
+                            : drawsSubFilter === 'ARCHIVE'
+                            ? 'Aucun tirage dans les archives.'
+                            : 'Aucun tirage disponible.'}
                         </td>
                       </tr>
-                    )}
+                    );
+                  })()}
                   </tbody>
                 </table>
               </div>
@@ -1266,14 +1443,18 @@ export default function DrawsPage() {
         </div>
       )}
 
-      {/* MODAL 2 : SAISIE DES RÉSULTATS GAGNANTS */}
+      {/* MODAL 2 : SAISIE / RECTIFICATION DES RÉSULTATS GAGNANTS */}
       {isResultModalOpen && selectedDrawForResults && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="relative w-full max-w-lg bg-roe-surface border border-roe-border/80 rounded-3xl p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Trophy size={20} className="text-roe-gold" />
-                <span>Proclamer les Résultats Gagnants</span>
+                <Trophy size={20} className={isOverrideMode ? "text-amber-400" : "text-roe-gold"} />
+                <span>
+                  {isOverrideMode
+                    ? "Modifier / Rectifier les Résultats Publiés"
+                    : "Publier les Résultats Gagnants"}
+                </span>
               </h3>
               {(() => {
                 const isMidi = new Date(selectedDrawForResults.salesClosingAt).getHours() < 16;
@@ -1286,6 +1467,9 @@ export default function DrawsPage() {
             </div>
             <p className="text-xs text-roe-textMuted mb-4">
               Tirage #{selectedDrawForResults.drawNumber} — <strong className="text-white">{selectedDrawForResults.game?.name}</strong> ({selectedDrawForResults.game?.code})
+              {isOverrideMode && (
+                <span className="ml-2 text-amber-400 font-semibold">(Mode Correction d'Erreur)</span>
+              )}
             </p>
 
             {actionError && (
@@ -1476,9 +1660,20 @@ export default function DrawsPage() {
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
-                ⚠️ <strong>Important :</strong> La validation déclenchera le calcul mathématique automatique de tous les tickets vendus (Borlette, Lòt 3, Maryaj, Lòt 4, Lòt 5), l’attribution des gains aux gagnants et le calcul des commissions vendeurs.
-              </div>
+              {isOverrideMode ? (
+                <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-[11px] text-amber-200 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5 text-amber-300">
+                    <span>⚠️ Mode Rectification / Correction d'Erreur :</span>
+                  </p>
+                  <p>
+                    Vous êtes sur le point de corriger les numéros officiels d'un tirage déjà publié. Tous les tickets vendus pour ce tirage seront automatiquement recalculés (gains mis à jour, commissions réajustées, historique audité).
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
+                  ⚠️ <strong>Important :</strong> La publication déclenchera le calcul mathématique automatique de tous les tickets vendus (Borlette, Lòt 3, Maryaj, Lòt 4, Lòt 5), l’attribution des gains aux gagnants et le calcul des commissions vendeurs.
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-roe-border/50">
                 <button
@@ -1491,9 +1686,15 @@ export default function DrawsPage() {
                 <button
                   type="submit"
                   disabled={resultActionLoading}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg text-xs font-extrabold shadow-lg disabled:opacity-50"
+                  className={`px-5 py-2.5 rounded-xl text-xs font-extrabold shadow-lg disabled:opacity-50 transition-all ${
+                    isOverrideMode
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-roe-bg hover:scale-105'
+                      : 'bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg hover:scale-105'
+                  }`}
                 >
-                  {resultActionLoading ? 'Calcul des Gains...' : 'Proclamer les Résultats'}
+                  {resultActionLoading
+                    ? (isOverrideMode ? 'Correction des Gains en cours...' : 'Calcul des Gains...')
+                    : (isOverrideMode ? 'Enregistrer la Rectification' : 'Publier les Résultats')}
                 </button>
               </div>
             </form>

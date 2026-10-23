@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Param,
   Query,
   Body,
@@ -129,7 +130,7 @@ export class DrawsController {
 
   @Post(':id/override')
   @UseGuards(RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   async override(
     @Param('id') id: string,
@@ -137,5 +138,16 @@ export class DrawsController {
     @CurrentUser('id') adminId: string,
   ) {
     return this.drawsService.overrideResults(id, dto, adminId);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.drawsService.deleteDraw(id, adminId);
   }
 }
