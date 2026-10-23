@@ -171,6 +171,7 @@ class MainActivity : ComponentActivity() {
         // État Résultats des Tirages
         var drawResults by remember { mutableStateOf<List<DrawResultItem>>(emptyList()) }
         var isLoadingResults by remember { mutableStateOf(false) }
+        var isShowingPastResults by remember { mutableStateOf(false) }
 
         // État Mise à jour de l'application (OTA)
         var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
@@ -427,11 +428,16 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        fun fetchDrawResults() {
+        fun fetchDrawResults(past: Boolean = isShowingPastResults) {
+            isShowingPastResults = past
             lifecycleScope.launch {
                 isLoadingResults = true
                 try {
-                    val res = apiService.getTodayResults()
+                    val res = if (past) {
+                        apiService.getPastResults()
+                    } else {
+                        apiService.getTodayResults(includePast = false)
+                    }
                     if (res.isSuccessful && res.body() != null) {
                         drawResults = res.body()!!
                     }
@@ -782,9 +788,16 @@ class MainActivity : ComponentActivity() {
                     ResultsScreen(
                         results = drawResults,
                         isLoading = isLoadingResults,
+                        isShowingPast = isShowingPastResults,
                         currentLanguage = currentLanguage,
-                        onBackClick = { currentScreen = "DASHBOARD" },
-                        onRefreshClick = { fetchDrawResults() }
+                        onBackClick = {
+                            isShowingPastResults = false
+                            currentScreen = "DASHBOARD"
+                        },
+                        onRefreshClick = { fetchDrawResults(isShowingPastResults) },
+                        onTogglePastResults = {
+                            fetchDrawResults(!isShowingPastResults)
+                        }
                     )
                 }
 
@@ -894,7 +907,8 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "RESULTS", "RÉSULTATS", "REZILTA" -> {
                                     currentScreen = "DRAWS_RESULTS"
-                                    fetchDrawResults()
+                                    isShowingPastResults = false
+                                    fetchDrawResults(false)
                                 }
                                 "CONTROL", "CONTRÔLE", "SOLDE", "KONTWÒL" -> {
                                     currentScreen = "CONTROL"

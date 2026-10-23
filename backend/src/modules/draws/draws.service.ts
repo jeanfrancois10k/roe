@@ -1304,21 +1304,60 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Consultation des résultats du jour pour l'affichage public et les terminaux vendeurs
+   * Consultation des résultats du jour (ou de tous les tirages publiés) pour l'affichage public et terminaux
    */
-  async getTodayResults() {
+  async getTodayResults(includePast: boolean = false) {
+    const haitiNow = getHaitiDateParts();
+    const dayStartHaiti = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 0, 0, 0);
+
+    const where: any = {
+      status: DrawStatus.PUBLISHED,
+    };
+
+    if (!includePast) {
+      where.publishedAt = { gte: dayStartHaiti };
+    }
+
+    const draws = await this.prisma.draw.findMany({
+      where,
+      include: {
+        game: { select: { id: true, code: true, name: true } },
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: includePast ? 50 : undefined,
+    });
+
+    return draws.map((d) => ({
+      id: d.id,
+      drawNumber: d.drawNumber,
+      gameCode: d.game.code,
+      gameName: d.game.name,
+      sessionName: d.sessionName,
+      scheduledAt: d.scheduledAt,
+      salesClosingAt: d.salesClosingAt,
+      publishedAt: d.publishedAt,
+      winningResults: d.winningResults,
+      validationHash: d.validationHash,
+    }));
+  }
+
+  /**
+   * Consultation spécifique des anciens tirages (historique antérieur à aujourd'hui)
+   */
+  async getPastResults(limit: number = 50) {
     const haitiNow = getHaitiDateParts();
     const dayStartHaiti = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 0, 0, 0);
 
     const draws = await this.prisma.draw.findMany({
       where: {
         status: DrawStatus.PUBLISHED,
-        publishedAt: { gte: dayStartHaiti },
+        publishedAt: { lt: dayStartHaiti },
       },
       include: {
         game: { select: { id: true, code: true, name: true } },
       },
       orderBy: { publishedAt: 'desc' },
+      take: limit,
     });
 
     return draws.map((d) => ({

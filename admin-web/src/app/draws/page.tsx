@@ -1122,6 +1122,27 @@ export default function DrawsPage() {
                 </table>
               </div>
             </div>
+
+            {/* Bouton au dessous pour voir les anciens résultats / basculer vers les tirages actifs */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              {drawsSubFilter === 'ACTIVE' ? (
+                <button
+                  onClick={() => setDrawsSubFilter('ARCHIVE')}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-roe-card hover:bg-roe-border/60 text-roe-gold border border-roe-gold/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-105"
+                >
+                  <Archive size={16} />
+                  <span>Voir les Anciens Résultats & Tirages Archivés ({draws.filter((d) => d.status === 'PUBLISHED' || d.status === 'CANCELLED').length})</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setDrawsSubFilter('ACTIVE')}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-roe-card hover:bg-roe-border/60 text-emerald-400 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-105"
+                >
+                  <Dices size={16} />
+                  <span>Retour aux Tirages en Cours / Actifs ({draws.filter((d) => d.status === 'OPEN' || d.status === 'CLOSED').length})</span>
+                </button>
+              )}
+            </div>
           </div>
             </>
           )}

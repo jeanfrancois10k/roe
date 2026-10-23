@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -32,9 +33,11 @@ import com.roebolet.vendor.util.TicketReceiptUtil
 fun ResultsScreen(
     results: List<DrawResultItem>,
     isLoading: Boolean,
+    isShowingPast: Boolean = false,
     currentLanguage: AppLanguage = AppLanguage.CREOLE,
     onBackClick: () -> Unit,
-    onRefreshClick: () -> Unit
+    onRefreshClick: () -> Unit,
+    onTogglePastResults: () -> Unit = {}
 ) {
     val isHt = currentLanguage == AppLanguage.CREOLE
 
@@ -74,7 +77,11 @@ fun ResultsScreen(
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = if (isHt) "Tiraj ofisyèl jodi a" else "Tirages certifiés du jour",
+                    text = if (isShowingPast) {
+                        if (isHt) "Ansyen tiraj ak rezilta pase yo" else "Historique des anciens résultats"
+                    } else {
+                        if (isHt) "Tiraj ofisyèl jodi a" else "Tirages certifiés du jour"
+                    },
                     color = RoeTextMuted,
                     fontSize = 11.sp
                 )
@@ -104,24 +111,71 @@ fun ResultsScreen(
             }
         } else if (results.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                ) {
                     Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = RoeGold, modifier = Modifier.size(48.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = if (isHt) "Poko gen okenn tiraj ki pwoklame jodi a" else "Aucun tirage proclamé aujourd'hui",
+                        text = if (isShowingPast) {
+                            if (isHt) "Poko gen okenn ansyen tiraj ki anrejistre" else "Aucun ancien tirage enregistré"
+                        } else {
+                            if (isHt) "Poko gen okenn tiraj ki pwoklame jodi a" else "Aucun tirage proclamé aujourd'hui"
+                        },
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = if (isHt)
-                            "Kou administrasyon an fin mete rezilta yo, y ap parèt la a touswit."
-                        else
-                            "Dès que l'administration proclame les numéros gagnants, ils s'affichent ici instantanément.",
+                        text = if (isShowingPast) {
+                            if (isHt) "Tout ansyen rezilta yo ap parèt la a kou yo achive."
+                            else "Tous les anciens résultats apparaîtront ici dès qu'ils seront archivés."
+                        } else {
+                            if (isHt) "Kou administrasyon an fin mete rezilta yo, y ap parèt la a touswit."
+                            else "Dès que l'administration proclame les numéros gagnants, ils s'affichent ici instantanément."
+                        },
                         color = RoeTextMuted,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
                     )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Bouton au dessous pour voir les anciens résultats quand la liste est vide
+                    Button(
+                        onClick = onTogglePastResults,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isShowingPast) RoeSurface else RoeGold,
+                            contentColor = if (isShowingPast) Color.White else RoeBackground
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isShowingPast) RoeBorder else RoeGoldDark
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .height(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isShowingPast) Icons.Default.Refresh else Icons.Default.History,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isShowingPast) {
+                                if (isHt) "WÈ REZILTA JODI A" else "VOIR RÉSULTATS DU JOUR"
+                            } else {
+                                if (isHt) "WÈ ANSYEN REZILTA YO" else "VOIR LES ANCIENS RÉSULTATS"
+                            },
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         } else {
@@ -229,6 +283,44 @@ fun ResultsScreen(
                             }
                         }
                     }
+                }
+
+                // Bouton au dessous pour voir les anciens résultats / basculer vers aujourd'hui
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onTogglePastResults,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isShowingPast) RoeSurface else RoeCard,
+                            contentColor = if (isShowingPast) Color.White else RoeGold
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isShowingPast) RoeBorder else RoeGold.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isShowingPast) Icons.Default.Refresh else Icons.Default.History,
+                            contentDescription = null,
+                            tint = if (isShowingPast) Color.White else RoeGold,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isShowingPast) {
+                                if (isHt) "WÈ REZILTA JODI A SÈLMAN" else "VOIR RÉSULTATS DU JOUR"
+                            } else {
+                                if (isHt) "WÈ ANSYEN REZILTA YO" else "VOIR LES ANCIENS RÉSULTATS"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }

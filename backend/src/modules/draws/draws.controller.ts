@@ -38,8 +38,14 @@ export class DrawsController {
 
   @Public()
   @Get('today/results')
-  async getTodayResults() {
-    return this.drawsService.getTodayResults();
+  async getTodayResults(@Query('includePast') includePast?: string) {
+    return this.drawsService.getTodayResults(includePast === 'true' || includePast === '1');
+  }
+
+  @Public()
+  @Get('past/results')
+  async getPastResults(@Query('limit') limit = '50') {
+    return this.drawsService.getPastResults(Number(limit));
   }
 
   @Public()

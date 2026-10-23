@@ -48,7 +48,14 @@ interface RoeApiService {
     suspend fun getOpenDraws(): Response<List<OpenDrawItem>>
 
     @GET("api/v1/draws/today/results")
-    suspend fun getTodayResults(): Response<List<DrawResultItem>>
+    suspend fun getTodayResults(
+        @retrofit2.http.Query("includePast") includePast: Boolean = false
+    ): Response<List<DrawResultItem>>
+
+    @GET("api/v1/draws/past/results")
+    suspend fun getPastResults(
+        @retrofit2.http.Query("limit") limit: Int = 50
+    ): Response<List<DrawResultItem>>
 
     @GET("api/v1/tickets")
     suspend fun getVendorTickets(
