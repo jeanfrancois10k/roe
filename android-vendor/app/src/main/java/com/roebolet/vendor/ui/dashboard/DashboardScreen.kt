@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.ui.theme.*
@@ -38,76 +40,101 @@ fun DashboardScreen(
 ) {
     val isHt = currentLanguage == AppLanguage.CREOLE
 
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(RoeBackground)
-            .padding(14.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        // Top Bar : Profil Vendeur & Solde en Direct
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(RoeSurface)
-                .border(1.dp, RoeBorder, RoundedCornerShape(16.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (isOnline) RoeSuccess else RoeDanger)
-                    )
-                    Text(
-                        text = vendorCode,
-                        color = RoeGold,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    if (pendingSyncCount > 0) {
-                        Surface(
-                            color = RoeWarning.copy(alpha = 0.2f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, RoeWarning),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = if (isHt) "$pendingSyncCount an pant" else "$pendingSyncCount en attente",
-                                color = RoeWarning,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-                Text(
-                    text = vendorName,
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+        val availableHeight = maxHeight
+        // Écrans courts (< 600dp, petits terminaux POS) : scroll vertical avec hauteurs confortables
+        // Écrans standards & longs (>= 600dp, smartphones & terminaux modernes) : distribution responsive sans scroll qui épouse 100% de la hauteur !
+        val isCompactScreen = availableHeight < 600.dp
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Ventes Totales & Bouton Contrôle
-                Surface(
-                    color = RoeCard,
-                    shape = RoundedCornerShape(10.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
-                    modifier = Modifier.clickable { onMenuClick("CONTROL") }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (isCompactScreen) Modifier.verticalScroll(rememberScrollState())
+                    else Modifier
+                ),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // 1. Top Bar : Profil Vendeur & Solde en Direct (épuré, sans surcharge)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(RoeSurface)
+                    .border(1.dp, RoeBorder, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Info Vendeur
+                Column(
+                    modifier = Modifier.weight(1f, fill = false)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.End) {
+                        Box(
+                            modifier = Modifier
+                                .size(9.dp)
+                                .clip(CircleShape)
+                                .background(if (isOnline) RoeSuccess else RoeDanger)
+                        )
+                        Text(
+                            text = vendorCode,
+                            color = RoeGold,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1
+                        )
+                        if (pendingSyncCount > 0) {
+                            Surface(
+                                color = RoeWarning.copy(alpha = 0.2f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, RoeWarning),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "$pendingSyncCount",
+                                    color = RoeWarning,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = vendorName,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Droite : Ventes, Langue & Déconnexion
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Solde Ventes Totales (Cliquer ouvre Kontwòl)
+                    Surface(
+                        color = RoeCard,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                        modifier = Modifier.clickable { onMenuClick("CONTROL") }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
                             Text(
                                 text = if (isHt) "VANT YO" else "VENTES",
                                 color = RoeTextMuted,
@@ -118,85 +145,64 @@ fun DashboardScreen(
                             Text(
                                 text = "${String.format("%.2f", Math.abs(balance))} G",
                                 color = RoeGold,
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
-                        Surface(
-                            color = RoeGold,
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = if (isHt) "KONTWÒL" else "CONTRÔLE",
-                                color = RoeBackground,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                            )
-                        }
                     }
-                }
 
-                // Bouton Changement Rapide de Langue (HT / FR)
-                Surface(
-                    color = RoeCard,
-                    shape = RoundedCornerShape(10.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
-                    modifier = Modifier.clickable {
-                        val next = if (isHt) AppLanguage.FRENCH else AppLanguage.CREOLE
-                        onLanguageChange(next)
-                    }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    // Bouton Changement Rapide de Langue (HT / FR)
+                    Surface(
+                        color = RoeCard,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
+                        modifier = Modifier.clickable {
+                            val next = if (isHt) AppLanguage.FRENCH else AppLanguage.CREOLE
+                            onLanguageChange(next)
+                        }
                     ) {
                         Text(
                             text = if (isHt) "🇭🇹 HT" else "🇫🇷 FR",
                             color = RoeGold,
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Black
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    // Bouton Déconnexion
+                    IconButton(
+                        onClick = onLogoutClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(RoeCard)
+                            .border(1.dp, RoeBorder, RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = if (isHt) "Fèmen Sesyon" else "Verrouiller",
+                            tint = RoeTextMuted,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
-
-                // Bouton Déconnexion
-                IconButton(
-                    onClick = onLogoutClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(RoeCard)
-                        .border(1.dp, RoeBorder, RoundedCornerShape(10.dp))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = if (isHt) "Fèmen Sesyon" else "Verrouiller",
-                        tint = RoeTextMuted,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Zone de Contenu Défilable (Compatible Écran Court / MobiIoT & Grand Écran)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // GROS BOUTON PRINCIPAL : VENTE
-            Box(
-                modifier = Modifier
+            // 2. GROS BOUTON PRINCIPAL : VENTE (NOUVO VANT)
+            val nouvoVantModifier = if (isCompactScreen) {
+                Modifier
                     .fillMaxWidth()
                     .height(68.dp)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .weight(0.85f)
+            }
+
+            Box(
+                modifier = nouvoVantModifier
                     .clip(RoundedCornerShape(18.dp))
                     .background(RoeGold)
                     .clickable { onMenuClick("SELL") }
@@ -208,7 +214,10 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.ShoppingCart,
                             contentDescription = "Vente",
@@ -240,7 +249,7 @@ fun DashboardScreen(
                 }
             }
 
-            // Grille des 8 boutons (avec PEYE FICH au lieu du doublon FICH YO)
+            // 3. Grille des 8 boutons (avec PEYE FICH)
             val menuItems = listOf(
                 MenuItem(if (isHt) "PEYE FICH" else "PAYER TICKET", Icons.Default.Payments, RoeGold, "PAY_TICKET"),
                 MenuItem(if (isHt) "ISTORIK" else "HISTORIQUE", Icons.Default.History, Color.White, "HISTORY"),
@@ -252,26 +261,36 @@ fun DashboardScreen(
                 MenuItem(if (isHt) "PARAMÈT" else "PARAMÈTRES", Icons.Default.Settings, RoeTextMuted, "SETTINGS"),
             )
 
+            val rowModifier = if (isCompactScreen) {
+                Modifier
+                    .fillMaxWidth()
+                    .height(78.dp)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            }
+
             // Ligne 1 : Payer Ticket + Historique
-            Row(modifier = Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = rowModifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[0], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[1], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
 
-            // Ligne 2 : Résultats + Rapports de Vente (avec Calendrier)
-            Row(modifier = Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Ligne 2 : Résultats + Rapports de Vente
+            Row(modifier = rowModifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[2], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[3], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
 
             // Ligne 3 : Contrôle + Vérifier Ticket
-            Row(modifier = Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = rowModifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[4], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[5], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
 
             // Ligne 4 : Synchro + Paramètres
-            Row(modifier = Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = rowModifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardItem(menuItems[6], modifier = Modifier.weight(1f)) { onMenuClick(it) }
                 DashboardItem(menuItems[7], modifier = Modifier.weight(1f)) { onMenuClick(it) }
             }
@@ -299,7 +318,7 @@ fun DashboardItem(
             .background(RoeCard)
             .border(1.dp, RoeBorder, RoundedCornerShape(16.dp))
             .clickable { onClick(if (item.actionId.isNotEmpty()) item.actionId else item.title) }
-            .padding(10.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -310,15 +329,18 @@ fun DashboardItem(
                 imageVector = item.icon,
                 contentDescription = item.title,
                 tint = item.accentColor,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(28.dp)
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = item.title,
                 color = Color.White,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
+                letterSpacing = 0.5.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
