@@ -2,6 +2,7 @@ package com.roebolet.vendor
 
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -52,6 +53,15 @@ class MainActivity : ComponentActivity() {
     private lateinit var networkMonitor: NetworkMonitor
     private val socketManager = SocketManager.instance
     private val syncManager = com.roebolet.vendor.data.sync.SyncManager.instance
+
+    private var onHardwareKeyAction: ((KeyEvent) -> Boolean)? = null
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (onHardwareKeyAction?.invoke(event) == true) {
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     private val bluetoothPermissionsLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
@@ -125,6 +135,7 @@ class MainActivity : ComponentActivity() {
         val pendingSyncCount by syncManager.pendingCount.collectAsState()
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var isLoading by remember { mutableStateOf(false) }
+        var loginPin by remember { mutableStateOf("") }
 
         // Langue de l'application (Kreyòl par défaut, Français)
         var currentLanguage by remember {
@@ -636,11 +647,13 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                "VERIFY_TICKET" -> {
+                "VERIFY_TICKET", "PAY_TICKET" -> {
                     VerifyTicketScreen(
                         isLoading = verifyLoading,
                         verificationResult = verifyResult,
                         errorMessage = verifyError,
+                        currentLanguage = currentLanguage,
+                        vendorTickets = vendorTickets,
                         onVerifyClick = { query ->
                             verifyLoading = true
                             verifyError = null
@@ -855,16 +868,20 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = "SELL_TICKET"
                                     fetchOpenDraws()
                                 }
+                                "PAY_TICKET", "PEYE FICH", "PAYER TICKET" -> {
+                                    currentScreen = "VERIFY_TICKET"
+                                    verifyResult = null
+                                    verifyError = null
+                                    if (vendorTickets.isEmpty()) {
+                                        fetchVendorTickets()
+                                    }
+                                }
                                 "VERIFY_TICKET", "VÉRIFIER TICKET", "VERIFYE FICH" -> {
                                     currentScreen = "VERIFY_TICKET"
                                     verifyResult = null
                                     verifyError = null
                                 }
-                                "TICKETS", "FICH YO" -> {
-                                    currentScreen = "TICKETS_LIST"
-                                    fetchVendorTickets()
-                                }
-                                "HISTORY", "HISTORIQUE", "ISTORIK" -> {
+                                "TICKETS", "FICH YO", "HISTORY", "HISTORIQUE", "ISTORIK" -> {
                                     currentScreen = "TICKETS_LIST"
                                     fetchVendorTickets()
                                 }
@@ -929,62 +946,114 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } else {
+            fun executePinLogin(code: String, pinToUse: String) {
+                if (isLoading) return
+                isLoading = true
+                errorMessage = null
+
+                lifecycleScope.launch {
+                    try {
+                        val request = PinLoginRequest(
+                            vendorCode = code,
+                            pin = pinToUse,
+                            deviceUuid = deviceUuid,
+                            deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
+                            osVersion = "Android ${Build.VERSION.RELEASE}",
+                            appVersion = "1.0.3"
+                        )
+
+                        val response = apiService.loginWithPin(request)
+                        if (response.isSuccessful && response.body() != null) {
+                            val body = response.body()!!
+                            val vendor = body.user.vendor
+
+                            if (vendor != null) {
+                                vendorCode = vendor.vendorCode
+                                vendorName = vendor.fullName
+                                balance = vendor.currentBalance
+
+                                prefs.saveAuthData(
+                                    token = body.accessToken,
+                                    refreshToken = body.refreshToken,
+                                    vendorId = vendor.id,
+                                    vendorCode = vendor.vendorCode,
+                                    fullName = vendor.fullName,
+                                    balance = vendor.currentBalance
+                                )
+
+                                isAuthenticated = true
+                                currentScreen = "DASHBOARD"
+                                errorMessage = null
+                                loginPin = ""
+                            } else {
+                                errorMessage = "Le compte connecté n'est pas un profil Vendeur."
+                            }
+                        } else {
+                            errorMessage = "Code Vendeur ou Code PIN incorrect."
+                        }
+                    } catch (e: Exception) {
+                        errorMessage = "Impossible de joindre le serveur. Vérifiez votre connexion Internet."
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            }
+
+            // Prise en charge universelle du clavier physique matériel (MobiIoT, Sunmi, PAX...)
+            DisposableEffect(isAuthenticated, currentScreen, loginPin, vendorCode, isLoading) {
+                onHardwareKeyAction = { keyEvent ->
+                    if (keyEvent.action == KeyEvent.ACTION_DOWN && !isLoading) {
+                        val digit = when (keyEvent.keyCode) {
+                            KeyEvent.KEYCODE_0, KeyEvent.KEYCODE_NUMPAD_0 -> "0"
+                            KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_NUMPAD_1 -> "1"
+                            KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_NUMPAD_2 -> "2"
+                            KeyEvent.KEYCODE_3, KeyEvent.KEYCODE_NUMPAD_3 -> "3"
+                            KeyEvent.KEYCODE_4, KeyEvent.KEYCODE_NUMPAD_4 -> "4"
+                            KeyEvent.KEYCODE_5, KeyEvent.KEYCODE_NUMPAD_5 -> "5"
+                            KeyEvent.KEYCODE_6, KeyEvent.KEYCODE_NUMPAD_6 -> "6"
+                            KeyEvent.KEYCODE_7, KeyEvent.KEYCODE_NUMPAD_7 -> "7"
+                            KeyEvent.KEYCODE_8, KeyEvent.KEYCODE_NUMPAD_8 -> "8"
+                            KeyEvent.KEYCODE_9, KeyEvent.KEYCODE_NUMPAD_9 -> "9"
+                            else -> null
+                        }
+                        if (digit != null) {
+                            if (loginPin.length < 6) {
+                                loginPin += digit
+                            }
+                            true
+                        } else if (keyEvent.keyCode == KeyEvent.KEYCODE_DEL || keyEvent.keyCode == KeyEvent.KEYCODE_CLEAR) {
+                            if (loginPin.isNotEmpty()) {
+                                loginPin = loginPin.dropLast(1)
+                            }
+                            true
+                        } else if (keyEvent.keyCode == KeyEvent.KEYCODE_ENTER || keyEvent.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+                            if (vendorCode.isNotEmpty() && loginPin.length >= 4) {
+                                executePinLogin(vendorCode, loginPin)
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                onDispose {
+                    onHardwareKeyAction = null
+                }
+            }
+
             LoginScreen(
                 initialVendorCode = vendorCode,
                 deviceUuid = deviceUuid,
                 errorMessage = errorMessage,
                 isLoading = isLoading,
                 currentLanguage = currentLanguage,
+                pin = loginPin,
+                onPinChange = { loginPin = it },
                 onLanguageChange = { handleLanguageChange(it) },
-                onLoginClick = { code, pin ->
-                    isLoading = true
-                    errorMessage = null
-
-                    lifecycleScope.launch {
-                        try {
-                            val request = PinLoginRequest(
-                                vendorCode = code,
-                                pin = pin,
-                                deviceUuid = deviceUuid,
-                                deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
-                                osVersion = "Android ${Build.VERSION.RELEASE}",
-                                appVersion = "1.0.0"
-                            )
-
-                            val response = apiService.loginWithPin(request)
-                            if (response.isSuccessful && response.body() != null) {
-                                val body = response.body()!!
-                                val vendor = body.user.vendor
-
-                                if (vendor != null) {
-                                    vendorCode = vendor.vendorCode
-                                    vendorName = vendor.fullName
-                                    balance = vendor.currentBalance
-
-                                    prefs.saveAuthData(
-                                        token = body.accessToken,
-                                        refreshToken = body.refreshToken,
-                                        vendorId = vendor.id,
-                                        vendorCode = vendor.vendorCode,
-                                        fullName = vendor.fullName,
-                                        balance = vendor.currentBalance
-                                    )
-
-                                    isAuthenticated = true
-                                    currentScreen = "DASHBOARD"
-                                    errorMessage = null
-                                } else {
-                                    errorMessage = "Le compte connecté n'est pas un profil Vendeur."
-                                }
-                            } else {
-                                errorMessage = "Code Vendeur ou Code PIN incorrect."
-                            }
-                        } catch (e: Exception) {
-                            errorMessage = "Impossible de joindre le serveur. Vérifiez votre connexion Internet."
-                        } finally {
-                            isLoading = false
-                        }
-                    }
+                onLoginClick = { code, pinVal ->
+                    executePinLogin(code, pinVal)
                 }
             )
         }
