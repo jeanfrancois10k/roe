@@ -369,11 +369,23 @@ object ThermalPrinterService {
         write(GS_TEXT_NORMAL, ESC_BOLD_OFF)
         writeText("================================\n")
 
-        // 6. Signature & Sécurité
+        // 6. Code-Barres officiel Code 128 (Impression thermique haute précision)
+        try {
+            val barcodeBitmap = Barcode128Util.generateBarcodeBitmap(ticket.ticketNumber, width = 360, height = 65)
+            val barcodeRaster = bitmapToEscPosRaster(barcodeBitmap, maxWidth = 360)
+            if (barcodeRaster.isNotEmpty()) {
+                write(ESC_ALIGN_CENTER)
+                write(barcodeRaster)
+                writeText("\n")
+            }
+        } catch (_: Exception) {}
+
+        // 7. Signature & Sécurité
         val checksum = (ticket.secureChecksum ?: ticket.ticketNumber).take(22)
+        write(ESC_ALIGN_CENTER)
         writeText("Siyati: $checksum...\n")
 
-        // 7. Footer légal
+        // 8. Footer légal
         if (lotteryFooterNote.isNotEmpty()) {
             writeText("$lotteryFooterNote\n")
         }
@@ -562,6 +574,80 @@ object ThermalPrinterService {
             onStatus(true, "Test d'impression envoyé avec succès à l'imprimante !")
         } else {
             onStatus(false, res.exceptionOrNull()?.message ?: "Erreur d'impression.")
+        }
+    }
+
+    /**
+     * Imprime un reçu de rapport des ventes / contrôle sur l'imprimante thermique Bluetooth
+     */
+    suspend fun printReportReceipt(
+        context: Context,
+        reportText: String,
+        onStatus: (success: Boolean, message: String) -> Unit
+    ) {
+        val prefs = PreferencesManager(context)
+        val mac = getPreferredPrinterMac(context)
+        val targetMac = mac ?: getPairedPrinters(context).firstOrNull()?.address
+
+        if (targetMac.isNullOrEmpty()) {
+            onStatus(false, "Pa gen okenn enprimant Bluetooth apparié trouvée.")
+            return
+        }
+
+        val stream = ByteArrayOutputStream()
+        fun write(vararg b: ByteArray) { b.forEach { stream.write(it) } }
+        fun writeText(text: String, charset: String = "CP437") {
+            try { stream.write(text.toByteArray(charset(charset))) }
+            catch (_: Exception) { stream.write(text.toByteArray()) }
+        }
+
+        write(ESC_INIT)
+
+        // Logo Officiel
+        try {
+            var logoBitmap: Bitmap? = null
+            val logoUrl = prefs.getLotteryLogoUrl()
+            if (logoUrl.isNotEmpty() && (logoUrl.startsWith("data:image") || logoUrl.length > 50)) {
+                val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
+                val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
+                logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            }
+            if (logoBitmap == null) {
+                logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+            }
+            if (logoBitmap != null) {
+                write(ESC_ALIGN_CENTER)
+                val raster = bitmapToEscPosRaster(logoBitmap, maxWidth = 320)
+                if (raster.isNotEmpty()) {
+                    write(raster)
+                    writeText("\n")
+                }
+            }
+        } catch (_: Exception) {}
+
+        // En-tête centré
+        val lotteryName = prefs.getLotteryName()
+        write(ESC_ALIGN_CENTER)
+        write(ESC_BOLD_ON, GS_TEXT_DOUBLE)
+        writeText("$lotteryName\n")
+        write(GS_TEXT_NORMAL)
+        writeText("RAPÒ VANT & KONTWÒL\n")
+        write(ESC_BOLD_OFF)
+        writeText("================================\n")
+        write(ESC_ALIGN_LEFT)
+        writeText("$reportText\n")
+        write(ESC_ALIGN_CENTER)
+        writeText("================================\n")
+        writeText("Siyati: ROE-RAPPORT-CERTIFIE\n")
+        writeText("Dat: ${TicketReceiptUtil.formatHaitiDateTimeSeconds(null)}\n")
+        write(FEED_AND_CUT)
+
+        val bytes = stream.toByteArray()
+        val res = sendBytesToBluetoothPrinter(context, bytes, targetMac)
+        if (res.isSuccess) {
+            onStatus(true, "Rapport imprimé avec succès sur l'imprimante Bluetooth !")
+        } else {
+            onStatus(false, res.exceptionOrNull()?.message ?: "Erreur d'impression du rapport.")
         }
     }
 

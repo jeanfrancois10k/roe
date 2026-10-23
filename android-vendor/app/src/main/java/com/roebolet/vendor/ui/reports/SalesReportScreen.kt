@@ -35,7 +35,9 @@ import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
 import com.roebolet.vendor.util.LotteryLogoView
 import com.roebolet.vendor.util.Strings
+import com.roebolet.vendor.util.ThermalPrinterService
 import com.roebolet.vendor.util.TicketReceiptUtil
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -57,6 +59,8 @@ fun SalesReportScreen(
 ) {
     val isCreole = currentLanguage == AppLanguage.CREOLE
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isPrintingThermal by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
 
     // Onglets : 0 = Rapo Vant & Balans (Photo 2), 1 = Fich Gayan (Photo 1)
@@ -1047,14 +1051,32 @@ fun SalesReportScreen(
 
                         Button(
                             onClick = {
-                                Toast.makeText(context, "🖨️ Envoi vers l'imprimante thermique...", Toast.LENGTH_LONG).show()
-                                showThermalPrintDialog = false
+                                if (isPrintingThermal) return@Button
+                                isPrintingThermal = true
+                                scope.launch {
+                                    ThermalPrinterService.printReportReceipt(context, printContentText) { success, msg ->
+                                        isPrintingThermal = false
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                        if (success) {
+                                            showThermalPrintDialog = false
+                                        }
+                                    }
+                                }
                             },
+                            enabled = !isPrintingThermal,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Imprimer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            if (isPrintingThermal) {
+                                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "...", color = Color.White, fontSize = 11.sp)
+                            } else {
+                                Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "Imprimer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

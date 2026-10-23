@@ -29,6 +29,8 @@ import com.roebolet.vendor.data.api.SalesReportResponse
 import com.roebolet.vendor.ui.theme.*
 import com.roebolet.vendor.util.AppLanguage
 import com.roebolet.vendor.util.Strings
+import com.roebolet.vendor.util.ThermalPrinterService
+import kotlinx.coroutines.launch
 
 @Composable
 fun ControlScreen(
@@ -46,6 +48,8 @@ fun ControlScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isPrintingControl by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val isHt = currentLanguage == AppLanguage.CREOLE
 
@@ -625,9 +629,10 @@ fun ControlScreen(
             // Boutons d'Action : Imprimer Reçu Contrôle
             Button(
                 onClick = {
+                    if (isPrintingControl) return@Button
                     val drawsSummary = if (drawsList.isNotEmpty()) {
                         "\n--- VANT PA TIRAJ ---\n" + drawsList.joinToString("\n") {
-                            "${it.gameName} (N°${it.drawNumber}): ${String.format("%.2f", it.totalSales)} G (${it.ticketsCount} fich)"
+                            "${it.gameName} (N°${it.drawNumber}): ${String.format(java.util.Locale.US, "%.2f", it.totalSales)} G (${it.ticketsCount} fich)"
                         } + "\n-------------------------"
                     } else ""
 
@@ -636,32 +641,44 @@ fun ControlScreen(
                         Vandè   : $vendorCode ($vendorName)
                         Peryòd  : $periodLabel
                         --------------------------------
-                        Vant Brite  : ${String.format("%.2f", totalSales)} $currency ($ticketsCount fich)
-                        Komisyon (${String.format("%.1f", commissionRate)}%): ${String.format("%.2f", commissionAmount)} $currency
-                        Prim Peye   : ${String.format("%.2f", prizesPaid)} $currency ($prizesPaidCount fich)
+                        Vant Brite  : ${String.format(java.util.Locale.US, "%.2f", totalSales)} $currency ($ticketsCount fich)
+                        Komisyon (${String.format(java.util.Locale.US, "%.1f", commissionRate)}%): ${String.format(java.util.Locale.US, "%.2f", commissionAmount)} $currency
+                        Prim Peye   : ${String.format(java.util.Locale.US, "%.2f", prizesPaid)} $currency ($prizesPaidCount fich)
                         --------------------------------
-                        POU REMÈT   : ${String.format("%.2f", Math.max(0.0, netDueToOwner))} $currency
-                        Kach En Caisse: ${String.format("%.2f", Math.max(0.0, cashInHand))} $currency
+                        POU REMÈT   : ${String.format(java.util.Locale.US, "%.2f", Math.max(0.0, netDueToOwner))} $currency
+                        Kach En Caisse: ${String.format(java.util.Locale.US, "%.2f", Math.max(0.0, cashInHand))} $currency
                         $drawsSummary
-                        ================================
                     """.trimIndent()
 
-                    Toast.makeText(context, "🖨️ Rapò Kontwòl ak Vant pare pou enprime !", Toast.LENGTH_LONG).show()
+                    isPrintingControl = true
+                    scope.launch {
+                        ThermalPrinterService.printReportReceipt(context, printMsg) { _, msg ->
+                            isPrintingControl = false
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        }
+                    }
                 },
+                enabled = !isPrintingControl,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = RoeGold),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Default.Print, contentDescription = null, tint = RoeBackground, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "ENPRIME RAPÒ KONTWÒL SA ($periodLabel)",
-                    color = RoeBackground,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black
-                )
+                if (isPrintingControl) {
+                    CircularProgressIndicator(color = RoeBackground, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Enpresyon ap fèt...", color = RoeBackground, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(Icons.Default.Print, contentDescription = null, tint = RoeBackground, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "ENPRIME RAPÒ KONTWÒL SA ($periodLabel)",
+                        color = RoeBackground,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
         }
     }

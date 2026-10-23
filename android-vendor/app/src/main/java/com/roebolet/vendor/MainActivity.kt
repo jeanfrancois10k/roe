@@ -310,7 +310,12 @@ class MainActivity : ComponentActivity() {
                 try {
                     val res = apiService.getOpenDraws()
                     if (res.isSuccessful && res.body() != null) {
-                        openDraws = res.body()!!
+                        val raw = res.body()!!
+                        // Dédupliquer rigoureusement par jeu et session
+                        openDraws = raw
+                            .groupBy { "${it.game.id}_${(it.sessionName ?: "").uppercase()}" }
+                            .map { (_, list) -> list.maxByOrNull { it.drawNumber } ?: list.first() }
+                            .sortedBy { it.salesClosingAt }
                     }
                 } catch (e: Exception) {
                     // Erreur silencieuse

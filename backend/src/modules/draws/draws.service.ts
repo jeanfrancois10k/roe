@@ -715,7 +715,21 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    return openDraws;
+    // Dédupliquer par jeu et session pour garantir qu'un même tirage n'apparaît jamais en double
+    const uniqueDrawsMap = new Map<string, typeof openDraws[0]>();
+    for (const draw of openDraws) {
+      const key = `${draw.gameId}_${(draw.sessionName || 'DEFAULT').toUpperCase()}`;
+      if (!uniqueDrawsMap.has(key)) {
+        uniqueDrawsMap.set(key, draw);
+      } else {
+        const existing = uniqueDrawsMap.get(key)!;
+        if (draw.drawNumber > existing.drawNumber) {
+          uniqueDrawsMap.set(key, draw);
+        }
+      }
+    }
+
+    return Array.from(uniqueDrawsMap.values());
   }
 
   async findAll(gameId?: string, status?: DrawStatus, page = 1, limit = 20) {

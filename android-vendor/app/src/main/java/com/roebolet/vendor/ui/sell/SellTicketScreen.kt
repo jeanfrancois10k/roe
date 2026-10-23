@@ -447,7 +447,13 @@ fun SellTicketScreen(
         else -> 5 // Maryaj (ex: "12x34" ou "1234")
     }
 
-    val selectedDraws = openDraws.filter { selectedDrawIds.contains(it.id) }
+    val distinctOpenDraws = remember(openDraws) {
+        openDraws
+            .groupBy { "${it.game.id}_${(it.sessionName ?: "").uppercase()}" }
+            .map { (_, list) -> list.maxByOrNull { it.drawNumber } ?: list.first() }
+            .sortedBy { it.salesClosingAt }
+    }
+    val selectedDraws = distinctOpenDraws.filter { selectedDrawIds.contains(it.id) }
     val lotteryTitle = when {
         selectedDraws.isEmpty() -> if (isCreole) "Chwazi Tiraj" else "Choisir Tirage"
         selectedDraws.size == 1 -> {
@@ -919,7 +925,7 @@ fun SellTicketScreen(
         }
 
         // BARRE RAPIDE DE SÉLECTION MULTI-TIRAGES (CHIPS DÉFILANTS)
-        if (openDraws.isNotEmpty()) {
+        if (distinctOpenDraws.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -929,7 +935,7 @@ fun SellTicketScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                openDraws.forEach { draw ->
+                distinctOpenDraws.forEach { draw ->
                     val isSelected = selectedDrawIds.contains(draw.id)
                     Surface(
                         color = if (isSelected) Color.White else Color(0x33FFFFFF),
@@ -1391,7 +1397,7 @@ fun SellTicketScreen(
                 }
             },
             text = {
-                if (openDraws.isEmpty()) {
+                if (distinctOpenDraws.isEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -1422,7 +1428,7 @@ fun SellTicketScreen(
                         ) {
                             TextButton(
                                 onClick = {
-                                    selectedDrawIds = openDraws.map { it.id }.toSet()
+                                    selectedDrawIds = distinctOpenDraws.map { it.id }.toSet()
                                 }
                             ) {
                                 Text(
@@ -1434,7 +1440,7 @@ fun SellTicketScreen(
                             }
 
                             Text(
-                                text = "${selectedDrawIds.size} / ${openDraws.size}",
+                                text = "${selectedDrawIds.size} / ${distinctOpenDraws.size}",
                                 color = Color(0xFF64748B),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
@@ -1447,7 +1453,7 @@ fun SellTicketScreen(
                                 .heightIn(max = 380.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(openDraws, key = { it.id }) { draw ->
+                            items(distinctOpenDraws, key = { it.id }) { draw ->
                                 val isChecked = selectedDrawIds.contains(draw.id)
                                 Surface(
                                     color = if (isChecked) Color(0xFFEFF6FF) else Color(0xFFF8FAFC),

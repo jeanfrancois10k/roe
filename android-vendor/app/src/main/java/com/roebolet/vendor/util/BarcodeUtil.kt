@@ -1,6 +1,8 @@
 package com.roebolet.vendor.util
 
-import androidx.compose.foundation.Canvas
+import android.graphics.Bitmap
+import android.graphics.Paint
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,9 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -38,16 +39,14 @@ object Barcode128Util {
     )
 
     fun encode(text: String): BooleanArray {
-        if (text.isEmpty()) return BooleanArray(0)
-
-        val cleanText = text.trim()
+        val cleanText = (if (text.isBlank()) "000000" else text).trim()
         val values = mutableListOf<Int>()
         for (ch in cleanText) {
             val code = ch.code - 32
             if (code in 0..95) {
                 values.add(code)
             } else {
-                values.add(0) // espace par défaut si caractère hors ASCII standard
+                values.add(0)
             }
         }
 
@@ -82,6 +81,41 @@ object Barcode128Util {
 
         return modules.toBooleanArray()
     }
+
+    /**
+     * Génère un Bitmap Android haute résolution du code-barres Code 128
+     * Utilisable à l'écran et pour l'impression thermique ESC/POS.
+     */
+    fun generateBarcodeBitmap(code: String, width: Int = 360, height: Int = 60): Bitmap {
+        val modules = encode(code)
+        val targetWidth = if (width < 100) 360 else ((width / 8) * 8)
+        val bitmap = Bitmap.createBitmap(targetWidth, height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawColor(android.graphics.Color.WHITE)
+
+        val paint = Paint().apply {
+            color = android.graphics.Color.BLACK
+            style = Paint.Style.FILL
+            isAntiAlias = false
+        }
+
+        if (modules.isNotEmpty()) {
+            val moduleWidth = targetWidth.toFloat() / modules.size.toFloat()
+            for (i in modules.indices) {
+                if (modules[i]) {
+                    canvas.drawRect(
+                        i * moduleWidth,
+                        0f,
+                        (i + 1) * moduleWidth,
+                        height.toFloat(),
+                        paint
+                    )
+                }
+            }
+        }
+
+        return bitmap
+    }
 }
 
 @Composable
@@ -91,7 +125,10 @@ fun Barcode128View(
     height: Dp = 46.dp,
     showCodeText: Boolean = true
 ) {
-    val modules = remember(code) { Barcode128Util.encode(code) }
+    val displayCode = if (code.isBlank()) "ROE-BOLET" else code
+    val barcodeBitmap = remember(displayCode) {
+        Barcode128Util.generateBarcodeBitmap(displayCode, width = 360, height = 60)
+    }
 
     Column(
         modifier = modifier
@@ -100,30 +137,18 @@ fun Barcode128View(
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (modules.isNotEmpty()) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(height)
-            ) {
-                val totalModules = modules.size
-                val moduleWidth = size.width / totalModules.toFloat()
-                for (i in 0 until totalModules) {
-                    if (modules[i]) {
-                        drawRect(
-                            color = Color.Black,
-                            topLeft = Offset(x = i * moduleWidth, y = 0f),
-                            size = Size(width = moduleWidth + 0.5f, height = size.height)
-                        )
-                    }
-                }
-            }
-        }
+        Image(
+            bitmap = barcodeBitmap.asImageBitmap(),
+            contentDescription = "Code-barres $displayCode",
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .height(height)
+        )
 
         if (showCodeText) {
             Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text = code,
+                text = displayCode,
                 color = Color.Black,
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
