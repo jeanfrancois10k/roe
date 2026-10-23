@@ -782,6 +782,7 @@ class MainActivity : ComponentActivity() {
                     ResultsScreen(
                         results = drawResults,
                         isLoading = isLoadingResults,
+                        currentLanguage = currentLanguage,
                         onBackClick = { currentScreen = "DASHBOARD" },
                         onRefreshClick = { fetchDrawResults() }
                     )
@@ -837,6 +838,7 @@ class MainActivity : ComponentActivity() {
                         vendorCode = vendorCode,
                         vendorName = vendorName,
                         balance = balance,
+                        currentLanguage = currentLanguage,
                         onBackClick = { currentScreen = "DASHBOARD" }
                     )
                 }
@@ -898,6 +900,9 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = "CONTROL"
                                     fetchControlSummary()
                                     fetchSalesReport(selectedReportPeriod)
+                                }
+                                "BALANCE", "KONT MWEN", "MON COMPTE", "COMPTE" -> {
+                                    currentScreen = "BALANCE_DETAILS"
                                 }
                                 "REPORTS", "RAPÒ", "RAPÒ VANT", "RAPPORTS" -> {
                                     currentScreen = "REPORTS"

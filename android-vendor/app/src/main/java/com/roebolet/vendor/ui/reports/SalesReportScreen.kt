@@ -221,7 +221,7 @@ fun SalesReportScreen(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCreole) "Fich Gayan (${report?.global?.nombreFichesGagnantes ?: 0})" else "Tickets Gagnants (${report?.global?.nombreFichesGagnantes ?: 0})",
+                        text = if (isCreole) "Fich Ganyan (${report?.global?.nombreFichesGagnantes ?: 0})" else "Tickets Gagnants (${report?.global?.nombreFichesGagnantes ?: 0})",
                         color = if (selectedReportTab == 1) Color.Black else RoeTextMuted,
                         fontSize = 11.sp,
                         fontWeight = if (selectedReportTab == 1) FontWeight.Black else FontWeight.Bold
@@ -239,9 +239,9 @@ fun SalesReportScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val quickPeriods = listOf(
-                "day" to if (isCreole) "Jodiya" else "Aujourd'hui",
-                "week" to if (isCreole) "Semèn sa" else "Semaine",
-                "month" to if (isCreole) "Mwa sa" else "Ce Mois"
+                "day" to if (isCreole) "Jodi a" else "Aujourd'hui",
+                "week" to if (isCreole) "Semèn sa a" else "Semaine",
+                "month" to if (isCreole) "Mwa sa a" else "Ce Mois"
             )
 
             quickPeriods.forEach { (key, label) ->
@@ -505,7 +505,7 @@ fun SalesReportScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = if (isCreole) "Balans nèt (Gain / Pèt)" else "Balance nette (Gain / Perte)",
+                                                text = if (isCreole) "Balans nèt (Gany / Pèt)" else "Balance nette (Gain / Perte)",
                                                 color = RoeTextMuted,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
@@ -639,7 +639,7 @@ fun SalesReportScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = if (isCreole) "Pa gen okenn fich gayan pou peryòd sa a." else "Aucun ticket gagnant enregistré pour cette période.",
+                                    text = if (isCreole) "Pa gen okenn fich ganyan pou peryòd sa a." else "Aucun ticket gagnant enregistré pour cette période.",
                                     color = RoeTextMuted,
                                     fontSize = 12.sp,
                                     textAlign = TextAlign.Center,
@@ -815,7 +815,7 @@ fun SalesReportScreen(
                     }
 
                     Text(
-                        text = if (isCreole) "Klike sou ikòn kalandriye a pou chwazi dat kòmansman ak finisyon" else "Cliquez sur l'icône calendrier pour choisir le début et la fin",
+                        text = if (isCreole) "Klike sou ikòn kalandriye a pou chwazi dat kòmansman ak dat fen" else "Cliquez sur l'icône calendrier pour choisir le début et la fin",
                         color = RoeTextMuted,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
@@ -842,7 +842,7 @@ fun SalesReportScreen(
                         val last7Val = sdfFormat.format(calPresets.time)
 
                         listOf(
-                            (if (isCreole) "Jodiya" else "Aujourd'hui") to (todayVal to todayVal),
+                            (if (isCreole) "Jodi a" else "Aujourd'hui") to (todayVal to todayVal),
                             (if (isCreole) "Yè" else "Hier") to (yesterdayVal to yesterdayVal),
                             (if (isCreole) "7 jou" else "7 jours") to (last7Val to todayVal)
                         ).forEach { (label, range) ->

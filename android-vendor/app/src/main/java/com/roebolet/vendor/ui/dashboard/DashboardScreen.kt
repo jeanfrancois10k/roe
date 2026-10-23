@@ -249,14 +249,14 @@ fun DashboardScreen(
                 }
             }
 
-            // 3. Grille des 8 boutons (avec PEYE FICH)
+            // 3. Grille des 8 boutons (PEYE FICH pour paiements, KONT MWEN pour solde/compte)
             val menuItems = listOf(
                 MenuItem(if (isHt) "PEYE FICH" else "PAYER TICKET", Icons.Default.Payments, RoeGold, "PAY_TICKET"),
                 MenuItem(if (isHt) "ISTORIK" else "HISTORIQUE", Icons.Default.History, Color.White, "HISTORY"),
                 MenuItem(if (isHt) "REZILTA" else "RÉSULTATS", Icons.Default.EmojiEvents, RoeGold, "RESULTS"),
                 MenuItem(if (isHt) "RAPÒ VANT" else "RAPPORTS", Icons.Default.DateRange, RoeGold, "REPORTS"),
                 MenuItem(if (isHt) "KONTWÒL" else "CONTRÔLE", Icons.Default.PointOfSale, RoeGold, "CONTROL"),
-                MenuItem(if (isHt) "VERIFYE FICH" else "VÉRIFIER TICKET", Icons.Default.QrCodeScanner, RoePurple, "VERIFY_TICKET"),
+                MenuItem(if (isHt) "KONT MWEN" else "MON COMPTE", Icons.Default.AccountBalanceWallet, RoePurple, "BALANCE"),
                 MenuItem(if (isHt) "SENKWO" else "SYNCHRO", Icons.Default.Sync, RoeTextMuted, "SYNC"),
                 MenuItem(if (isHt) "PARAMÈT" else "PARAMÈTRES", Icons.Default.Settings, RoeTextMuted, "SETTINGS"),
             )

@@ -410,7 +410,7 @@ fun TicketsListScreen(
                                 ) {
                                     Text(
                                         text = when (ticket.status) {
-                                            "CONFIRMED" -> if (ticket.isWinner) (if (isCreole) "GAGNAN" else "GAGNANT") else (if (isCreole) "KONFIME" else "CONFIRMÉ")
+                                            "CONFIRMED" -> if (ticket.isWinner) (if (isCreole) "GANYAN" else "GAGNANT") else (if (isCreole) "KONFIME" else "CONFIRMÉ")
                                             "CANCELLED" -> if (isCreole) "ANILE" else "ANNULÉ"
                                             else -> ticket.status
                                         },

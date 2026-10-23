@@ -89,7 +89,7 @@ fun VerifyTicketScreen(
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = if (isHt) "Chèche fich la pou peye gayan an" else "Recherchez le ticket pour payer",
+                    text = if (isHt) "Chèche fich la pou peye ganyan an" else "Recherchez le ticket pour payer",
                     color = RoeTextMuted,
                     fontSize = 11.sp
                 )
@@ -443,7 +443,7 @@ fun VerifyTicketScreen(
             onDismissRequest = { showConfirmPayDialog = false },
             title = {
                 Text(
-                    text = if (isHt) "KONFIME PÈYMAN GANYAN" else "CONFIRMATION DE PAIEMENT",
+                    text = if (isHt) "KONFIME PÈMAN GANYAN" else "CONFIRMATION DE PAIEMENT",
                     fontWeight = FontWeight.Black,
                     color = Color.White,
                     fontSize = 16.sp

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.data.api.DrawResultItem
 import com.roebolet.vendor.ui.theme.*
+import com.roebolet.vendor.util.AppLanguage
 import com.roebolet.vendor.util.DrawPeriodBadge
 import com.roebolet.vendor.util.TicketReceiptUtil
 
@@ -31,9 +32,12 @@ import com.roebolet.vendor.util.TicketReceiptUtil
 fun ResultsScreen(
     results: List<DrawResultItem>,
     isLoading: Boolean,
+    currentLanguage: AppLanguage = AppLanguage.CREOLE,
     onBackClick: () -> Unit,
     onRefreshClick: () -> Unit
 ) {
+    val isHt = currentLanguage == AppLanguage.CREOLE
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -56,21 +60,21 @@ fun ResultsScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Retour",
+                    contentDescription = if (isHt) "Tounen" else "Retour",
                     tint = Color.White
                 )
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "RÉSULTATS OFFICIELS",
+                    text = if (isHt) "REZILTA OFISYÈL" else "RÉSULTATS OFFICIELS",
                     color = RoeGold,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "Tirages certifiés du jour",
+                    text = if (isHt) "Tiraj ofisyèl jodi a" else "Tirages certifiés du jour",
                     color = RoeTextMuted,
                     fontSize = 11.sp
                 )
@@ -86,7 +90,7 @@ fun ResultsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Actualiser",
+                    contentDescription = if (isHt) "Rechaje" else "Actualiser",
                     tint = RoeGold
                 )
             }
@@ -103,8 +107,21 @@ fun ResultsScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = RoeGold, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "Aucun tirage proclamé aujourd'hui", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(text = "Dès que l'administration proclame les numéros gagnants, ils s'affichent ici instantanément.", color = RoeTextMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                    Text(
+                        text = if (isHt) "Poko gen okenn tiraj ki pwoklame jodi a" else "Aucun tirage proclamé aujourd'hui",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                    Text(
+                        text = if (isHt)
+                            "Kou administrasyon an fin mete rezilta yo, y ap parèt la a touswit."
+                        else
+                            "Dès que l'administration proclame les numéros gagnants, ils s'affichent ici instantanément.",
+                        color = RoeTextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         } else {
@@ -133,7 +150,12 @@ fun ResultsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Text(text = "Tirage N° ${res.drawNumber}", color = RoeGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = if (isHt) "Tiraj N° ${res.drawNumber}" else "Tirage N° ${res.drawNumber}",
+                                            color = RoeGold,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                         DrawPeriodBadge(period = res.sessionName ?: period)
                                     }
                                 }
@@ -167,7 +189,7 @@ fun ResultsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "RÉSULTAT BORLETTE :",
+                                        text = if (isHt) "REZILTA BÒLÈT :" else "RÉSULTAT BORLETTE :",
                                         color = RoeTextMuted,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
@@ -189,18 +211,18 @@ fun ResultsScreen(
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
                                 WinningBall(
-                                    prizeLabel = "1er Lot & Lòt 3",
+                                    prizeLabel = if (isHt) "1ye Lo & Lòt 3" else "1er Lot & Lòt 3",
                                     number = first,
-                                    subLabel = if (first.length >= 2) "1er: ${first.takeLast(2)}" else null,
+                                    subLabel = if (first.length >= 2) (if (isHt) "1ye: ${first.takeLast(2)}" else "1er: ${first.takeLast(2)}") else null,
                                     isFirst = true
                                 )
                                 WinningBall(
-                                    prizeLabel = "2e Lot",
+                                    prizeLabel = if (isHt) "2yèm Lo" else "2e Lot",
                                     number = second,
                                     subLabel = null
                                 )
                                 WinningBall(
-                                    prizeLabel = "3e Lot",
+                                    prizeLabel = if (isHt) "3yèm Lo" else "3e Lot",
                                     number = third,
                                     subLabel = null
                                 )

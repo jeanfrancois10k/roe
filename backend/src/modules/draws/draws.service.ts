@@ -469,6 +469,33 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           now < targetClose &&
           game.status === 'ACTIVE';
 
+        // Invariant 1: Fermer immédiatement tous les anciens tirages OPEN de ce jeu dont l'heure de clôture est passée
+        await this.prisma.draw.updateMany({
+          where: {
+            gameId: game.id,
+            status: DrawStatus.OPEN,
+            salesClosingAt: { lte: now },
+          },
+          data: { status: DrawStatus.CLOSED },
+        });
+
+        // Invariant 2: Nettoyage proactif de tout doublon OPEN pour ce jeu (règle d'or: max 1 tirage OPEN par jeu)
+        const openDrawsForGame = await this.prisma.draw.findMany({
+          where: {
+            gameId: game.id,
+            status: DrawStatus.OPEN,
+          },
+          orderBy: { drawNumber: 'desc' },
+        });
+        if (openDrawsForGame.length > 1) {
+          const [keepLatest, ...staleDuplicates] = openDrawsForGame;
+          await this.prisma.draw.updateMany({
+            where: { id: { in: staleDuplicates.map((d) => d.id) } },
+            data: { status: DrawStatus.CLOSED },
+          });
+          this.logger.warn(`🧹 Dédoublonnage : ${staleDuplicates.length} doublons OPEN fermés pour ${game.name}`);
+        }
+
         // 4. Synchronisation du tirage en base (par date du jour et nom de session)
         const targetParts = getHaitiDateParts(targetClose);
         const dayStartHaiti = createHaitiDate(targetParts.year, targetParts.month, targetParts.day, 0, 0, 0);
@@ -497,6 +524,16 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
             (!existingDraw.winningResults || Object.keys(existingDraw.winningResults as any).length === 0);
 
           if (isEligibleToOpen && existingDraw.status !== DrawStatus.OPEN && canBeOpened) {
+            // Clôturer tout autre tirage qui pourrait être resté ouvert pour ce jeu
+            await this.prisma.draw.updateMany({
+              where: {
+                gameId: game.id,
+                status: DrawStatus.OPEN,
+                id: { not: existingDraw.id },
+              },
+              data: { status: DrawStatus.CLOSED },
+            });
+
             await this.prisma.draw.update({
               where: { id: existingDraw.id },
               data: {
@@ -550,6 +587,17 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
             _max: { drawNumber: true },
           });
           const nextDrawNum = (maxDraw._max.drawNumber || 100) + 1;
+
+          // Avant de créer un tirage OPEN, fermer tout tirage précédent pour ce jeu
+          if (isEligibleToOpen) {
+            await this.prisma.draw.updateMany({
+              where: {
+                gameId: game.id,
+                status: DrawStatus.OPEN,
+              },
+              data: { status: DrawStatus.CLOSED },
+            });
+          }
 
           const newDraw = await this.prisma.draw.create({
             data: {
@@ -715,10 +763,10 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    // Dédupliquer par jeu et session pour garantir qu'un même tirage n'apparaît jamais en double
+    // Dédupliquer STRICTEMENT par jeu : un seul tirage ouvert par loterie à la fois
     const uniqueDrawsMap = new Map<string, typeof openDraws[0]>();
     for (const draw of openDraws) {
-      const key = `${draw.gameId}_${(draw.sessionName || 'DEFAULT').toUpperCase()}`;
+      const key = draw.gameId; // Clé unique par jeu
       if (!uniqueDrawsMap.has(key)) {
         uniqueDrawsMap.set(key, draw);
       } else {
