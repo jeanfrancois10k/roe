@@ -283,12 +283,16 @@ object ThermalPrinterService {
                 var logoBitmap: Bitmap? = null
                 val logoUrl = prefs.getLotteryLogoUrl()
                 if (logoUrl.isNotEmpty() && (logoUrl.startsWith("data:image") || logoUrl.length > 50)) {
-                    val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
-                    val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
-                    logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    try {
+                        val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
+                        val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
+                        logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } catch (_: Exception) {}
                 }
                 if (logoBitmap == null) {
-                    logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                    try {
+                        logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                    } catch (_: Exception) {}
                 }
                 if (logoBitmap != null) {
                     write(ESC_ALIGN_CENTER)
@@ -588,12 +592,16 @@ object ThermalPrinterService {
                 var logoBitmap: Bitmap? = null
                 val logoUrl = prefs.getLotteryLogoUrl()
                 if (logoUrl.isNotEmpty() && (logoUrl.startsWith("data:image") || logoUrl.length > 50)) {
-                    val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
-                    val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
-                    logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    try {
+                        val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
+                        val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
+                        logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } catch (_: Exception) {}
                 }
                 if (logoBitmap == null) {
-                    logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                    try {
+                        logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                    } catch (_: Exception) {}
                 }
                 if (logoBitmap != null) {
                     write(ESC_ALIGN_CENTER)
@@ -828,12 +836,16 @@ object ThermalPrinterService {
             var logoBitmap: Bitmap? = null
             val logoUrl = prefs.getLotteryLogoUrl()
             if (logoUrl.isNotEmpty() && (logoUrl.startsWith("data:image") || logoUrl.length > 50)) {
-                val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
-                val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
-                logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                try {
+                    val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
+                    val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
+                    logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } catch (_: Exception) {}
             }
             if (logoBitmap == null) {
-                logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                try {
+                    logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                } catch (_: Exception) {}
             }
             if (logoBitmap != null) {
                 write(ESC_ALIGN_CENTER)
