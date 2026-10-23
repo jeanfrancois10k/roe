@@ -4,11 +4,16 @@ import {
   IsNumber,
   IsEnum,
   Min,
+  MinLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { VendorStatus } from '@prisma/client';
 
 export class UpdateVendorDto {
+  @IsOptional()
+  @IsString()
+  vendorCode?: string;
+
   @IsOptional()
   @IsString()
   fullName?: string;
@@ -20,6 +25,18 @@ export class UpdateVendorDto {
   @IsOptional()
   @IsString()
   posAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  username?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  pin?: string;
 
   @IsOptional()
   @IsEnum(VendorStatus)

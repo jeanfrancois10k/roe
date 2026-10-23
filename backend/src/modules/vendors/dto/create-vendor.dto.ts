@@ -22,9 +22,9 @@ export class CreateVendorDto {
   @IsNotEmpty()
   posAddress: string;
 
-  @IsString({ message: "Le nom d'utilisateur de connexion est obligatoire" })
-  @IsNotEmpty()
-  username: string;
+  @IsOptional()
+  @IsString({ message: "Le nom d'utilisateur doit être une chaîne de caractères" })
+  username?: string;
 
   @IsString()
   @MinLength(6, { message: 'Le mot de passe doit comporter au moins 6 caractères' })

@@ -274,6 +274,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
             drawFrequency: lotto.drawFrequency,
             status: 'ACTIVE',
             gameRules: updatedRules,
+            minBetAmount: 1.0,
           },
           create: {
             code: lotto.code,
@@ -281,7 +282,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
             description: lotto.description,
             drawFrequency: lotto.drawFrequency,
             status: 'ACTIVE',
-            minBetAmount: 5.0,
+            minBetAmount: 1.0,
             maxBetAmount: 2500.0,
             currency: 'HTG' as any,
             defaultCommission: 5.0,
@@ -289,9 +290,14 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           },
         });
       }
+
+      // S'assurer que tous les jeux existants ont la mise minimale fixée à 1 HTG
+      await this.prisma.game.updateMany({
+        data: { minBetAmount: 1.0 },
+      });
     }
     DrawsService.defaultLotteriesEnsured = true;
-    this.logger.log('✅ 6 Loteries officielles synchronisées avec horaires stricts : CHI, FL, GA, NY, TN, TX');
+    this.logger.log('✅ 6 Loteries officielles synchronisées avec mise minimum 1 HTG : CHI, FL, GA, NY, TN, TX');
   }
 
   /**

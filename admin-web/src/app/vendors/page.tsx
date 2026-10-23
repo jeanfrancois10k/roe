@@ -268,7 +268,7 @@ export default function VendorsPage() {
                             setIsVendorModalOpen(true);
                           }}
                           className="p-2 rounded-xl bg-roe-card hover:bg-roe-cardHover text-roe-textMuted hover:text-white border border-roe-border"
-                          title="Modifier"
+                          title="Modifier toutes les informations (Coordonnées, Identifiant, PIN, Mot de passe, Limites)"
                         >
                           <Sliders size={16} />
                         </button>
@@ -425,7 +425,7 @@ export default function VendorsPage() {
                                   setVendorToEdit(v);
                                   setIsVendorModalOpen(true);
                                 }}
-                                title="Modifier Limites"
+                                title="Modifier toutes les informations (Coordonnées, Identifiant, PIN, Mot de passe, Limites)"
                                 className="p-2 rounded-xl bg-roe-card hover:bg-roe-cardHover text-roe-textMuted hover:text-white border border-roe-border transition-colors"
                               >
                                 <Sliders size={15} />

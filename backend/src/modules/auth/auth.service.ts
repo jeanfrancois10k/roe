@@ -233,8 +233,14 @@ export class AuthService {
   }
 
   async loginWithPin(dto: PinLoginDto, ipAddress?: string, userAgent?: string) {
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { vendorCode: dto.vendorCode },
+    const identifier = (dto.vendorCode || '').trim();
+    const vendor = await this.prisma.vendor.findFirst({
+      where: {
+        OR: [
+          { vendorCode: { equals: identifier, mode: 'insensitive' } },
+          { user: { username: { equals: identifier, mode: 'insensitive' } } },
+        ],
+      },
       include: {
         user: true,
         devices: true,

@@ -17,6 +17,19 @@ import { AssignDeviceDto } from './dto/assign-device.dto';
 import { BalanceAdjustmentDto } from './dto/balance-adjustment.dto';
 import { Role, VendorStatus, DeviceStatus, TransactionType, TicketStatus, TicketPayoutStatus, Prisma } from '@prisma/client';
 
+/**
+ * Formatage standard d'un nom d'utilisateur vendeur combinant son nom et son code PIN
+ */
+export function formatVendorUsername(fullName: string, pin?: string): string {
+  const cleanName = (fullName || 'VENDEUR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase();
+  const cleanPin = pin ? pin.trim() : '';
+  return `${cleanName}${cleanPin}`;
+}
+
 @Injectable()
 export class VendorsService {
   private readonly logger = new Logger(VendorsService.name);
@@ -31,12 +44,21 @@ export class VendorsService {
    * Création d'un nouveau vendeur
    */
   async createVendor(dto: CreateVendorDto, adminId?: string) {
-    // 1. Vérification unicité username & phone
+    // 1. Détermination du nom d'utilisateur (Combinaison Nom + PIN si non fourni ou personnalisation)
+    let username = dto.username?.trim();
+    if (!username && dto.fullName) {
+      username = formatVendorUsername(dto.fullName, dto.pin);
+    }
+    if (!username) {
+      throw new BadRequestException("Le nom d'utilisateur est obligatoire ou doit pouvoir être combiné depuis le nom et le PIN.");
+    }
+
+    // Vérification unicité username & phone
     const existingUser = await this.prisma.user.findUnique({
-      where: { username: dto.username },
+      where: { username },
     });
     if (existingUser) {
-      throw new BadRequestException(`Le nom d'utilisateur '${dto.username}' est déjà utilisé.`);
+      throw new BadRequestException(`Le nom d'utilisateur '${username}' est déjà utilisé.`);
     }
 
     const existingPhone = await this.prisma.vendor.findUnique({
@@ -68,7 +90,7 @@ export class VendorsService {
     const vendor = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          username: dto.username,
+          username,
           passwordHash,
           pinHash,
           role: Role.VENDOR,
@@ -274,31 +296,97 @@ export class VendorsService {
   }
 
   /**
-   * Mise à jour des coordonnées et des limites d'un vendeur
+   * Mise à jour complète de toutes les informations d'un vendeur (coordonnées, identifiant, PIN, mot de passe, limites, statut)
    */
   async updateVendor(id: string, dto: UpdateVendorDto, adminId?: string) {
-    const vendor = await this.prisma.vendor.findUnique({ where: { id } });
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      include: { user: true },
+    });
     if (!vendor) {
       throw new NotFoundException('Vendeur introuvable');
     }
 
-    // Si le statut passe à SUSPENDED, appliquer la procédure de suspension complète
+    // 1. Vérification unicité vendorCode si modifié
+    if (dto.vendorCode && dto.vendorCode !== vendor.vendorCode) {
+      const existingCode = await this.prisma.vendor.findUnique({
+        where: { vendorCode: dto.vendorCode },
+      });
+      if (existingCode) {
+        throw new BadRequestException(`Le code vendeur '${dto.vendorCode}' est déjà utilisé.`);
+      }
+    }
+
+    // 2. Vérification unicité téléphone si modifié
+    if (dto.phone && dto.phone !== vendor.phone) {
+      const existingPhone = await this.prisma.vendor.findUnique({
+        where: { phone: dto.phone },
+      });
+      if (existingPhone) {
+        throw new BadRequestException(`Le numéro de téléphone '${dto.phone}' est déjà attribué à un autre vendeur.`);
+      }
+    }
+
+    // 3. Vérification unicité username si modifié
+    if (dto.username && dto.username !== vendor.user?.username) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { username: dto.username },
+      });
+      if (existingUser) {
+        throw new BadRequestException(`Le nom d'utilisateur '${dto.username}' est déjà utilisé.`);
+      }
+    }
+
+    // 4. Si le statut passe à SUSPENDED, appliquer la procédure de suspension complète
     if (dto.status === VendorStatus.SUSPENDED && vendor.status !== VendorStatus.SUSPENDED) {
       return this.suspendVendor(id, adminId || 'SYSTEM', 'Mise à jour statut vers SUSPENDED');
     }
 
-    const updated = await this.prisma.vendor.update({
-      where: { id },
-      data: {
-        fullName: dto.fullName,
-        phone: dto.phone,
-        posAddress: dto.posAddress,
-        creditLimit: dto.creditLimit !== undefined ? dto.creditLimit : undefined,
-        dailySalesLimit: dto.dailySalesLimit !== undefined ? dto.dailySalesLimit : undefined,
-        maxTicketAmount: dto.maxTicketAmount !== undefined ? dto.maxTicketAmount : undefined,
-        defaultCommissionRate: dto.defaultCommissionRate !== undefined ? dto.defaultCommissionRate : undefined,
-        status: dto.status,
-      },
+    // 5. Préparation des données d'authentification User
+    const userData: any = {};
+    if (dto.username && dto.username.trim().length > 0) {
+      userData.username = dto.username.trim();
+    }
+    if (dto.password && dto.password.trim().length >= 6) {
+      userData.passwordHash = await bcrypt.hash(dto.password.trim(), 12);
+    }
+    if (dto.pin !== undefined) {
+      const trimmedPin = dto.pin ? String(dto.pin).trim() : '';
+      if (trimmedPin.length >= 4) {
+        userData.pinHash = await bcrypt.hash(trimmedPin, 12);
+      } else if (trimmedPin === '') {
+        userData.pinHash = null;
+      }
+    }
+
+    // 6. Mise à jour transactionnelle du Vendeur et de son Utilisateur
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(userData).length > 0 && vendor.userId) {
+        await tx.user.update({
+          where: { id: vendor.userId },
+          data: userData,
+        });
+      }
+
+      return tx.vendor.update({
+        where: { id },
+        data: {
+          vendorCode: dto.vendorCode !== undefined ? dto.vendorCode : undefined,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          posAddress: dto.posAddress,
+          creditLimit: dto.creditLimit !== undefined ? dto.creditLimit : undefined,
+          dailySalesLimit: dto.dailySalesLimit !== undefined ? dto.dailySalesLimit : undefined,
+          maxTicketAmount: dto.maxTicketAmount !== undefined ? dto.maxTicketAmount : undefined,
+          defaultCommissionRate: dto.defaultCommissionRate !== undefined ? dto.defaultCommissionRate : undefined,
+          status: dto.status,
+        },
+        include: {
+          user: {
+            select: { id: true, username: true, role: true, isActive: true },
+          },
+        },
+      });
     });
 
     await this.auditService.log({
