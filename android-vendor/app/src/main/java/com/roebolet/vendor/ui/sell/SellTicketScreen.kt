@@ -157,9 +157,10 @@ fun SellTicketScreen(
     // FONCTIONNALITÉS VENDEUR INTELLIGENT
     var bulkAmountInput by remember { mutableStateOf("") }
     var applyToAllTabs by remember { mutableStateOf(false) }
-    var defaultAmountValue by remember { mutableStateOf(prefs.getDefaultBetAmount().toInt().toString()) }
-    var autoApplyDefaultEnabled by remember { mutableStateOf(prefs.isAutoApplyDefaultAmount()) }
+    var defaultAmountValue by remember { mutableStateOf(prefs.getDefaultBetAmount().toInt().let { if (it > 0) it.toString() else "" }) }
+    var autoApplyDefaultEnabled by remember { mutableStateOf(false) }
     var showDefaultAmountConfigDialog by remember { mutableStateOf(false) }
+    var showBulkAmountDialog by remember { mutableStateOf(false) }
 
     // Suivi et dialogues des vérifications intelligentes
     var showMissingAmountDialog by remember { mutableStateOf(false) }
@@ -522,6 +523,17 @@ fun SellTicketScreen(
             }
         }
 
+        // Règle Officielle : 5 Mariages Gratuits automatiques avec 10 boules distinctes
+        val paidGrids = list.filter { it.isGratis != true }
+        if (paidGrids.isNotEmpty()) {
+            val existingGratis = list.filter { it.isGratis == true }
+            if (existingGratis.size < 5) {
+                val freeMarriages = CombinationEngine.generateFiveFreeMarriages(paidGrids)
+                list.removeAll { it.isGratis == true }
+                list.addAll(freeMarriages)
+            }
+        }
+
         return list
     }
 
@@ -667,30 +679,16 @@ fun SellTicketScreen(
         }
 
         if (missing.isNotEmpty()) {
-            val defAmtDouble = defaultAmountValue.toDoubleOrNull() ?: 0.0
-            if (autoApplyDefaultEnabled && defAmtDouble > 0.0) {
-                missing.forEach { item ->
-                    when (item.tabIndex) {
-                        0 -> boletLines[item.lineIndex] = boletLines[item.lineIndex].copy(amount = defaultAmountValue)
-                        1 -> loto3Lines[item.lineIndex] = loto3Lines[item.lineIndex].copy(amount = defaultAmountValue)
-                        2 -> loto4Lines[item.lineIndex] = loto4Lines[item.lineIndex].copy(amount = defaultAmountValue)
-                        3 -> loto5Lines[item.lineIndex] = loto5Lines[item.lineIndex].copy(amount = defaultAmountValue)
-                        4 -> maryajLines[item.lineIndex] = maryajLines[item.lineIndex].copy(amount = defaultAmountValue)
-                    }
-                }
-                Toast.makeText(
-                    context,
-                    if (isCreole) "Montan pa defo ($defaultAmountValue HTG) aplike sou ${missing.size} nimewo san montan."
-                    else "Montant par défaut ($defaultAmountValue HTG) appliqué sur ${missing.size} numéro(s) sans montant.",
-                    Toast.LENGTH_SHORT
-                ).show()
-                showPreValidationPreview = true
-            } else {
-                missingAmountItems = missing
-                tempMissingDefaultAmount = defaultAmountValue
-                tempAutoApplyMissing = autoApplyDefaultEnabled
-                showMissingAmountDialog = true
-            }
+            val numList = missing.take(3).joinToString(", ") { it.number }
+            Toast.makeText(
+                context,
+                if (isCreole) "Tanpri mete yon montan pou chak nimewo ($numList...)" else "Veuillez entrer un montant pour chaque numéro ($numList...)",
+                Toast.LENGTH_SHORT
+            ).show()
+            missingAmountItems = missing
+            tempMissingDefaultAmount = defaultAmountValue
+            tempAutoApplyMissing = false
+            showMissingAmountDialog = true
             return
         }
 
@@ -843,6 +841,16 @@ fun SellTicketScreen(
                             expanded = showOptionsMenu,
                             onDismissRequest = { showOptionsMenu = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(if (isCreole) "Mete yon montan pou tout" else "Appliquer un montant à tous") },
+                                onClick = {
+                                    showOptionsMenu = false
+                                    showBulkAmountDialog = true
+                                },
+                                leadingIcon = {
+                                    Text("💵", fontSize = 16.sp)
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text(if (isCreole) "Moteur Konbinezon (Loto 4, Maryaj...)" else "Moteur de Combinaisons") },
                                 onClick = {
@@ -1012,229 +1020,6 @@ fun SellTicketScreen(
             }
         }
 
-        // SMART BARRE D'ACTIONS RAPIDES : Montant pour tous & Générer 10 paires
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(10.dp),
-            shadowElevation = 1.dp,
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    // Champ Montant pour tous
-                    OutlinedTextField(
-                        value = bulkAmountInput,
-                        onValueChange = { input ->
-                            bulkAmountInput = input.filter { it.isDigit() }.take(6)
-                        },
-                        placeholder = {
-                            Text(
-                                text = Strings.t("amount_for_all", currentLanguage),
-                                fontSize = 11.sp,
-                                color = PlaceholderColor
-                            )
-                        },
-                        leadingIcon = {
-                            Text("💵", fontSize = 13.sp)
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CommonInputColors,
-                        textStyle = TextStyle(
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFF0F172A),
-                            fontFamily = FontFamily.Monospace
-                        )
-                    )
-
-                    // Bouton Appliquer
-                    Button(
-                        onClick = {
-                            val amt = bulkAmountInput.toDoubleOrNull()
-                            if (amt == null || amt <= 0) {
-                                Toast.makeText(
-                                    context,
-                                    if (isCreole) "Tanpri antre yon montan valid (egz: 50)" else "Entrez un montant valide (ex: 50)",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                var countUpdated = 0
-                                if (applyToAllTabs) {
-                                    listOf(boletLines, loto3Lines, loto4Lines, loto5Lines, maryajLines).forEach { list ->
-                                        list.indices.forEach { idx ->
-                                            val l = list[idx]
-                                            if (l.number.isNotBlank() && !l.isGratis) {
-                                                list[idx] = l.copy(amount = bulkAmountInput)
-                                                countUpdated++
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    currentLines.indices.forEach { idx ->
-                                        val l = currentLines[idx]
-                                        if (l.number.isNotBlank() && !l.isGratis) {
-                                            currentLines[idx] = l.copy(amount = bulkAmountInput)
-                                            countUpdated++
-                                        }
-                                    }
-                                }
-                                Toast.makeText(
-                                    context,
-                                    if (isCreole) "$countUpdated nimewo mete a $bulkAmountInput HTG !" else "$countUpdated numéro(s) mis à jour à $bulkAmountInput HTG !",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = TopBarPurple),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(44.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = Strings.t("apply_all", currentLanguage),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    // Bouton Générer 10 Paires (accessible directement)
-                    Surface(
-                        color = Color(0xFFFEF3C7),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFFFCD34D)),
-                        modifier = Modifier
-                            .height(44.dp)
-                            .clickable {
-                                tenPairsAmountInput = if (bulkAmountInput.isNotBlank()) bulkAmountInput else defaultAmountValue
-                                showTenPairsDialog = true
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("🎲", fontSize = 13.sp)
-                            Text(
-                                text = Strings.t("generate_pairs", currentLanguage),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF92400E)
-                            )
-                        }
-                    }
-                }
-
-                // Ligne de sous-options : Onglet courant / Tous les onglets + Config Montant par défaut
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { applyToAllTabs = !applyToAllTabs }
-                    ) {
-                        Checkbox(
-                            checked = applyToAllTabs,
-                            onCheckedChange = { applyToAllTabs = it },
-                            modifier = Modifier.size(22.dp),
-                            colors = CheckboxDefaults.colors(checkedColor = TopBarPurple)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (applyToAllTabs) Strings.t("apply_all_tabs", currentLanguage) else Strings.t("apply_current_tab", currentLanguage),
-                            fontSize = 11.sp,
-                            color = if (applyToAllTabs) TopBarPurple else Color(0xFF64748B),
-                            fontWeight = if (applyToAllTabs) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { showDefaultAmountConfigDialog = true }
-                    ) {
-                        Text(
-                            text = "⚙️ ${Strings.t("default_amount_config", currentLanguage)}: $defaultAmountValue G",
-                            fontSize = 10.sp,
-                            color = Color(0xFF64748B),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-
-        // Bannière d'aide Moteur Intelligent pour BÒLET (si au moins 2 numéros saisis)
-        val activeBoletSources = boletLines.map { it.number.trim() }.filter { it.isNotEmpty() }
-        if (selectedTabIndex == 0 && activeBoletSources.size >= 2) {
-            Surface(
-                color = Color(0xFFF3E8FF),
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, Color(0xFFD8B4FE)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .clickable { showCombinationDialog = true }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(text = "⚡", fontSize = 16.sp)
-                        Column {
-                            Text(
-                                text = "${activeBoletSources.size} nimewo Bòlet (${activeBoletSources.joinToString(", ")})",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF6B21A8)
-                            )
-                            Text(
-                                text = if (isCreole) "Klike pou jenere Loto 4, Maryaj & kalkile miz" else "Cliquer pour générer Loto 4, Mariage & calcul",
-                                fontSize = 10.sp,
-                                color = Color(0xFF7E22CE)
-                            )
-                        }
-                    }
-                    Surface(
-                        color = TopBarPurple,
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.clickable { showCombinationDialog = true }
-                    ) {
-                        Text(
-                            text = if (isCreole) "Jenere" else "Générer",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-        }
-
         // 3. TABLEAU DES LIGNES DE JEU (Dynamique avec minimum 10)
         LazyColumn(
             modifier = Modifier
@@ -1282,8 +1067,7 @@ fun SellTicketScreen(
                                 onValueChange = { newVal ->
                                     val digits = newVal.filter { it.isDigit() || it == 'x' || it == 'X' || it == '-' || it == '*' }
                                     if (digits.length <= maxDigits) {
-                                        val autoAmt = if (autoApplyDefaultEnabled && line.amount.isBlank() && digits.length == maxDigits && defaultAmountValue.isNotBlank()) defaultAmountValue else line.amount
-                                        currentLines[rowIndex] = line.copy(number = digits, amount = autoAmt, isEdited = line.isAutoGenerated)
+                                        currentLines[rowIndex] = line.copy(number = digits, amount = line.amount, isEdited = line.isAutoGenerated)
                                         if (digits.length == maxDigits && rowIndex < currentLines.size - 1) {
                                             focusManager.moveFocus(FocusDirection.Right)
                                         }
@@ -1852,8 +1636,7 @@ fun SellTicketScreen(
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
-                                val ticketDate = ticket.createdAt?.take(19)?.replace("T", " ")
-                                    ?: java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                                val ticketDate = TicketReceiptUtil.formatHaitiDateTimeSeconds(ticket.createdAt)
                                 Text(
                                     text = "Dat & Lè: $ticketDate",
                                     color = Color(0xFF212121),
@@ -1942,9 +1725,9 @@ fun SellTicketScreen(
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = "Mariage Gratuit",
-                                        color = Color(0xFF424242),
+                                        color = Color.Black,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
+                                        fontSize = 12.sp
                                     )
                                     gratisGrids.forEach { g ->
                                         val formattedGratis = TicketReceiptUtil.formatGridNumbers("MARIAGE", g.numbers)
@@ -1957,14 +1740,16 @@ fun SellTicketScreen(
                                         ) {
                                             Text(
                                                 text = "Mariage  $formattedGratis",
-                                                color = Color(0xFF616161),
-                                                fontSize = 11.sp,
+                                                color = Color.Black,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
                                                 fontFamily = FontFamily.Monospace
                                             )
                                             Text(
-                                                text = "xxxx HTG",
-                                                color = Color(0xFF757575),
-                                                fontSize = 11.sp,
+                                                text = "GRATUIT",
+                                                color = Color.Black,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
                                                 fontFamily = FontFamily.Monospace
                                             )
                                         }
@@ -2262,7 +2047,7 @@ fun SellTicketScreen(
                             fontFamily = FontFamily.Monospace
                         )
                     }
-                    val nowFormatted = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                    val nowFormatted = TicketReceiptUtil.currentHaitiDateTimeString()
                     Text(
                         text = "Dat & Lè: $nowFormatted",
                         color = Color(0xFF212121),
@@ -2344,9 +2129,9 @@ fun SellTicketScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Mariage Gratuit",
-                            color = Color(0xFF424242),
+                            color = Color.Black,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                         gratisGrids.forEach { g ->
                             val formattedGratis = TicketReceiptUtil.formatGridNumbers("MARIAGE", g.numbers)
@@ -2359,14 +2144,16 @@ fun SellTicketScreen(
                             ) {
                                 Text(
                                     text = "Mariage  $formattedGratis",
-                                    color = Color(0xFF616161),
-                                    fontSize = 11.sp,
+                                    color = Color.Black,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace
                                 )
                                 Text(
-                                    text = "xxxx HTG",
-                                    color = Color(0xFF757575),
-                                    fontSize = 11.sp,
+                                    text = "GRATUIT",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
@@ -2729,6 +2516,184 @@ fun SellTicketScreen(
                         text = if (isCreole) "Mwen pral korije yo" else "Je vais corriger",
                         color = Color.White,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
+    }
+
+    // MODAL : APPLIQUER UN MONTANT À TOUS
+    if (showBulkAmountDialog) {
+        AlertDialog(
+            onDismissRequest = { showBulkAmountDialog = false },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("💵", fontSize = 20.sp)
+                    Text(
+                        text = if (isCreole) "Mete yon montan pou tout" else "Appliquer un montant à tous",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 16.sp,
+                        color = TopBarPurple
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = if (isCreole)
+                            "Chwazi montan ou vle mete pou tout nimewo ki deja tape yo :"
+                        else
+                            "Choisissez le montant à attribuer à tous les numéros déjà saisis :",
+                        fontSize = 12.sp,
+                        color = Color(0xFF475569)
+                    )
+
+                    OutlinedTextField(
+                        value = bulkAmountInput,
+                        onValueChange = { input ->
+                            bulkAmountInput = input.filter { it.isDigit() }.take(6)
+                        },
+                        placeholder = {
+                            Text(
+                                text = if (isCreole) "Egz: 50" else "Ex: 50",
+                                fontSize = 13.sp,
+                                color = PlaceholderColor
+                            )
+                        },
+                        trailingIcon = {
+                            Text(
+                                text = "HTG",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = Color(0xFF1E293B)
+                            )
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CommonInputColors,
+                        textStyle = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0F172A),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+
+                    // Puces rapides de montants
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("25", "50", "100", "250").forEach { quickAmt ->
+                            Surface(
+                                color = if (bulkAmountInput == quickAmt) TopBarPurple else Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { bulkAmountInput = quickAmt }
+                            ) {
+                                Text(
+                                    text = "$quickAmt G",
+                                    color = if (bulkAmountInput == quickAmt) Color.White else Color(0xFF1E293B),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Checkbox onglet courant ou tous les onglets
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { applyToAllTabs = !applyToAllTabs }
+                    ) {
+                        Checkbox(
+                            checked = applyToAllTabs,
+                            onCheckedChange = { applyToAllTabs = it },
+                            modifier = Modifier.size(24.dp),
+                            colors = CheckboxDefaults.colors(checkedColor = TopBarPurple)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (applyToAllTabs) Strings.t("apply_all_tabs", currentLanguage) else Strings.t("apply_current_tab", currentLanguage),
+                            fontSize = 12.sp,
+                            color = if (applyToAllTabs) TopBarPurple else Color(0xFF64748B),
+                            fontWeight = if (applyToAllTabs) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amt = bulkAmountInput.toDoubleOrNull()
+                        if (amt == null || amt <= 0) {
+                            Toast.makeText(
+                                context,
+                                if (isCreole) "Tanpri antre yon montan valid (egz: 50)" else "Entrez un montant valide (ex: 50)",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            var countUpdated = 0
+                            if (applyToAllTabs) {
+                                listOf(boletLines, loto3Lines, loto4Lines, loto5Lines, maryajLines).forEach { list ->
+                                    list.indices.forEach { idx ->
+                                        val l = list[idx]
+                                        if (l.number.isNotBlank() && !l.isGratis) {
+                                            list[idx] = l.copy(amount = bulkAmountInput)
+                                            countUpdated++
+                                        }
+                                    }
+                                }
+                            } else {
+                                currentLines.indices.forEach { idx ->
+                                    val l = currentLines[idx]
+                                    if (l.number.isNotBlank() && !l.isGratis) {
+                                        currentLines[idx] = l.copy(amount = bulkAmountInput)
+                                        countUpdated++
+                                    }
+                                }
+                            }
+                            showBulkAmountDialog = false
+                            Toast.makeText(
+                                context,
+                                if (isCreole) "$countUpdated nimewo mete a $bulkAmountInput HTG !" else "$countUpdated numéro(s) mis à jour à $bulkAmountInput HTG !",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TopBarPurple),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = Strings.t("apply_all", currentLanguage),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showBulkAmountDialog = false },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = Strings.t("cancel", currentLanguage),
+                        color = Color(0xFF64748B)
                     )
                 }
             }

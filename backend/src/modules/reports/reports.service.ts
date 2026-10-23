@@ -71,14 +71,15 @@ export class ReportsService {
     }
 
     // Paramètres système (Nom de la borlette, Logo, Devise)
-    const [nameSetting, logoSetting, phoneSetting, currencySetting] = await Promise.all([
+    const [companyNameSetting, lotteryNameSetting, logoSetting, phoneSetting, currencySetting] = await Promise.all([
+      this.prisma.systemSetting.findUnique({ where: { key: 'COMPANY_NAME' } }),
       this.prisma.systemSetting.findUnique({ where: { key: 'LOTTERY_NAME' } }),
-      this.prisma.systemSetting.findUnique({ where: { key: 'LOTTERY_LOGO_URL' } }),
-      this.prisma.systemSetting.findUnique({ where: { key: 'LOTTERY_PHONE' } }),
+      this.prisma.systemSetting.findFirst({ where: { key: { in: ['COMPANY_LOGO_URL', 'LOTTERY_LOGO_URL'] } } }),
+      this.prisma.systemSetting.findFirst({ where: { key: { in: ['COMPANY_PHONE', 'LOTTERY_PHONE'] } } }),
       this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } }),
     ]);
 
-    const lotteryName = nameSetting?.value || 'TOTAL CENTER LOTO';
+    const lotteryName = companyNameSetting?.value || lotteryNameSetting?.value || 'ROE BOLET';
     const lotteryLogoUrl = logoSetting?.value || '';
     const lotteryPhone = phoneSetting?.value || '';
     const currency = currencySetting?.value || 'HTG';

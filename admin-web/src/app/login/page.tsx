@@ -18,7 +18,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await api.post('/api/v1/auth/login', { username, password });
+      const res = await api.post('/api/v1/auth/login', { username: username.trim(), password });
       localStorage.setItem('roe_access_token', res.accessToken);
       localStorage.setItem('roe_refresh_token', res.refreshToken);
       localStorage.setItem('roe_user', JSON.stringify(res.user));
@@ -64,7 +64,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-roe-textMuted uppercase mb-1.5">
-              Identifiant Administrateur
+              Identifiant ou E-mail Administrateur
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-roe-textMuted">
@@ -75,7 +75,7 @@ export default function LoginPage() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="superadmin"
+                placeholder="haitibolet2026 ou haitibolet2026@gmail.com"
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-roe-card border border-roe-border text-white text-sm focus:border-roe-gold focus:outline-none transition-colors"
               />
             </div>

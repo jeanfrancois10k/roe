@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  NotFoundException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -74,8 +75,11 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ipAddress?: string, userAgent?: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { username: dto.username },
+    const identifier = dto.username?.trim();
+
+    // 1. Recherche par nom d'utilisateur exact
+    let user = await this.prisma.user.findUnique({
+      where: { username: identifier },
       include: {
         vendorProfile: {
           include: {
@@ -84,6 +88,25 @@ export class AuthService {
         },
       },
     });
+
+    // 2. Fallback par e-mail ou nom d'utilisateur insensible à la casse
+    if (!user) {
+      user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: { equals: identifier, mode: 'insensitive' } },
+            { email: { equals: identifier, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          vendorProfile: {
+            include: {
+              devices: true,
+            },
+          },
+        },
+      });
+    }
 
     if (!user) {
       await this.auditService.log({
@@ -433,6 +456,47 @@ export class AuthService {
       accessToken,
       refreshToken: rawRefreshToken,
       expiresIn: accessExpiresSeconds,
+    };
+  }
+
+  async changePassword(userId: string, currentPassword?: string, newPassword?: string) {
+    if (!newPassword || newPassword.trim().length < 6) {
+      throw new BadRequestException('Le nouveau mot de passe doit comporter au moins 6 caractères.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable.');
+    }
+
+    if (currentPassword) {
+      const match = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!match) {
+        throw new BadRequestException('Le mot de passe actuel est incorrect.');
+      }
+    }
+
+    const saltRounds = 12;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    await this.auditService.log({
+      userId,
+      action: 'PASSWORD_CHANGED',
+      resource: `User:${userId}`,
+      newPayload: { username: user.username, email: user.email },
+    });
+
+    return {
+      success: true,
+      message: 'Mot de passe modifié avec succès !',
     };
   }
 }

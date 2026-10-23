@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   Req,
   HttpCode,
@@ -71,5 +72,15 @@ export class AuthController {
   @Get('me')
   async getMe(@CurrentUser() user: any) {
     return { user };
+  }
+
+  @Patch('change-password')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.AUDITOR, Role.VENDOR)
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() body: { currentPassword?: string; newPassword: string },
+  ) {
+    return this.authService.changePassword(userId, body.currentPassword, body.newPassword);
   }
 }

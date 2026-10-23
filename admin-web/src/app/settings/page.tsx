@@ -21,6 +21,8 @@ import {
   Trash2,
   Sun,
   Moon,
+  KeyRound,
+  Lock,
 } from 'lucide-react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
@@ -52,6 +54,14 @@ export default function SettingsPage() {
 
   // Période de prévisualisation du ticket (Midi vs Soir)
   const [previewPeriod, setPreviewPeriod] = useState<'MIDI' | 'SOIR'>('MIDI');
+
+  // Changement de mot de passe administrateur
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const fetchSettings = async () => {
     try {
@@ -127,6 +137,39 @@ export default function SettingsPage() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Le nouveau mot de passe doit comporter au moins 6 caractères.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('La confirmation ne correspond pas au nouveau mot de passe.');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await api.patch('/api/v1/auth/change-password', {
+        currentPassword: currentPassword || undefined,
+        newPassword,
+      });
+      setPasswordSuccess(res?.message || 'Mot de passe modifié avec succès !');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSuccess(null), 6000);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Erreur lors du changement de mot de passe.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-roe-dark text-white font-sans flex">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -181,8 +224,10 @@ export default function SettingsPage() {
 
           {/* DEUX COLONNES : FORMULAIRE À GAUCHE & APERÇU TICKET THERMIQUE À DROITE */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* FORMULAIRE DE CONFIGURATION (7 COLONNES) */}
-            <form onSubmit={handleSaveSettings} className="lg:col-span-7 space-y-6">
+            {/* COLONNE GAUCHE (7 COLONNES) */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* FORMULAIRE DE CONFIGURATION */}
+              <form onSubmit={handleSaveSettings} className="space-y-6">
               {/* Carte 1 : Identité de la Loterie / Borlette */}
               <div className="bg-roe-surface p-5 sm:p-6 rounded-2xl border border-roe-border/60 space-y-4 shadow-xl">
                 <h2 className="text-sm sm:text-base font-bold text-roe-gold flex items-center gap-2">
@@ -269,18 +314,11 @@ export default function SettingsPage() {
                   <div className="flex flex-col sm:flex-row items-center gap-4 p-3.5 bg-roe-dark/70 rounded-xl border border-roe-border/60">
                     {/* Zone de prévisualisation du Logo */}
                     <div className="w-20 h-20 rounded-xl bg-white/5 border border-dashed border-roe-border flex items-center justify-center overflow-hidden flex-shrink-0 relative">
-                      {logoUrl ? (
-                        <img
-                          src={logoUrl}
-                          alt="Logo Borlette"
-                          className="w-full h-full object-contain p-1"
-                        />
-                      ) : (
-                        <div className="text-center p-1">
-                          <span className="text-2xl">🌙</span>
-                          <span className="block text-[9px] text-roe-textMuted mt-0.5">Par défaut</span>
-                        </div>
-                      )}
+                      <img
+                        src={logoUrl || '/logo.png'}
+                        alt="Logo Borlette"
+                        className="w-full h-full object-contain p-1"
+                      />
                     </div>
 
                     {/* Actions d'upload et URL */}
@@ -411,8 +449,93 @@ export default function SettingsPage() {
               </div>
             </form>
 
-            {/* APERÇU THERMIQUE EN TEMPS RÉEL (5 COLONNES) */}
-            <div className="lg:col-span-5 sticky top-24 space-y-3">
+            {/* Carte Sécurité & Mot de passe administrateur */}
+            <form onSubmit={handleChangePassword} className="bg-roe-surface p-5 sm:p-6 rounded-2xl border border-roe-border/60 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm sm:text-base font-bold text-roe-gold flex items-center gap-2">
+                  <KeyRound size={18} /> Sécurité & Modification du Mot de Passe
+                </h2>
+                <span className="text-[11px] font-semibold text-roe-textMuted bg-roe-card px-2.5 py-1 rounded-lg border border-roe-border">
+                  Compte Administrateur
+                </span>
+              </div>
+
+              <p className="text-xs text-roe-textMuted">
+                Modifiez le mot de passe de votre compte administrateur en toute sécurité.
+              </p>
+
+              {passwordSuccess && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="flex-shrink-0" />
+                  <span>{passwordSuccess}</span>
+                </div>
+              )}
+
+              {passwordError && (
+                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2.5">
+                  <AlertTriangle size={16} className="flex-shrink-0" />
+                  <span>{passwordError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-roe-textMuted mb-1.5">
+                    Mot de passe actuel
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-roe-textMuted mb-1.5">
+                    Nouveau mot de passe *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Min. 6 caractères"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-roe-textMuted mb-1.5">
+                    Confirmer nouveau *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Confirmer"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-roe-gold text-roe-bg font-black text-xs shadow-md hover:scale-[1.02] transition"
+                >
+                  {passwordLoading ? <RefreshCw size={14} className="animate-spin" /> : <Lock size={14} />}
+                  {passwordLoading ? 'Mise à jour...' : 'Modifier mon mot de passe'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* APERÇU THERMIQUE EN TEMPS RÉEL (5 COLONNES) */}
+          <div className="lg:col-span-5 sticky top-24 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-roe-gold uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles size={15} /> Aperçu Reçu Thermique POS
@@ -447,19 +570,15 @@ export default function SettingsPage() {
 
               {/* SIMULATEUR DE PAPIER THERMIQUE EXACT */}
               <div className="bg-[#f8f9fa] text-black font-mono text-xs p-5 rounded-2xl shadow-2xl border border-gray-300 relative select-none">
-                {/* Logo Officiel ou Icône Croissant de Lune */}
+                {/* Logo Officiel de la Loterie */}
                 <div className="text-center mb-2">
-                  {logoUrl ? (
-                    <div className="flex justify-center mb-1.5">
-                      <img
-                        src={logoUrl}
-                        alt="Logo Borlette"
-                        className="max-h-16 max-w-[150px] object-contain"
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-3xl font-black">🌙</div>
-                  )}
+                  <div className="flex justify-center mb-1.5">
+                    <img
+                      src={logoUrl || '/logo.png'}
+                      alt="Logo Borlette"
+                      className="max-h-16 max-w-[150px] object-contain"
+                    />
+                  </div>
                   <div className="text-[11px] font-bold tracking-widest text-gray-700 mt-1">
                     {ticketHeaderNote || '*** ORIGINAL FICHE ***'}
                   </div>
@@ -509,29 +628,29 @@ export default function SettingsPage() {
 
                 {/* Grille de Jeux Joués */}
                 <div className="space-y-1 my-2 text-[11px]">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between font-bold text-black">
                     <span>Borlette 95</span>
-                    <span className="font-bold">4 000 HTG</span>
+                    <span className="font-black">4 000 HTG</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between font-bold text-black">
                     <span>Borlette 86</span>
-                    <span className="font-bold">4 000 HTG</span>
+                    <span className="font-black">4 000 HTG</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between font-bold text-black">
                     <span>Mariage 95*86</span>
-                    <span className="font-bold">5 000 HTG</span>
+                    <span className="font-black">5 000 HTG</span>
                   </div>
 
-                  <div className="text-center pt-1 font-bold text-[10px] text-gray-700">
+                  <div className="text-center pt-1 font-bold text-[11px] text-black">
                     Mariage Gratuit
                   </div>
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between font-bold text-black">
                     <span>Mariage 45*00</span>
-                    <span>xxxx HTG</span>
+                    <span className="font-black">GRATUIT</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between font-bold text-black">
                     <span>Mariage 09*11</span>
-                    <span>xxxx HTG</span>
+                    <span className="font-black">GRATUIT</span>
                   </div>
                 </div>
 

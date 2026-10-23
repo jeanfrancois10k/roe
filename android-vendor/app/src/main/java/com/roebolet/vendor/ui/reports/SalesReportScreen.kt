@@ -49,7 +49,7 @@ fun SalesReportScreen(
     vendorCode: String = "",
     vendorName: String = "",
     lotteryLogoUrl: String? = null,
-    lotteryName: String = "TOTAL CENTER LOTO",
+    lotteryName: String = "ROE BOLET",
     onFilterChange: (period: String, startDate: String?, endDate: String?, drawId: String?) -> Unit = { _, _, _, _ -> },
     onPeriodChange: (String) -> Unit,
     onRefreshClick: () -> Unit,
@@ -74,7 +74,7 @@ fun SalesReportScreen(
     var printContentText by remember { mutableStateOf("") }
     var printTitleText by remember { mutableStateOf("") }
 
-    val effectiveLotteryName = report?.lottery?.name ?: lotteryName
+    val effectiveLotteryName = report?.lottery?.name?.takeIf { it.isNotBlank() && it != "TOTAL CENTER LOTO" } ?: lotteryName
     val effectiveLogo = report?.lottery?.logoUrl ?: lotteryLogoUrl
     val effectiveVendorCode = if (vendorCode.isNotEmpty()) vendorCode else (report?.vendor?.code ?: "404")
 

@@ -262,4 +262,90 @@ class CombinationEngineTest {
         val l5Numbers = loto5.map { it.number }
         assertTrue(l5Numbers.containsAll(listOf("70220", "72002")))
     }
+
+    // 11. LES CINQ MARIAGES GRATUITS : RÈGLE DES 10 BOULES DISTINCTES
+    @Test
+    fun testGenerateFiveFreeMarriages_TenDistinctBalls() {
+        val playedGrids = listOf(
+            BetGrid(numbers = listOf("22"), betAmount = 50.0, gameType = "BORLETTE"),
+            BetGrid(numbers = listOf("10"), betAmount = 25.0, gameType = "BORLETTE")
+        )
+
+        val freeMarriages = CombinationEngine.generateFiveFreeMarriages(playedGrids)
+
+        // Exactement 5 mariages gratuits
+        assertEquals(5, freeMarriages.size)
+
+        // Tous les mariages doivent avoir la mise à 0 HTG et le flag isGratis
+        freeMarriages.forEach {
+            assertEquals(0.0, it.betAmount, 0.0001)
+            assertTrue(it.isGratis == true)
+            assertEquals("GRATIS", it.option)
+            assertEquals("MARIAGE", it.gameType)
+            assertEquals(2, it.numbers.size)
+        }
+
+        // Récupérer les 10 boules au total
+        val allTenBalls = freeMarriages.flatMap { it.numbers }
+        assertEquals(10, allTenBalls.size)
+
+        // RÈGLE OBLIGATOIRE : Les 10 boules doivent être TOUTES DISTINCTES les unes des autres (zéro doublon)
+        assertEquals(10, allTenBalls.distinct().size)
+    }
+
+    // 12. LES CINQ MARIAGES GRATUITS : RÈGLE D'EXCLUSION ABSOLUE DES NUMÉROS JOUÉS
+    @Test
+    fun testGenerateFiveFreeMarriages_StrictExclusionOfPlayedNumbers() {
+        // Le client joue Borlette 22, Loto 3 145, Loto 4 0220, Mariage 08X19
+        val playedGrids = listOf(
+            BetGrid(numbers = listOf("22"), betAmount = 50.0, gameType = "BORLETTE"),
+            BetGrid(numbers = listOf("145"), betAmount = 20.0, gameType = "LOTO3"),
+            BetGrid(numbers = listOf("0220"), betAmount = 20.0, gameType = "LOTO4"),
+            BetGrid(numbers = listOf("08", "19"), betAmount = 10.0, gameType = "MARIAGE")
+        )
+
+        val playedBalls = CombinationEngine.extractAllPlayedBalls(playedGrids)
+        // Vérifier que tous les numéros joués sont bien répertoriés
+        assertTrue(playedBalls.contains("22"))
+        assertTrue(playedBalls.contains("45")) // de 145
+        assertTrue(playedBalls.contains("02")) // de 0220
+        assertTrue(playedBalls.contains("20")) // de 0220
+        assertTrue(playedBalls.contains("08")) // de 08
+        assertTrue(playedBalls.contains("19")) // de 19
+
+        val freeMarriages = CombinationEngine.generateFiveFreeMarriages(playedGrids)
+        val allTenBalls = freeMarriages.flatMap { it.numbers }
+
+        // RÈGLE OBLIGATOIRE : Aucune des 10 boules ne peut figurer parmi les numéros joués !
+        for (ball in allTenBalls) {
+            assertFalse(
+                "La boule gratuite $ball ne doit JAMAIS faire partie des numéros joués !",
+                playedBalls.contains(ball)
+            )
+        }
+    }
+
+    // 13. LES CINQ MARIAGES GRATUITS : STABILITÉ ET DÉTERMINISME
+    @Test
+    fun testGenerateFiveFreeMarriages_Stability() {
+        val playedGrids1 = listOf(
+            BetGrid(numbers = listOf("22"), betAmount = 50.0, gameType = "BORLETTE"),
+            BetGrid(numbers = listOf("16"), betAmount = 20.0, gameType = "BORLETTE")
+        )
+
+        // Même ticket mais avec une mise différente
+        val playedGrids2 = listOf(
+            BetGrid(numbers = listOf("22"), betAmount = 100.0, gameType = "BORLETTE"),
+            BetGrid(numbers = listOf("16"), betAmount = 50.0, gameType = "BORLETTE")
+        )
+
+        val run1 = CombinationEngine.generateFiveFreeMarriages(playedGrids1)
+        val run2 = CombinationEngine.generateFiveFreeMarriages(playedGrids2)
+
+        val pairs1 = run1.map { it.numbers.joinToString("X") }
+        val pairs2 = run2.map { it.numbers.joinToString("X") }
+
+        // La génération doit être stable et reproductible
+        assertEquals(pairs1, pairs2)
+    }
 }

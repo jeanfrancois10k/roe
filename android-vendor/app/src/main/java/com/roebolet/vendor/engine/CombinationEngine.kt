@@ -492,4 +492,104 @@ object CombinationEngine {
             warnings = warnings
         )
     }
+
+    /**
+     * J. EXTRACTION DE TOUTES LES BOULES (2 CHIFFRES) JOUÉES DANS LE TICKET
+     * Règle d'exclusion absolue : Borlette, Loto 3, Loto 4, Loto 5, Mariage
+     */
+    fun extractAllPlayedBalls(grids: List<BetGrid>): Set<String> {
+        val balls = mutableSetOf<String>()
+        for (grid in grids) {
+            if (grid.isGratis == true) continue
+
+            val rawNumbers = grid.numbers
+            for (raw in rawNumbers) {
+                val clean = raw.trim().filter { it.isDigit() }
+                when (clean.length) {
+                    1 -> balls.add("0$clean")
+                    2 -> balls.add(clean)
+                    3 -> {
+                        // Loto 3 : les 2 derniers chiffres et les 2 premiers
+                        balls.add(clean.takeLast(2))
+                        balls.add(clean.take(2))
+                    }
+                    4 -> {
+                        // Loto 4 : les deux paires de 2 chiffres
+                        balls.add(clean.substring(0, 2))
+                        balls.add(clean.substring(2, 4))
+                    }
+                    5 -> {
+                        // Loto 5 : préfixe + deux paires
+                        balls.add(clean.substring(1, 3))
+                        balls.add(clean.substring(3, 5))
+                    }
+                }
+            }
+        }
+        return balls
+    }
+
+    /**
+     * K. GÉNÉRATION DES 5 MARIAGES GRATUITS (RÈGLE DES 10 BOULES DISTINCTES)
+     * 1. Exactement 5 mariages gratuits par ticket.
+     * 2. Sélection de 10 boules au total (00 à 99).
+     * 3. Les 10 boules sont TOUTES distinctes entre elles (zéro doublon).
+     * 4. Exclusion absolue : aucune des 10 boules ne peut figurer parmi les numéros joués par le client.
+     * 5. Génération stable et déterministe (reproductible tant que les numéros joués ne changent pas).
+     * 6. Montant 0 G (isGratis = true, option = "GRATIS").
+     */
+    fun generateFiveFreeMarriages(
+        paidGrids: List<BetGrid>,
+        preferredSeed: Long? = null
+    ): List<BetGrid> {
+        val excludedBalls = extractAllPlayedBalls(paidGrids)
+
+        // Bassin de 100 boules (00 à 99) filtré par exclusion stricte
+        val availablePool = (0..99)
+            .map { String.format(java.util.Locale.US, "%02d", it) }
+            .filter { !excludedBalls.contains(it) }
+            .toMutableList()
+
+        if (availablePool.size < 10) {
+            return emptyList()
+        }
+
+        // Graine déterministe basée sur les numéros joués ordonnés
+        val signature = paidGrids
+            .filter { it.isGratis != true }
+            .map { "${it.gameType}_${it.numbers.joinToString("-")}" }
+            .sorted()
+            .joinToString(";")
+
+        val seed = preferredSeed ?: (signature.hashCode().toLong() and 0xFFFFFFFFL)
+        val rng = java.util.Random(seed)
+
+        // Tirer exactement 10 boules distinctes sans remise
+        val selectedBalls = mutableListOf<String>()
+        for (i in 0 until 10) {
+            val idx = rng.nextInt(availablePool.size)
+            selectedBalls.add(availablePool.removeAt(idx))
+        }
+
+        // Former les 5 mariages gratuits (paires de 2 boules ordonnées)
+        val freeMarriages = mutableListOf<BetGrid>()
+        for (i in 0 until 5) {
+            val numA = selectedBalls[i * 2]
+            val numB = selectedBalls[i * 2 + 1]
+            val pair = if (numA <= numB) listOf(numA, numB) else listOf(numB, numA)
+
+            freeMarriages.add(
+                BetGrid(
+                    numbers = pair,
+                    betAmount = 0.0,
+                    multiplier = 1,
+                    option = "GRATIS",
+                    gameType = "MARIAGE",
+                    isGratis = true
+                )
+            )
+        }
+
+        return freeMarriages
+    }
 }

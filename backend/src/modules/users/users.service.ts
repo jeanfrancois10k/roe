@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -88,5 +89,38 @@ export class UsersService {
     });
 
     return updated;
+  }
+
+  async changeUserPassword(id: string, newPass: string, adminId: string) {
+    if (!newPass || newPass.trim().length < 6) {
+      throw new BadRequestException('Le mot de passe doit comporter au moins 6 caractères');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(newPass, saltRounds);
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+      select: { id: true, username: true, email: true, role: true },
+    });
+
+    await this.auditService.log({
+      userId: adminId,
+      action: 'ADMIN_PASSWORD_RESET',
+      resource: `User:${id}`,
+      newPayload: { username: updated.username, email: updated.email },
+    });
+
+    return {
+      success: true,
+      message: 'Mot de passe modifié avec succès',
+      user: updated,
+    };
   }
 }

@@ -723,7 +723,7 @@ fun TicketsListScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(text = "Dat & Lè :", color = Color(0xFF616161), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = TicketReceiptUtil.formatHaitiDateTime(previewTicket.createdAt),
+                            text = TicketReceiptUtil.formatHaitiDateTimeSeconds(previewTicket.createdAt),
                             color = Color.Black,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -1010,7 +1010,7 @@ fun TicketsListScreen(
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "Dat & Lè: ${TicketReceiptUtil.formatHaitiDateTime(reprintTicket.createdAt)}",
+                        text = "Dat & Lè: ${TicketReceiptUtil.formatHaitiDateTimeSeconds(reprintTicket.createdAt)}",
                         color = Color(0xFF212121),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -1113,8 +1113,9 @@ fun TicketsListScreen(
                                     fontFamily = FontFamily.Monospace
                                 )
                                 Text(
-                                    text = "xxxx HTG",
-                                    color = Color(0xFF757575),
+                                    text = "GRATUIT",
+                                    color = Color(0xFF2E7D32),
+                                    fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace
                                 )

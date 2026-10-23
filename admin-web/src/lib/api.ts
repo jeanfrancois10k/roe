@@ -20,7 +20,9 @@ export async function apiRequest<T = any>(
     headers,
   });
 
-  if (response.status === 401) {
+  const isLoginEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/vendor-pin');
+
+  if (response.status === 401 && !isLoginEndpoint) {
     if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
       localStorage.removeItem('roe_access_token');
       localStorage.removeItem('roe_user');

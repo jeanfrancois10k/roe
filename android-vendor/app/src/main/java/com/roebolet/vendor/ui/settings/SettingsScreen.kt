@@ -1,11 +1,16 @@
 package com.roebolet.vendor.ui.settings
 
 import android.annotation.SuppressLint
+import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -18,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roebolet.vendor.ui.theme.*
@@ -43,11 +47,22 @@ fun SettingsScreen(
     var serverUrlInput by remember { mutableStateOf(currentServerUrl) }
     val isHt = currentLanguage == AppLanguage.CREOLE
 
+    // Détection automatique de l'imprimante Bluetooth appairée si aucune n'est enregistrée
+    val pairedPrinters = remember { ThermalPrinterService.getPairedPrinters(context) }
     var preferredPrinterName by remember {
-        mutableStateOf(
-            ThermalPrinterService.getPreferredPrinterName(context)
-                ?: if (isHt) "Okenn enprimant chwazi" else "Aucune imprimante choisie"
-        )
+        val savedName = ThermalPrinterService.getPreferredPrinterName(context)
+        val defaultName = if (isHt) "Okenn enprimant chwazi" else "Aucune imprimante choisie"
+        if (!savedName.isNullOrEmpty()) {
+            mutableStateOf(savedName)
+        } else if (pairedPrinters.isNotEmpty()) {
+            val autoDev = pairedPrinters.first()
+            @SuppressLint("MissingPermission")
+            val autoName = try { autoDev.name ?: "Enprimant POS" } catch (_: Exception) { "Enprimant POS" }
+            ThermalPrinterService.setPreferredPrinter(context, autoDev.address, autoName)
+            mutableStateOf(autoName)
+        } else {
+            mutableStateOf(defaultName)
+        }
     }
     var showPrinterPicker by remember { mutableStateOf(false) }
     var isPrintingTest by remember { mutableStateOf(false) }
@@ -56,11 +71,13 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(RoeBackground)
-            .padding(14.dp)
+            .padding(horizontal = 14.dp)
     ) {
-        // En-tête
+        // En-tête fixe en haut
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -97,7 +114,14 @@ fun SettingsScreen(
             Box(modifier = Modifier.size(40.dp))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Zone de contenu avec scroll vertical pour compatibilité totale avec tous les écrans POS/mobiles
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 36.dp)
+        ) {
 
         // Section 0 : Langue de l'application / Lang Aplikasyon
         Text(
@@ -415,7 +439,8 @@ fun SettingsScreen(
                 )
             }
         }
-    }
+        } // Fin Column avec scroll vertical
+    } // Fin Column racine
 
     // Modal de Sélection de l'Imprimante Bluetooth
     if (showPrinterPicker) {
@@ -436,9 +461,9 @@ fun SettingsScreen(
                     if (pairedDevices.isEmpty()) {
                         Text(
                             text = if (isHt)
-                                "Pa gen okenn aparèy Bluetooth ki apparié.\n\nTanpri ale nan Paramèt Bluetooth telefòn lan, apparier enprimant tèmik la (egz: MPT-II, POS-58, PT-210), epi retounen la a."
+                                "Pa gen okenn aparèy Bluetooth ki apparié.\n\nTanpri klike sou bouton anba a pou louvri paramèt Bluetooth yo, apparier enprimant tèmik la (egz: MPT-II, POS-58, PT-210), epi retounen la a."
                             else
-                                "Aucun appareil Bluetooth appairé trouvé.\n\nVeuillez vous rendre dans les Paramètres Bluetooth d'Android, associer votre imprimante thermique (ex: POS-58, MPT-II), puis revenir ici.",
+                                "Aucun appareil Bluetooth appairé trouvé.\n\nVeuillez cliquer sur le bouton ci-dessous pour ouvrir les Paramètres Bluetooth d'Android, associer votre imprimante thermique (ex: POS-58, MPT-II), puis revenir ici.",
                             color = RoeTextMuted,
                             fontSize = 12.sp
                         )
@@ -482,6 +507,33 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+
+                    // Bouton Raccourci vers les Paramètres Bluetooth du système Android
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, if (isHt) "Enposib pou louvri paramèt Bluetooth yo" else "Impossible d'ouvrir les paramètres Bluetooth", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = RoeCard),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RoeGold),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null, tint = RoeGold, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isHt) "Ouvri Paramèt Bluetooth Aparèy la" else "Ouvrir Paramètres Bluetooth Android",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             },

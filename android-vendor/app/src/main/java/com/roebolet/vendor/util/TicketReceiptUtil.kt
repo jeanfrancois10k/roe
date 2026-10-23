@@ -15,20 +15,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.roebolet.vendor.R
 import java.util.Calendar
 
 object TicketReceiptUtil {
 
-    // Haïti est sur UTC-4 / GMT-4 en période d'heure d'été (EDT)
-    val HAITI_TIMEZONE: java.util.TimeZone = java.util.TimeZone.getTimeZone("GMT-4")
+    // Fuseau horaire officiel d'Haïti (America/Port-au-Prince / EDT UTC-4 en été, EST UTC-5 en hiver)
+    val HAITI_TIMEZONE: java.util.TimeZone = java.util.TimeZone.getTimeZone("America/Port-au-Prince")
 
     /**
-     * Parse un horodatage ISO (UTC) et le convertit précisément dans le fuseau d'Haïti (GMT-4)
+     * Parse un horodatage ISO (UTC) et le convertit précisément dans le fuseau officiel d'Haïti
      */
     fun parseHaitiCalendar(isoString: String?): java.util.Calendar? {
         if (isoString.isNullOrEmpty()) return null
@@ -43,6 +46,27 @@ object TicketReceiptUtil {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Retourne la date et heure courante en heure d'Haïti formatée (ex: "2026-10-22 09:50:00")
+     */
+    fun currentHaitiDateTimeString(): String {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        sdf.timeZone = HAITI_TIMEZONE
+        return sdf.format(java.util.Date())
+    }
+
+    /**
+     * Formate un horodatage ISO (UTC) en heure d'Haïti au format "yyyy-MM-dd HH:mm:ss"
+     * Convertit automatiquement depuis UTC vers l'heure civile d'Haïti.
+     */
+    fun formatHaitiDateTimeSeconds(isoString: String?): String {
+        if (isoString.isNullOrEmpty()) return currentHaitiDateTimeString()
+        val cal = parseHaitiCalendar(isoString) ?: return currentHaitiDateTimeString()
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        sdf.timeZone = HAITI_TIMEZONE
+        return sdf.format(cal.time)
     }
 
     /**
@@ -290,14 +314,15 @@ object TicketReceiptUtil {
 }
 
 /**
- * Composant Compose pour l'en-tête du ticket : affiche le logo officiel si configuré,
- * ou le croissant de lune 🌙 par défaut.
+ * Composant Compose pour l'en-tête du ticket : affiche le logo officiel ROE BOLET.
+ * Si un logo personnalisé Base64 est configuré sur le serveur, il est affiché.
+ * Sinon, le logo officiel embarqué de l'application (R.drawable.app_logo) est TOUJOURS affiché par défaut.
  */
 @Composable
 fun LotteryLogoView(
     logoUrl: String?,
     modifier: Modifier = Modifier,
-    fallbackEmoji: String = "🌙"
+    fallbackEmoji: String = ""
 ) {
     val bitmap = remember(logoUrl) {
         if (!logoUrl.isNullOrEmpty() && (logoUrl.startsWith("data:image") || logoUrl.length > 50)) {
@@ -307,26 +332,30 @@ fun LotteryLogoView(
         }
     }
 
-    if (bitmap != null) {
-        Box(
-            modifier = modifier
-                .padding(vertical = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
+    Box(
+        modifier = modifier.padding(vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = "Logo Borlette",
+                contentDescription = "Logo Officiel ROE BOLET",
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .heightIn(max = 52.dp)
-                    .widthIn(max = 140.dp)
+                    .heightIn(max = 56.dp)
+                    .widthIn(max = 160.dp)
+            )
+        } else {
+            // Toujours afficher le vrai logo embarqué dans l'application par défaut
+            Image(
+                painter = painterResource(id = R.drawable.app_logo),
+                contentDescription = "Logo Officiel ROE BOLET",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .heightIn(max = 56.dp)
+                    .widthIn(max = 160.dp)
             )
         }
-    } else {
-        Text(
-            text = fallbackEmoji,
-            fontSize = 28.sp,
-            modifier = modifier.padding(vertical = 2.dp)
-        )
     }
 }
 

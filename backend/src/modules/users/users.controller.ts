@@ -39,4 +39,14 @@ export class UsersController {
   ) {
     return this.usersService.toggleActive(id, isActive, adminId);
   }
+
+  @Patch(':id/password')
+  @Roles(Role.SUPER_ADMIN)
+  async updatePassword(
+    @Param('id') id: string,
+    @Body('password') password: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.usersService.changeUserPassword(id, password, adminId);
+  }
 }
