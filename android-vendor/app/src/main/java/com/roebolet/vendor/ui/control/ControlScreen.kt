@@ -330,6 +330,66 @@ fun ControlScreen(
                     // ONGLET 1 : RÈGLEMAN & CAISSE
                     // ==========================================
 
+                    // 0. SOLDE DISPONIBLE / GAINS À PAYER / CRÉDITS CENTRAL
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            color = RoeSurface,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, RoeSuccess.copy(alpha = 0.5f)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(if (isHt) "Sòld Dispo" else "Solde Dispo", color = RoeSuccess, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "${String.format(java.util.Locale.US, "%.0f", Math.max(0.0, controlSummary?.currentBalance ?: 0.0))} G",
+                                    color = RoeSuccess,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+
+                        Surface(
+                            color = RoeSurface,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, RoeGold.copy(alpha = 0.5f)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(if (isHt) "Gains Pou Peye" else "Gains à Payer", color = RoeGold, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "${String.format(java.util.Locale.US, "%.0f", controlSummary?.unpaidPrizesAmount ?: 0.0)} G",
+                                    color = RoeGold,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+
+                        Surface(
+                            color = RoeSurface,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF60A5FA).copy(alpha = 0.5f)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(if (isHt) "Kredi Santral" else "Crédits Central", color = Color(0xFF60A5FA), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "${String.format(java.util.Locale.US, "%.0f", controlSummary?.centralCreditsAmount ?: 0.0)} G",
+                                    color = Color(0xFF60A5FA),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+
                     // 1. VENTES TOTALES (Gross Sales)
                     Surface(
                         color = RoeSurface,

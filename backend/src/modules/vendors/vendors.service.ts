@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -110,8 +111,8 @@ export class VendorsService {
           status: VendorStatus.ACTIVE,
           currentBalance: initialBalance,
           creditLimit: dto.creditLimit ?? 0,
-          dailySalesLimit: dto.dailySalesLimit ?? 5000,
-          maxTicketAmount: dto.maxTicketAmount ?? 500,
+          dailySalesLimit: dto.dailySalesLimit ?? 100000,
+          maxTicketAmount: dto.maxTicketAmount ?? 10000,
           defaultCommissionRate: dto.defaultCommissionRate ?? 5.0,
         },
         include: {
@@ -213,19 +214,92 @@ export class VendorsService {
       }),
     ]);
 
+    const vendorIds = items.map((v) => v.id);
+
+    const [unpaidWinnersByVendor, paidWinnersByVendor, centralCreditsByVendor] =
+      vendorIds.length > 0
+        ? await Promise.all([
+            this.prisma.ticket.groupBy({
+              by: ['vendorId'],
+              where: {
+                vendorId: { in: vendorIds },
+                status: TicketStatus.CONFIRMED,
+                isWinner: true,
+                payoutStatus: TicketPayoutStatus.UNPAID,
+              },
+              _sum: { wonAmount: true },
+              _count: { id: true },
+            }),
+            this.prisma.ticket.groupBy({
+              by: ['paidByVendorId'],
+              where: {
+                paidByVendorId: { in: vendorIds },
+                payoutStatus: TicketPayoutStatus.PAID,
+              },
+              _sum: { wonAmount: true },
+              _count: { id: true },
+            }),
+            this.prisma.transaction.groupBy({
+              by: ['vendorId'],
+              where: {
+                vendorId: { in: vendorIds },
+                type: { in: [TransactionType.DEPOSIT, TransactionType.ADJUSTMENT] },
+                amount: { gt: 0 },
+                NOT: { reference: { startsWith: 'INIT-DEP-' } },
+              },
+              _sum: { amount: true },
+              _count: { id: true },
+            }),
+          ])
+        : [[], [], []];
+
+    const unpaidMap = new Map(
+      unpaidWinnersByVendor.map((u) => [
+        u.vendorId,
+        { amount: Number(u._sum.wonAmount || 0), count: u._count.id || 0 },
+      ]),
+    );
+    const paidMap = new Map(
+      paidWinnersByVendor.map((p) => [
+        p.paidByVendorId || '',
+        { amount: Number(p._sum.wonAmount || 0), count: p._count.id || 0 },
+      ]),
+    );
+    const creditsMap = new Map(
+      centralCreditsByVendor.map((c) => [
+        c.vendorId,
+        { amount: Number(c._sum.amount || 0), count: c._count.id || 0 },
+      ]),
+    );
+
     return {
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-      items: items.map((v) => ({
-        ...v,
-        currentBalance: Math.abs(Number(v.currentBalance)),
-        creditLimit: Number(v.creditLimit),
-        dailySalesLimit: Number(v.dailySalesLimit),
-        maxTicketAmount: Number(v.maxTicketAmount),
-        defaultCommissionRate: Number(v.defaultCommissionRate),
-      })),
+      items: items.map((v) => {
+        const currentBalance = Number(v.currentBalance);
+        const unpaid = unpaidMap.get(v.id) || { amount: 0, count: 0 };
+        const paid = paidMap.get(v.id) || { amount: 0, count: 0 };
+        const credits = creditsMap.get(v.id) || { amount: 0, count: 0 };
+        const shortfallAmount = Math.max(0, Number((unpaid.amount - currentBalance).toFixed(2)));
+
+        return {
+          ...v,
+          currentBalance,
+          unpaidPrizesAmount: unpaid.amount,
+          unpaidPrizesCount: unpaid.count,
+          shortfallAmount,
+          centralCreditsAmount: credits.amount,
+          centralCreditsCount: credits.count,
+          prizesPaidAmount: paid.amount,
+          prizesPaidCount: paid.count,
+          creditLimit: Number(v.creditLimit),
+          dailySalesLimit: Number(v.dailySalesLimit),
+          maxTicketAmount: Number(v.maxTicketAmount),
+          defaultCommissionRate: Number(v.defaultCommissionRate),
+        };
+      }),
     };
   }
 
@@ -254,7 +328,7 @@ export class VendorsService {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
-    const [todaySales, monthSales, totalTickets] = await Promise.all([
+    const [todaySales, monthSales, totalTickets, unpaidWinnersAgg, paidWinnersAgg, centralCreditsAgg] = await Promise.all([
       this.prisma.ticket.aggregate({
         where: {
           vendorId: id,
@@ -277,11 +351,51 @@ export class VendorsService {
       this.prisma.ticket.count({
         where: { vendorId: id },
       }),
+      this.prisma.ticket.aggregate({
+        where: {
+          vendorId: id,
+          status: TicketStatus.CONFIRMED,
+          isWinner: true,
+          payoutStatus: TicketPayoutStatus.UNPAID,
+        },
+        _sum: { wonAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.ticket.aggregate({
+        where: {
+          paidByVendorId: id,
+          payoutStatus: TicketPayoutStatus.PAID,
+        },
+        _sum: { wonAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          vendorId: id,
+          type: { in: [TransactionType.DEPOSIT, TransactionType.ADJUSTMENT] },
+          amount: { gt: 0 },
+          NOT: { reference: { startsWith: 'INIT-DEP-' } },
+        },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
     ]);
+
+    const currentBalance = Number(vendor.currentBalance);
+    const unpaidPrizesAmount = Number(unpaidWinnersAgg._sum.wonAmount || 0);
+    const unpaidPrizesCount = unpaidWinnersAgg._count.id || 0;
+    const shortfallAmount = Math.max(0, Number((unpaidPrizesAmount - currentBalance).toFixed(2)));
+    const centralCreditsAmount = Number(centralCreditsAgg._sum.amount || 0);
+    const prizesPaidAmount = Number(paidWinnersAgg._sum.wonAmount || 0);
 
     return {
       ...vendor,
-      currentBalance: Math.abs(Number(vendor.currentBalance)),
+      currentBalance,
+      unpaidPrizesAmount,
+      unpaidPrizesCount,
+      shortfallAmount,
+      centralCreditsAmount,
+      prizesPaidAmount,
       creditLimit: Number(vendor.creditLimit),
       dailySalesLimit: Number(vendor.dailySalesLimit),
       maxTicketAmount: Number(vendor.maxTicketAmount),
@@ -291,6 +405,11 @@ export class VendorsService {
         todayTicketsCount: todaySales._count.id || 0,
         monthSalesAmount: Number(monthSales._sum.totalAmount || 0),
         totalTicketsCount: totalTickets,
+        unpaidPrizesAmount,
+        unpaidPrizesCount,
+        shortfallAmount,
+        centralCreditsAmount,
+        prizesPaidAmount,
       },
     };
   }
@@ -497,42 +616,82 @@ export class VendorsService {
   }
 
   /**
-   * Régularisation manuelle du solde (ADJUSTMENT) avec grand livre immuable
+   * Régularisation manuelle du solde / Couverture de gain client (ADJUSTMENT) avec grand livre immuable et protection anti-double crédit
    */
   async adjustBalance(vendorId: string, dto: BalanceAdjustmentDto, adminId: string) {
-    return await this.prisma.$transaction(async (tx) => {
-      const vendor = await tx.vendor.findUnique({
-        where: { id: vendorId },
-      });
+    if (dto.amount === undefined || dto.amount === null || Number(dto.amount) === 0 || Number.isNaN(Number(dto.amount))) {
+      throw new BadRequestException('Veuillez saisir un montant valide non nul.');
+    }
 
-      if (!vendor) {
+    const cleanAmount = Number(Number(dto.amount).toFixed(2));
+    const cleanReason = (dto.reason || 'Couverture du gain client').trim();
+    if (!cleanReason) {
+      throw new BadRequestException('Le motif de l’opération est obligatoire.');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Verrouillage pessimiste de la ligne du vendeur
+      const [lockedVendor] = await tx.$queryRaw<
+        Array<{ id: string; currentBalance: any; creditLimit: any; vendorCode: string }>
+      >`
+        SELECT "id", "currentBalance", "creditLimit", "vendorCode"
+        FROM "Vendor"
+        WHERE "id" = ${vendorId}::uuid
+        FOR UPDATE
+      `;
+
+      if (!lockedVendor) {
         throw new NotFoundException('Vendeur introuvable');
       }
 
-      const balanceBefore = Number(vendor.currentBalance);
-      const balanceAfter = balanceBefore + dto.amount;
+      // 2. Protection anti-double crédit (empêche la soumission en double dans les 15 secondes)
+      const duplicateWindow = new Date(Date.now() - 15000);
+      const recentDuplicate = await tx.transaction.findFirst({
+        where: {
+          vendorId,
+          type: { in: [TransactionType.ADJUSTMENT, TransactionType.DEPOSIT] },
+          amount: cleanAmount,
+          description: cleanReason,
+          createdAt: { gte: duplicateWindow },
+        },
+      });
+      if (recentDuplicate) {
+        throw new ConflictException(
+          `Protection anti-double crédit : cette opération (${cleanAmount} HTG — "${cleanReason}") vient déjà d'être enregistrée il y a quelques secondes.`,
+        );
+      }
 
-      if (balanceAfter < 0 && Math.abs(balanceAfter) > Number(vendor.creditLimit)) {
+      const balanceBefore = Number(lockedVendor.currentBalance);
+      const balanceAfter = Number((balanceBefore + cleanAmount).toFixed(2));
+
+      if (balanceAfter < 0 && Math.abs(balanceAfter) > Number(lockedVendor.creditLimit)) {
         throw new BadRequestException('Opération impossible : solde après ajustement inférieur au découvert autorisé.');
       }
 
-      // Mise à jour solde
+      // 3. Mise à jour du solde vendeur
       const updatedVendor = await tx.vendor.update({
         where: { id: vendorId },
-        data: { currentBalance: balanceAfter },
+        data: {
+          currentBalance: balanceAfter,
+          lastActivityAt: new Date(),
+        },
       });
 
-      // Écriture Ledger
+      // 4. Écriture Ledger immuable
       const transaction = await tx.transaction.create({
         data: {
           vendorId,
           operatorId: adminId,
           type: TransactionType.ADJUSTMENT,
-          amount: dto.amount,
+          amount: cleanAmount,
           balanceBefore,
           balanceAfter,
           reference: `ADJ-${crypto.randomBytes(6).toString('hex').toUpperCase()}`,
-          description: dto.reason,
+          description: cleanReason,
+        },
+        include: {
+          vendor: { select: { id: true, vendorCode: true, fullName: true } },
+          operator: { select: { id: true, username: true } },
         },
       });
 
@@ -541,18 +700,34 @@ export class VendorsService {
         action: 'VENDOR_BALANCE_ADJUSTED',
         resource: `Vendor:${vendorId}`,
         newPayload: {
-          amount: dto.amount,
+          amount: cleanAmount,
           balanceBefore,
           balanceAfter,
-          reason: dto.reason,
+          reason: cleanReason,
         },
       });
+
+      // 5. Notification temps réel vers le terminal vendeur et le dashboard admin
+      this.realtimeGateway.notifyVendorBalanceUpdated(
+        vendorId,
+        balanceAfter,
+        cleanAmount,
+        cleanReason,
+      );
 
       return {
         success: true,
         message: 'Ajustement de solde enregistré dans le Grand Livre.',
-        vendor: updatedVendor,
-        transaction,
+        vendor: {
+          ...updatedVendor,
+          currentBalance: Number(updatedVendor.currentBalance),
+        },
+        transaction: {
+          ...transaction,
+          amount: Number(transaction.amount),
+          balanceBefore: Number(transaction.balanceBefore),
+          balanceAfter: Number(transaction.balanceAfter),
+        },
       };
     });
   }
@@ -806,7 +981,55 @@ export class VendorsService {
     // 5. Cash net en caisse théorique (Ventes - Lots Payés)
     const cashInHand = Number((totalSales - prizesPaid).toFixed(2));
 
-    const currencySetting = await this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } });
+    // 6. Gains à payer (en attente) & Crédits reçus du Central & Transactions récentes
+    const [unpaidWinnersAgg, centralCreditsAgg, initialDepositAgg, recentTransactions, currencySetting] =
+      await Promise.all([
+        this.prisma.ticket.aggregate({
+          where: {
+            vendorId,
+            status: TicketStatus.CONFIRMED,
+            isWinner: true,
+            payoutStatus: TicketPayoutStatus.UNPAID,
+          },
+          _sum: { wonAmount: true },
+          _count: { _all: true },
+        }),
+        this.prisma.transaction.aggregate({
+          where: {
+            vendorId,
+            type: { in: [TransactionType.DEPOSIT, TransactionType.ADJUSTMENT] },
+            amount: { gt: 0 },
+            NOT: { reference: { startsWith: 'INIT-DEP-' } },
+          },
+          _sum: { amount: true },
+          _count: { _all: true },
+        }),
+        this.prisma.transaction.aggregate({
+          where: {
+            vendorId,
+            type: TransactionType.DEPOSIT,
+            reference: { startsWith: 'INIT-DEP-' },
+          },
+          _sum: { amount: true },
+        }),
+        this.prisma.transaction.findMany({
+          where: { vendorId },
+          orderBy: { createdAt: 'desc' },
+          take: 15,
+          include: {
+            operator: { select: { username: true } },
+          },
+        }),
+        this.prisma.systemSetting.findUnique({ where: { key: 'DEFAULT_CURRENCY' } }),
+      ]);
+
+    const currentBalance = Number(vendor.currentBalance);
+    const unpaidPrizesAmount = Number(unpaidWinnersAgg._sum.wonAmount || 0);
+    const unpaidPrizesCount = unpaidWinnersAgg._count._all || 0;
+    const shortfallAmount = Math.max(0, Number((unpaidPrizesAmount - currentBalance).toFixed(2)));
+    const centralCreditsAmount = Number(centralCreditsAgg._sum.amount || 0);
+    const centralCreditsCount = centralCreditsAgg._count._all || 0;
+    const initialBalanceAmount = Number(initialDepositAgg._sum.amount || 0);
     const currency = currencySetting?.value || 'HTG';
 
     return {
@@ -821,10 +1044,27 @@ export class VendorsService {
       commissionAmount,
       prizesPaid,
       prizesPaidCount,
+      unpaidPrizesAmount,
+      unpaidPrizesCount,
+      shortfallAmount,
+      centralCreditsAmount,
+      centralCreditsCount,
+      initialBalanceAmount,
       netDueToOwner,
       cashInHand,
-      currentBalance: Math.abs(Number(vendor.currentBalance)),
+      currentBalance,
       currency,
+      recentTransactions: recentTransactions.map((tx) => ({
+        id: tx.id,
+        reference: tx.reference,
+        type: tx.type,
+        amount: Number(tx.amount),
+        balanceBefore: Number(tx.balanceBefore),
+        balanceAfter: Number(tx.balanceAfter),
+        description: tx.description,
+        operatorUsername: tx.operator?.username || 'Système',
+        createdAt: tx.createdAt,
+      })),
     };
   }
 }

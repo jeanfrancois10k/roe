@@ -287,7 +287,10 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (res.isSuccessful && res.body() != null) {
-                        controlSummary = res.body()
+                        val body = res.body()!!
+                        controlSummary = body
+                        balance = body.currentBalance
+                        prefs.updateBalance(body.currentBalance)
                     } else {
                         val errBody = res.errorBody()?.string() ?: ""
                         val msg = try {
@@ -467,7 +470,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Configuration du KILL SWITCH
+        // Configuration du KILL SWITCH & Mise à jour temps réel du Solde
         LaunchedEffect(Unit) {
             socketManager.setOnForceLogoutListener { reason ->
                 prefs.clearSession()
@@ -475,6 +478,18 @@ class MainActivity : ComponentActivity() {
                 currentScreen = "DASHBOARD"
                 errorMessage = "🚨 VERROUILLAGE SÉCURITÉ : $reason"
                 Toast.makeText(this@MainActivity, reason, Toast.LENGTH_LONG).show()
+            }
+
+            socketManager.setOnBalanceUpdatedListener { newBal, amt, reason ->
+                balance = newBal
+                prefs.updateBalance(newBal)
+                fetchControlSummary()
+                val sign = if (amt >= 0) "+" else ""
+                Toast.makeText(
+                    this@MainActivity,
+                    "💰 Solde mis à jour ($sign${String.format(java.util.Locale.US, "%.2f", amt)} HTG) — $reason. Nouveau solde : ${String.format(java.util.Locale.US, "%.2f", newBal)} HTG",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
 
@@ -485,6 +500,7 @@ class MainActivity : ComponentActivity() {
                 if (vendorId.isNotEmpty()) {
                     socketManager.connect(prefs.getServerUrl(), vendorId, deviceUuid)
                 }
+                fetchControlSummary()
             } else {
                 socketManager.disconnect()
             }
@@ -626,11 +642,8 @@ class MainActivity : ComponentActivity() {
                                         val lastSale = successfulSales.lastOrNull()
                                         if (lastSale?.newBalance != null) {
                                             balance = lastSale.newBalance!!
-                                        } else {
-                                            val defaultComm = totalCharged * 0.05
-                                            balance -= (totalCharged - defaultComm)
+                                            prefs.updateBalance(balance)
                                         }
-                                        prefs.updateBalance(balance)
                                         soldTicketResults = successfulSales
                                         fetchVendorTickets()
                                     }
@@ -731,13 +744,20 @@ class MainActivity : ComponentActivity() {
                                             balance = body.vendor.newBalance
                                             prefs.updateBalance(body.vendor.newBalance)
                                         }
+                                        fetchControlSummary()
                                         verifyResult = verifyResult?.copy(
                                             canBePaid = false,
                                             statusKey = "ALREADY_PAID",
                                             statusLabel = "TICKET DÉJÀ PAYÉ"
                                         )
                                     } else {
-                                        verifyError = "Erreur de paiement : ce ticket a peut-être déjà été payé."
+                                        val errBody = response.errorBody()?.string() ?: ""
+                                        val serverMsg = try {
+                                            org.json.JSONObject(errBody).optString("message", "Erreur de paiement : solde insuffisant ou ticket déjà payé.")
+                                        } catch (e: Exception) {
+                                            "Erreur de paiement (HTTP ${response.code()})"
+                                        }
+                                        verifyError = serverMsg
                                     }
                                 } catch (e: Exception) {
                                     verifyError = "Erreur : ${e.localizedMessage ?: "Impossible de finaliser le paiement"}"
@@ -851,7 +871,10 @@ class MainActivity : ComponentActivity() {
                         vendorCode = vendorCode,
                         vendorName = vendorName,
                         balance = balance,
+                        controlSummary = controlSummary,
+                        isLoading = isLoadingControl,
                         currentLanguage = currentLanguage,
+                        onRefreshClick = { fetchControlSummary() },
                         onBackClick = { currentScreen = "DASHBOARD" }
                     )
                 }
@@ -892,6 +915,7 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = "VERIFY_TICKET"
                                     verifyResult = null
                                     verifyError = null
+                                    fetchControlSummary()
                                     if (vendorTickets.isEmpty()) {
                                         fetchVendorTickets()
                                     }
@@ -900,6 +924,7 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = "VERIFY_TICKET"
                                     verifyResult = null
                                     verifyError = null
+                                    fetchControlSummary()
                                 }
                                 "TICKETS", "FICH YO", "HISTORY", "HISTORIQUE", "ISTORIK" -> {
                                     currentScreen = "TICKETS_LIST"
@@ -917,6 +942,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 "BALANCE", "KONT MWEN", "MON COMPTE", "COMPTE" -> {
                                     currentScreen = "BALANCE_DETAILS"
+                                    fetchControlSummary()
                                 }
                                 "REPORTS", "RAPÒ", "RAPÒ VANT", "RAPPORTS" -> {
                                     currentScreen = "REPORTS"

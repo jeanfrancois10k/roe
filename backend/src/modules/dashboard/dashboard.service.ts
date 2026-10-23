@@ -24,6 +24,9 @@ export class DashboardService {
       totalTicketsSold,
       winningTicketsCount,
       paidPrizes,
+      unpaidPrizes,
+      centralCredits,
+      vendorBalancesAgg,
       commissionsAgg,
       recentTransactions,
       recentAuditLogs,
@@ -53,6 +56,30 @@ export class DashboardService {
         },
         _sum: { wonAmount: true },
       }),
+      this.prisma.ticket.aggregate({
+        where: {
+          status: 'CONFIRMED',
+          isWinner: true,
+          payoutStatus: 'UNPAID',
+          ...ticketFilter,
+        },
+        _sum: { wonAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          type: { in: ['DEPOSIT', 'ADJUSTMENT'] },
+          amount: { gt: 0 },
+          NOT: { reference: { startsWith: 'INIT-DEP-' } },
+          ...transactionFilter,
+        },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.vendor.aggregate({
+        where: vendorId ? { id: vendorId } : {},
+        _sum: { currentBalance: true },
+      }),
       this.prisma.transaction.aggregate({
         where: { type: 'COMMISSION', ...transactionFilter },
         _sum: { amount: true },
@@ -63,6 +90,7 @@ export class DashboardService {
         orderBy: { createdAt: 'desc' },
         include: {
           vendor: { select: { vendorCode: true, fullName: true } },
+          operator: { select: { username: true } },
         },
       }),
       this.prisma.auditLog.findMany({
@@ -99,6 +127,12 @@ export class DashboardService {
     const todaySalesAmount = Number(todaySales._sum.totalAmount || 0);
     const monthSalesAmount = Number(monthSales._sum.totalAmount || 0);
     const paidPrizesAmount = Number(paidPrizes._sum.wonAmount || 0);
+    const unpaidPrizesAmount = Number(unpaidPrizes._sum.wonAmount || 0);
+    const unpaidPrizesCount = unpaidPrizes._count.id || 0;
+    const centralCreditsAmount = Number(centralCredits._sum.amount || 0);
+    const centralCreditsCount = centralCredits._count.id || 0;
+    const totalVendorAvailableBalance = Number(vendorBalancesAgg._sum.currentBalance || 0);
+    const shortfallAmount = Math.max(0, Number((unpaidPrizesAmount - totalVendorAvailableBalance).toFixed(2)));
     const commissionsAmount = Number(commissionsAgg._sum.amount || 0);
 
     // Chiffre d'affaires brut et net
@@ -107,6 +141,15 @@ export class DashboardService {
 
     // Alertes automatiques
     const alerts = [];
+    if (shortfallAmount > 0) {
+      alerts.push({
+        id: 'alert-coverage-needed',
+        type: 'WARNING',
+        title: `Couverture de gain requise : ${shortfallAmount.toLocaleString('fr-FR')} HTG manquants`,
+        message: `Gains à payer (${unpaidPrizesAmount.toLocaleString('fr-FR')} HTG) supérieurs au solde disponible (${totalVendorAvailableBalance.toLocaleString('fr-FR')} HTG). Attribuez les fonds manquants au vendeur.`,
+        count: unpaidPrizesCount,
+      });
+    }
     if (suspendedVendorsCount > 0 && !vendorId) {
       alerts.push({
         id: 'alert-suspended',
@@ -139,6 +182,12 @@ export class DashboardService {
         totalTicketsSold,
         winningTicketsCount,
         paidPrizesAmount,
+        unpaidPrizesAmount,
+        unpaidPrizesCount,
+        centralCreditsAmount,
+        centralCreditsCount,
+        totalVendorAvailableBalance,
+        shortfallAmount,
         commissionsAmount,
         grossRevenue,
         netRevenue,
@@ -149,7 +198,12 @@ export class DashboardService {
       selectedVendor: selectedVendor
         ? {
             ...selectedVendor,
-            currentBalance: Math.abs(Number(selectedVendor.currentBalance)),
+            currentBalance: Number(selectedVendor.currentBalance),
+            unpaidPrizesAmount,
+            unpaidPrizesCount,
+            centralCreditsAmount,
+            shortfallAmount,
+            paidPrizesAmount,
             defaultCommissionRate: Number(selectedVendor.defaultCommissionRate),
             creditLimit: Number(selectedVendor.creditLimit),
           }

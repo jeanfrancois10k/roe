@@ -70,10 +70,14 @@ export default function DashboardPage() {
     socket.on('vendor:heartbeat-ping', () => {
       fetchStats();
     });
+    socket.on('vendor:balance-updated', () => {
+      fetchStats();
+    });
 
     return () => {
       socket.off('vendor:status-change');
       socket.off('vendor:heartbeat-ping');
+      socket.off('vendor:balance-updated');
     };
   }, []);
 
@@ -100,6 +104,11 @@ export default function DashboardPage() {
     totalTicketsSold: 0,
     winningTicketsCount: 0,
     paidPrizesAmount: 0,
+    unpaidPrizesAmount: 0,
+    unpaidPrizesCount: 0,
+    totalVendorAvailableBalance: 0,
+    centralCreditsAmount: 0,
+    shortfallAmount: 0,
     commissionsAmount: 0,
     netRevenue: 0,
     currency: 'HTG',
@@ -215,7 +224,35 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 pt-1">
+                <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-emerald-500/30">
+                  <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Solde Disponible</p>
+                  <p className="text-base sm:text-xl font-black text-emerald-300 font-mono mt-1">
+                    {formatCurrency(overview.totalVendorAvailableBalance ?? 0, activeCurrency)}
+                  </p>
+                  <p className="text-[10px] text-roe-textMuted mt-0.5">Réserve pour payer les gains</p>
+                </div>
+
+                <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-amber-500/30">
+                  <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Gains à Payer</p>
+                  <p className="text-base sm:text-xl font-black text-amber-300 font-mono mt-1">
+                    {formatCurrency(overview.unpaidPrizesAmount ?? 0, activeCurrency)}
+                  </p>
+                  <p className="text-[10px] text-roe-textMuted mt-0.5">
+                    {overview.shortfallAmount > 0
+                      ? `⚠️ Manque ${formatCurrency(overview.shortfallAmount, activeCurrency)}`
+                      : `${overview.unpaidPrizesCount || 0} ticket(s) en attente`}
+                  </p>
+                </div>
+
+                <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-blue-500/30">
+                  <p className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Crédits Central</p>
+                  <p className="text-base sm:text-xl font-black text-blue-300 font-mono mt-1">
+                    {formatCurrency(overview.centralCreditsAmount ?? 0, activeCurrency)}
+                  </p>
+                  <p className="text-[10px] text-roe-textMuted mt-0.5">Fonds attribués par l'Admin</p>
+                </div>
+
                 <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-roe-border">
                   <p className="text-[11px] font-bold text-roe-textMuted uppercase tracking-wider">Ventes Brutes (Jour)</p>
                   <p className="text-base sm:text-xl font-black text-white font-mono mt-1">
@@ -225,19 +262,11 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-roe-border">
-                  <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Commission Vendeur</p>
-                  <p className="text-base sm:text-xl font-black text-amber-300 font-mono mt-1">
-                    {formatCurrency(overview.commissionsAmount, activeCurrency)}
-                  </p>
-                  <p className="text-[10px] text-roe-textMuted mt-0.5">Taux fixe: {data.selectedVendor.defaultCommissionRate}%</p>
-                </div>
-
-                <div className="p-3 sm:p-4 rounded-xl bg-roe-surface border border-roe-border">
-                  <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Lots Payés aux Joueurs</p>
+                  <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Gains Payés</p>
                   <p className="text-base sm:text-xl font-black text-rose-300 font-mono mt-1">
                     {formatCurrency(overview.paidPrizesAmount, activeCurrency)}
                   </p>
-                  <p className="text-[10px] text-roe-textMuted mt-0.5">Avancés par le vendeur</p>
+                  <p className="text-[10px] text-roe-textMuted mt-0.5">Versés aux clients</p>
                 </div>
 
                 <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-500/20 to-roe-surface border border-emerald-500/40">
@@ -329,6 +358,31 @@ export default function DashboardPage() {
               variant="amber"
             />
             <StatCard
+              title="Solde Disponible Vendeurs"
+              value={formatCurrency(overview.totalVendorAvailableBalance ?? 0, activeCurrency)}
+              subtitle="Fonds disponibles pour payer les gains"
+              icon={Wallet}
+              variant="emerald"
+            />
+            <StatCard
+              title="Gains à Payer (En Attente)"
+              value={formatCurrency(overview.unpaidPrizesAmount ?? 0, activeCurrency)}
+              subtitle={
+                overview.shortfallAmount > 0
+                  ? `⚠️ Manque ${formatCurrency(overview.shortfallAmount, activeCurrency)} à couvrir`
+                  : `${overview.unpaidPrizesCount || 0} ticket(s) gagnant(s) non payé(s)`
+              }
+              icon={Trophy}
+              variant="amber"
+            />
+            <StatCard
+              title="Crédits Reçus du Central"
+              value={formatCurrency(overview.centralCreditsAmount ?? 0, activeCurrency)}
+              subtitle="Couvertures & dépôts attribués par l'Admin"
+              icon={ArrowUpRight}
+              variant="purple"
+            />
+            <StatCard
               title="Gains Payés"
               value={formatCurrency(overview.paidPrizesAmount, activeCurrency)}
               subtitle="Distribués aux joueurs"
@@ -370,7 +424,7 @@ export default function DashboardPage() {
               <div className="space-y-3 flex-1">
                 {data?.recentTransactions && data.recentTransactions.length > 0 ? (
                   data.recentTransactions.map((tx: any) => {
-                    const isPositive = ['DEPOSIT', 'COMMISSION', 'REIMBURSEMENT'].includes(tx.type);
+                    const isPositive = Number(tx.amount) >= 0;
                     return (
                       <div
                         key={tx.id}
@@ -394,6 +448,9 @@ export default function DashboardPage() {
                               </span>
                             </p>
                             <p className="text-[11px] text-roe-textMuted">{tx.description}</p>
+                            <p className="text-[10px] text-roe-textMuted/80 font-mono mt-0.5">
+                              Par: {tx.operator?.username || 'Système'} • {tx.createdAt ? tx.createdAt.replace('T', ' ').slice(0, 16) : ''}
+                            </p>
                           </div>
                         </div>
 

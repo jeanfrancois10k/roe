@@ -254,6 +254,18 @@ data class AppUpdateInfo(
     @SerializedName("isMandatory") val isMandatory: Boolean = false
 )
 
+data class VendorTransactionItem(
+    @SerializedName("id") val id: String,
+    @SerializedName("reference") val reference: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("balanceBefore") val balanceBefore: Double,
+    @SerializedName("balanceAfter") val balanceAfter: Double,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("operatorUsername") val operatorUsername: String? = null,
+    @SerializedName("createdAt") val createdAt: String? = null
+)
+
 data class ControlSummaryResponse(
     @SerializedName("vendorId") val vendorId: String,
     @SerializedName("vendorCode") val vendorCode: String,
@@ -266,10 +278,15 @@ data class ControlSummaryResponse(
     @SerializedName("commissionAmount") val commissionAmount: Double,
     @SerializedName("prizesPaid") val prizesPaid: Double,
     @SerializedName("prizesPaidCount") val prizesPaidCount: Int,
+    @SerializedName("unpaidPrizesAmount") val unpaidPrizesAmount: Double = 0.0,
+    @SerializedName("unpaidPrizesCount") val unpaidPrizesCount: Int = 0,
+    @SerializedName("shortfallAmount") val shortfallAmount: Double = 0.0,
+    @SerializedName("centralCreditsAmount") val centralCreditsAmount: Double = 0.0,
     @SerializedName("netDueToOwner") val netDueToOwner: Double,
     @SerializedName("cashInHand") val cashInHand: Double,
     @SerializedName("currentBalance") val currentBalance: Double,
-    @SerializedName("currency") val currency: String = "HTG"
+    @SerializedName("currency") val currency: String = "HTG",
+    @SerializedName("recentTransactions") val recentTransactions: List<VendorTransactionItem>? = null
 )
 
 data class WinningTicketReportItem(

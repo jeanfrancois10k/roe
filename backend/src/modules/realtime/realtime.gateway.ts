@@ -162,4 +162,20 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   broadcastToAdmins(event: string, payload: any) {
     this.server.to('admin_channel').emit(event, payload);
   }
+
+  /**
+   * Notification temps réel de mise à jour du solde vendeur (Crédit Central / Couverture de Gain / Paiement)
+   */
+  notifyVendorBalanceUpdated(vendorId: string, newBalance: number, amount: number, reason?: string) {
+    if (!this.server) return;
+    const payload = {
+      vendorId,
+      newBalance,
+      amount,
+      reason: reason || 'Mise à jour du solde',
+      timestamp: new Date().toISOString(),
+    };
+    this.server.to(`vendor_${vendorId}`).emit('vendor:balance-updated', payload);
+    this.server.to('admin_channel').emit('vendor:balance-updated', payload);
+  }
 }

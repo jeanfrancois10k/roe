@@ -3,14 +3,17 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DepositDto } from './dto/deposit.dto';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { TransactionQueryDto } from './dto/transaction-query.dto';
-import { TransactionType, Role, Prisma } from '@prisma/client';
+import { TransactionType, TicketStatus, TicketPayoutStatus, Role, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -20,17 +23,24 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    @Optional() private readonly realtimeGateway?: RealtimeGateway,
   ) {}
 
   /**
-   * Crédit / Dépôt de fonds sur le compte d'un vendeur
-   * Opération atomique avec verrouillage pessimiste PostgreSQL
+   * Crédit / Dépôt de fonds sur le compte d'un vendeur (ex: Couverture du gain client)
+   * Opération atomique avec verrouillage pessimiste PostgreSQL et protection anti-double crédit
    */
   async deposit(dto: DepositDto, operatorId: string) {
-    const reference = dto.reference || `DEP-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+    if (!dto.amount || Number(dto.amount) <= 0 || Number.isNaN(Number(dto.amount))) {
+      throw new BadRequestException('Le montant à créditer doit être strictement positif.');
+    }
+
+    const cleanAmount = Number(Number(dto.amount).toFixed(2));
+    const description = (dto.description || 'Couverture du gain client').trim();
+    const reference = dto.reference?.trim() || `DEP-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
 
     return await this.prisma.$transaction(async (tx) => {
-      // 1. Verrouillage pessimiste de la ligne du vendeur
+      // 1. Verrouillage pessimiste de la ligne du vendeur (sérialise toutes les opérations sur ce vendeur)
       const [lockedVendor] = await tx.$queryRaw<Array<{ id: string; currentBalance: any; vendorCode: string }>>`
         SELECT "id", "currentBalance", "vendorCode"
         FROM "Vendor"
@@ -42,10 +52,38 @@ export class TransactionsService {
         throw new NotFoundException('Vendeur introuvable');
       }
 
-      const balanceBefore = Number(lockedVendor.currentBalance);
-      const balanceAfter = Number((balanceBefore + dto.amount).toFixed(2));
+      // 2. Protection anti-double crédit par référence explicite ou soumission identique rapprochée (< 15s)
+      if (dto.reference) {
+        const existingRef = await tx.transaction.findUnique({
+          where: { reference },
+        });
+        if (existingRef) {
+          throw new ConflictException(
+            `Protection anti-double crédit : la référence '${reference}' a déjà été traitée.`,
+          );
+        }
+      }
 
-      // 2. Mise à jour du solde vendeur
+      const duplicateWindow = new Date(Date.now() - 15000);
+      const recentDuplicate = await tx.transaction.findFirst({
+        where: {
+          vendorId: dto.vendorId,
+          type: { in: [TransactionType.DEPOSIT, TransactionType.ADJUSTMENT] },
+          amount: cleanAmount,
+          description,
+          createdAt: { gte: duplicateWindow },
+        },
+      });
+      if (recentDuplicate) {
+        throw new ConflictException(
+          `Protection anti-double crédit : un crédit identique de ${cleanAmount} HTG (${description}) vient déjà d'être enregistré il y a quelques secondes.`,
+        );
+      }
+
+      const balanceBefore = Number(lockedVendor.currentBalance);
+      const balanceAfter = Number((balanceBefore + cleanAmount).toFixed(2));
+
+      // 3. Mise à jour du solde vendeur
       const updatedVendor = await tx.vendor.update({
         where: { id: dto.vendorId },
         data: {
@@ -54,17 +92,17 @@ export class TransactionsService {
         },
       });
 
-      // 3. Écriture immutable dans le Grand Livre (Ledger)
+      // 4. Écriture immutable dans le Grand Livre (Ledger)
       const transaction = await tx.transaction.create({
         data: {
           vendorId: dto.vendorId,
           operatorId,
           type: TransactionType.DEPOSIT,
-          amount: dto.amount,
+          amount: cleanAmount,
           balanceBefore,
           balanceAfter,
           reference,
-          description: dto.description,
+          description,
         },
         include: {
           vendor: { select: { id: true, vendorCode: true, fullName: true } },
@@ -72,22 +110,30 @@ export class TransactionsService {
         },
       });
 
-      // 4. Audit Log
+      // 5. Audit Log
       await this.auditService.log({
         userId: operatorId,
         action: 'VENDOR_DEPOSIT',
         resource: `Vendor:${dto.vendorId}`,
         newPayload: {
-          amount: dto.amount,
+          amount: cleanAmount,
           balanceBefore,
           balanceAfter,
           reference,
-          description: dto.description,
+          description,
         },
       });
 
+      // 6. Notification temps réel vers le terminal vendeur et le dashboard admin
+      this.realtimeGateway?.notifyVendorBalanceUpdated(
+        dto.vendorId,
+        balanceAfter,
+        cleanAmount,
+        description,
+      );
+
       this.logger.log(
-        `Dépôt réussi : +$${dto.amount} pour vendeur ${lockedVendor.vendorCode}. Nouveau solde : $${balanceAfter}`,
+        `Dépôt réussi : +${cleanAmount} HTG pour vendeur ${lockedVendor.vendorCode}. Nouveau solde : ${balanceAfter} HTG`,
       );
 
       return {
@@ -352,17 +398,49 @@ export class TransactionsService {
       count: b._count.id,
     }));
 
-    // Somme totale de toutes les transactions
-    const totalAgg = await this.prisma.transaction.aggregate({
-      where: { vendorId },
-      _sum: { amount: true },
-      _count: { id: true },
-    });
+    // Somme des écritures affectant le solde disponible du compte vendeur (Dépôts, Retraits, Ajustements, Paiements de gains)
+    const [balanceAgg, totalCountAgg, unpaidWinnersAgg, centralCreditsAgg] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          vendorId,
+          type: {
+            in: [
+              TransactionType.DEPOSIT,
+              TransactionType.WITHDRAWAL,
+              TransactionType.ADJUSTMENT,
+              TransactionType.PRIZE_PAYOUT,
+            ],
+          },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.count({ where: { vendorId } }),
+      this.prisma.ticket.aggregate({
+        where: {
+          vendorId,
+          status: TicketStatus.CONFIRMED,
+          isWinner: true,
+          payoutStatus: TicketPayoutStatus.UNPAID,
+        },
+        _sum: { wonAmount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          vendorId,
+          type: { in: [TransactionType.DEPOSIT, TransactionType.ADJUSTMENT] },
+          amount: { gt: 0 },
+          NOT: { reference: { startsWith: 'INIT-DEP-' } },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
 
-    const ledgerSum = Number(Number(totalAgg._sum.amount || 0).toFixed(2));
+    const ledgerSum = Number(Number(balanceAgg._sum.amount || 0).toFixed(2));
     const currentBalance = Number(Number(vendor.currentBalance).toFixed(2));
     const discrepancy = Number((currentBalance - ledgerSum).toFixed(2));
     const isBalanced = Math.abs(discrepancy) < 0.001;
+    const unpaidPrizesAmount = Number(unpaidWinnersAgg._sum.wonAmount || 0);
+    const centralCreditsAmount = Number(centralCreditsAgg._sum.amount || 0);
 
     return {
       vendorId: vendor.id,
@@ -370,9 +448,14 @@ export class TransactionsService {
       fullName: vendor.fullName,
       currentBalance,
       ledgerSum,
+      calculatedBalance: ledgerSum,
       discrepancy,
+      difference: discrepancy,
+      unpaidPrizesAmount,
+      centralCreditsAmount,
+      shortfallAmount: Math.max(0, Number((unpaidPrizesAmount - currentBalance).toFixed(2))),
       isBalanced,
-      transactionsCount: totalAgg._count.id,
+      transactionsCount: totalCountAgg,
       reconciledAt: new Date(),
       breakdown,
       status: isBalanced ? 'RECONCILED' : 'DISCREPANCY_DETECTED',

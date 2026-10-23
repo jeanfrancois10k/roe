@@ -278,40 +278,30 @@ export class TicketsService {
       `;
 
       const currentBal = Number(lockedVendor.currentBalance);
-      const creditLim = Number(lockedVendor.creditLimit);
-
-      // Le modèle Borlette standard : le vendeur encaisse le cash des parieurs
-      // Le solde évolue naturellement avec les ventes et commissions.
-      // La sécurité est assurée par le plafond journalier (vendor.dailySalesLimit) et le montant max par ticket.
-
-
-      // 1. Débit de la vente
-      const balanceAfterSale = currentBal - totalAmount;
-      const netBalanceAfter = balanceAfterSale + commissionAmount;
+      const netBalanceAfter = currentBal;
 
       await tx.vendor.update({
         where: { id: vendorId },
         data: {
-          currentBalance: netBalanceAfter,
           lastActivityAt: now,
         },
       });
 
-      // 2. Écriture Ledger : Débit de la Vente
+      // 2. Écriture Ledger : Vente Ticket
       await tx.transaction.create({
         data: {
           vendorId,
           operatorId: operatorUserId,
           type: TransactionType.SALE,
-          amount: -totalAmount,
+          amount: totalAmount,
           balanceBefore: currentBal,
-          balanceAfter: balanceAfterSale,
+          balanceAfter: currentBal,
           reference: dto.idempotencyKey,
           description: `Vente Ticket ${ticketNumber} (${game.name})`,
         },
       });
 
-      // 3. Écriture Ledger : Crédit de la Commission immédiate
+      // 3. Écriture Ledger : Commission Vendeur
       if (commissionAmount > 0) {
         await tx.transaction.create({
           data: {
@@ -319,8 +309,8 @@ export class TicketsService {
             operatorId: operatorUserId,
             type: TransactionType.COMMISSION,
             amount: commissionAmount,
-            balanceBefore: balanceAfterSale,
-            balanceAfter: netBalanceAfter,
+            balanceBefore: currentBal,
+            balanceAfter: currentBal,
             reference: `COM-${dto.idempotencyKey}`,
             description: commissionDescription,
           },
@@ -436,20 +426,20 @@ export class TicketsService {
       `;
 
       const currentBal = Number(lockedVendor.currentBalance);
-      const balanceAfterCancel = currentBal + ticketAmount;
+      const balanceAfterCancel = currentBal;
 
       await tx.vendor.update({
         where: { id: ticket.vendorId },
-        data: { currentBalance: balanceAfterCancel },
+        data: { lastActivityAt: now },
       });
 
-      // Écriture Ledger : Remboursement de la vente
+      // Écriture Ledger : Annulation de la vente
       await tx.transaction.create({
         data: {
           vendorId: ticket.vendorId,
           operatorId: operatorUserId,
           type: TransactionType.SALE_CANCEL,
-          amount: ticketAmount,
+          amount: -ticketAmount,
           balanceBefore: currentBal,
           balanceAfter: balanceAfterCancel,
           reference: `CANCEL-${ticket.ticketNumber}`,
@@ -747,7 +737,7 @@ export class TicketsService {
         throw new BadRequestException('Ce ticket a expiré et ne peut plus être payé.');
       }
 
-      // 4. Verrouillage pessimiste sur le compte VENDEUR pour remboursement du gain avancé
+      // 4. Verrouillage pessimiste sur le compte VENDEUR et vérification du solde disponible
       const [lockedVendor] = await tx.$queryRaw<Array<{ id: string; currentBalance: any; vendorCode: string }>>`
         SELECT "id", "currentBalance", "vendorCode"
         FROM "Vendor"
@@ -756,9 +746,17 @@ export class TicketsService {
       `;
 
       const balanceBefore = Number(lockedVendor.currentBalance);
-      const balanceAfter = Number((balanceBefore + wonAmount).toFixed(2));
 
-      // 5. Crédit du solde vendeur (la maison lui rembourse le cash remis au gagnant)
+      if (balanceBefore < wonAmount) {
+        const missingAmount = Number((wonAmount - balanceBefore).toFixed(2));
+        throw new BadRequestException(
+          `Solde disponible insuffisant (${balanceBefore.toFixed(2)} HTG) pour payer ce gain de ${wonAmount.toFixed(2)} HTG. Montant manquant à couvrir par le Central : ${missingAmount.toFixed(2)} HTG.`,
+        );
+      }
+
+      const balanceAfter = Number((balanceBefore - wonAmount).toFixed(2));
+
+      // 5. Débit du solde disponible du vendeur pour le paiement du gain client
       await tx.vendor.update({
         where: { id: vendorId },
         data: {
@@ -775,11 +773,11 @@ export class TicketsService {
           operatorId: operatorUserId,
           ticketId: lockedTicket.id,
           type: TransactionType.PRIZE_PAYOUT,
-          amount: wonAmount,
+          amount: -wonAmount,
           balanceBefore,
           balanceAfter,
           reference,
-          description: `Paiement Gain Ticket ${lockedTicket.ticketNumber} ($${wonAmount.toFixed(2)})`,
+          description: `Paiement Gain Ticket ${lockedTicket.ticketNumber} (${wonAmount.toFixed(2)} HTG)`,
         },
       });
 
@@ -820,15 +818,21 @@ export class TicketsService {
           paidByVendorId: vendorId,
           paidAt: now.toISOString(),
         });
+        this.realtimeGateway.notifyVendorBalanceUpdated(
+          vendorId,
+          balanceAfter,
+          -wonAmount,
+          `Paiement Gain Ticket ${lockedTicket.ticketNumber}`,
+        );
       }
 
       this.logger.log(
-        `Gain payé avec succès : Ticket ${lockedTicket.ticketNumber} ($${wonAmount.toFixed(2)}) par ${lockedVendor.vendorCode}`,
+        `Gain payé avec succès : Ticket ${lockedTicket.ticketNumber} (${wonAmount.toFixed(2)} HTG) par ${lockedVendor.vendorCode}. Nouveau solde : ${balanceAfter.toFixed(2)} HTG`,
       );
 
       return {
         success: true,
-        message: `Gain de $${wonAmount.toFixed(2)} payé avec succès.`,
+        message: `Gain de ${wonAmount.toFixed(2)} HTG payé avec succès.`,
         ticket: {
           id: updatedTicket.id,
           ticketNumber: updatedTicket.ticketNumber,

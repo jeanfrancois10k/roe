@@ -72,11 +72,13 @@ export default function VendorsPage() {
     socket.on('vendor:status-change', () => fetchVendors());
     socket.on('vendor:suspended', () => fetchVendors());
     socket.on('vendor:reactivated', () => fetchVendors());
+    socket.on('vendor:balance-updated', () => fetchVendors());
 
     return () => {
       socket.off('vendor:status-change');
       socket.off('vendor:suspended');
       socket.off('vendor:reactivated');
+      socket.off('vendor:balance-updated');
     };
   }, [statusFilter]);
 
@@ -233,21 +235,44 @@ export default function VendorsPage() {
                       <p className="truncate"><span className="text-white font-medium">Terminal :</span> {device ? device.deviceModel : 'Non lié'}</p>
                     </div>
 
-                    {/* Finances : Solde & Plafonds */}
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    {/* Finances : Solde Disponible, Gains à Payer, Crédits Central */}
+                    <div className="grid grid-cols-3 gap-2 text-xs">
                       <div className="p-2.5 rounded-xl bg-roe-card/60 border border-roe-border/40">
-                        <p className="text-[10px] text-roe-textMuted uppercase font-bold">Solde Actuel</p>
-                        <p className="font-mono font-bold text-roe-gold text-sm mt-0.5">
-                          {formatCurrency(Math.abs(Number(v.currentBalance || 0)), currency)}
+                        <p className="text-[10px] text-roe-textMuted uppercase font-bold">Solde Dispo</p>
+                        <p className="font-mono font-bold text-roe-gold text-xs sm:text-sm mt-0.5">
+                          {formatCurrency(Number(v.currentBalance || 0), currency)}
                         </p>
                       </div>
                       <div className="p-2.5 rounded-xl bg-roe-card/60 border border-roe-border/40">
-                        <p className="text-[10px] text-roe-textMuted uppercase font-bold">Plafond Jour</p>
-                        <p className="font-mono font-bold text-white text-sm mt-0.5">
-                          {formatCurrency(v.dailySalesLimit, currency)}
+                        <p className="text-[10px] text-amber-400 uppercase font-bold">Gains à Payer</p>
+                        <p className="font-mono font-bold text-amber-300 text-xs sm:text-sm mt-0.5">
+                          {formatCurrency(Number(v.unpaidPrizesAmount || 0), currency)}
+                        </p>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-roe-card/60 border border-roe-border/40">
+                        <p className="text-[10px] text-cyan-400 uppercase font-bold">Crédits Central</p>
+                        <p className="font-mono font-bold text-cyan-300 text-xs sm:text-sm mt-0.5">
+                          {formatCurrency(Number(v.centralCreditsAmount || 0), currency)}
                         </p>
                       </div>
                     </div>
+
+                    {Number(v.shortfallAmount || 0) > 0 && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between gap-2 text-xs">
+                        <span className="text-amber-300 font-bold">
+                          ⚠️ Manque {formatCurrency(Number(v.shortfallAmount), currency)} pour payer le gagnant
+                        </span>
+                        <button
+                          onClick={() => {
+                            setVendorToAdjust(v);
+                            setIsAdjustModalOpen(true);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-400 text-roe-bg font-black text-[11px] whitespace-nowrap"
+                        >
+                          Couvrir Gain
+                        </button>
+                      </div>
+                    )}
 
                     {/* Barre d'Actions Mobile */}
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-roe-border/50">
@@ -257,10 +282,11 @@ export default function VendorsPage() {
                             setVendorToAdjust(v);
                             setIsAdjustModalOpen(true);
                           }}
-                          className="p-2 rounded-xl bg-roe-card hover:bg-roe-cardHover text-roe-textMuted hover:text-white border border-roe-border"
-                          title="Régulariser Solde"
+                          className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 text-xs font-bold"
+                          title="Créditer ou Couvrir un Gain Client"
                         >
-                          <DollarSign size={16} />
+                          <DollarSign size={14} />
+                          <span>Créditer</span>
                         </button>
                         <button
                           onClick={() => {
@@ -312,8 +338,8 @@ export default function VendorsPage() {
                     <th className="p-4 pl-6">Code & Nom</th>
                     <th className="p-4">Point de Vente</th>
                     <th className="p-4">Statut & En Ligne</th>
-                    <th className="p-4">Solde Actuel</th>
-                    <th className="p-4">Plafonds</th>
+                    <th className="p-4">Solde Dispo & Gains à Payer</th>
+                    <th className="p-4">Crédits Central & Plafonds</th>
                     <th className="p-4">Terminal Android</th>
                     <th className="p-4 pr-6 text-right">Contrôle à Distance</th>
                   </tr>
@@ -370,20 +396,27 @@ export default function VendorsPage() {
                             </div>
                           </td>
 
-                          {/* Solde */}
+                          {/* Solde Dispo & Gains à Payer */}
                           <td className="p-4">
                             <p className="font-mono font-bold text-roe-gold text-sm">
-                              {formatCurrency(Math.abs(Number(v.currentBalance || 0)), currency)}
+                              Dispo : {formatCurrency(Number(v.currentBalance || 0), currency)}
                             </p>
-                            <p className="text-[10px] text-roe-textMuted font-mono">
-                              Découvert: {formatCurrency(v.creditLimit, currency)}
+                            <p className="text-xs font-mono text-amber-300 mt-0.5">
+                              Gains à payer : {formatCurrency(Number(v.unpaidPrizesAmount || 0), currency)}
                             </p>
+                            {Number(v.shortfallAmount || 0) > 0 && (
+                              <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] font-black font-mono">
+                                ⚠️ Manque {formatCurrency(Number(v.shortfallAmount), currency)}
+                              </span>
+                            )}
                           </td>
 
-                          {/* Plafonds */}
+                          {/* Crédits Central & Plafonds */}
                           <td className="p-4 text-xs font-mono text-roe-textMuted">
+                            <p className="text-cyan-300 font-bold">
+                              Crédits Central: {formatCurrency(Number(v.centralCreditsAmount || 0), currency)}
+                            </p>
                             <p>Jour: {formatCurrency(v.dailySalesLimit, currency)}</p>
-                            <p>Ticket: {formatCurrency(v.maxTicketAmount, currency)}</p>
                             <p className="text-roe-gold">Com: {Number(v.defaultCommissionRate)}%</p>
                           </td>
 
@@ -407,16 +440,17 @@ export default function VendorsPage() {
                           {/* Actions / Kill Switch */}
                           <td className="p-4 pr-6 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {/* Bouton Régulariser */}
+                              {/* Bouton Créditer / Couvrir Gain */}
                               <button
                                 onClick={() => {
                                   setVendorToAdjust(v);
                                   setIsAdjustModalOpen(true);
                                 }}
-                                title="Régulariser Solde"
-                                className="p-2 rounded-xl bg-roe-card hover:bg-roe-cardHover text-roe-textMuted hover:text-white border border-roe-border transition-colors"
+                                title="Créditer le vendeur / Couvrir un gain client"
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 text-xs font-bold transition-colors"
                               >
-                                <DollarSign size={15} />
+                                <DollarSign size={14} />
+                                <span>Créditer</span>
                               </button>
 
                               {/* Bouton Modifier */}

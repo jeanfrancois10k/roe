@@ -175,6 +175,7 @@ export default function TransactionsPage() {
       setActionAmount('');
       setActionDescription('');
       setActionVendorId('');
+      fetchVendors();
       fetchTransactions();
     } catch (err: any) {
       setActionError(err.message || 'Erreur lors de l’opération financière');
@@ -234,16 +235,19 @@ export default function TransactionsPage() {
 
   const getTypeBadge = (type: string) => {
     switch (type) {
+      case 'SALE':
       case 'TICKET_SALE':
         return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Vente Ticket</span>;
+      case 'PRIZE_PAYOUT':
       case 'TICKET_PAYOUT':
         return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30">Gain Payé</span>;
+      case 'SALE_CANCEL':
       case 'TICKET_CANCEL':
         return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">Annulation Ticket</span>;
       case 'COMMISSION':
         return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-roe-gold/10 text-roe-gold border border-roe-gold/30">Commission</span>;
       case 'DEPOSIT':
-        return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">Dépôt / Rechargement</span>;
+        return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">Crédit Central / Dépôt</span>;
       case 'WITHDRAWAL':
         return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">Retrait Caisse</span>;
       case 'ADJUSTMENT':
@@ -389,11 +393,11 @@ export default function TransactionsPage() {
                   className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-roe-gold"
                 >
                   <option value="">Tous les types</option>
-                  <option value="TICKET_SALE">Vente de Ticket</option>
-                  <option value="TICKET_PAYOUT">Gain Payé au Joueur</option>
-                  <option value="TICKET_CANCEL">Annulation Ticket</option>
+                  <option value="SALE">Vente de Ticket</option>
+                  <option value="PRIZE_PAYOUT">Gain Payé au Joueur</option>
+                  <option value="SALE_CANCEL">Annulation Ticket</option>
                   <option value="COMMISSION">Commission Vendeur</option>
-                  <option value="DEPOSIT">Dépôt / Rechargement</option>
+                  <option value="DEPOSIT">Crédit Central / Dépôt</option>
                   <option value="WITHDRAWAL">Retrait / Règlement</option>
                   <option value="ADJUSTMENT">Ajustement Manuel</option>
                 </select>
@@ -496,6 +500,7 @@ export default function TransactionsPage() {
                       <th className="py-3.5 px-4 text-right">Solde Avant</th>
                       <th className="py-3.5 px-4 text-right">Solde Après</th>
                       <th className="py-3.5 px-4">Description / Ticket</th>
+                      <th className="py-3.5 px-4">Responsable</th>
                       <th className="py-3.5 px-4 text-center">Actions</th>
                     </tr>
                   </thead>
@@ -556,6 +561,13 @@ export default function TransactionsPage() {
                                 #{t.ticket.ticketNumber}
                               </span>
                             )}
+                          </td>
+
+                          {/* Responsable / Opérateur */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded bg-roe-card text-[11px] font-mono text-white border border-roe-border/50">
+                              {t.operator?.username || 'Système'}
+                            </span>
                           </td>
 
                           {/* Actions */}
@@ -642,18 +654,78 @@ export default function TransactionsPage() {
                 <label className="block text-xs font-bold text-roe-textMuted mb-1.5">Vendeur Bénéficiaire</label>
                 <select
                   value={actionVendorId}
-                  onChange={(e) => setActionVendorId(e.target.value)}
+                  onChange={(e) => {
+                    const vid = e.target.value;
+                    setActionVendorId(vid);
+                    const v = vendorsList.find((item) => item.id === vid);
+                    if (actionType === 'DEPOSIT' && v && Number(v.shortfallAmount || 0) > 0) {
+                      setActionAmount(Number(v.shortfallAmount));
+                      setActionDescription('Couverture du gain client');
+                    }
+                  }}
                   required
                   className="w-full bg-roe-dark border border-roe-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
                 >
                   <option value="">Sélectionnez un vendeur...</option>
                   {vendorsList.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.vendorCode} - {v.fullName} (Solde actuel : {formatCurrency(Math.abs(Number(v.currentBalance || 0)), currency)})
+                      {v.vendorCode} - {v.fullName} (Solde dispo : {formatCurrency(Math.max(0, Number(v.currentBalance || 0)), currency)}
+                      {Number(v.unpaidPrizesAmount || 0) > 0 ? ` | Gains à payer : ${formatCurrency(Number(v.unpaidPrizesAmount), currency)}` : ''})
                     </option>
                   ))}
                 </select>
               </div>
+
+              {actionVendorId && (() => {
+                const selectedV = vendorsList.find((v) => v.id === actionVendorId);
+                if (!selectedV) return null;
+                const avail = Math.max(0, Number(selectedV.currentBalance || 0));
+                const unpaid = Number(selectedV.unpaidPrizesAmount || 0);
+                const credits = Number(selectedV.centralCreditsAmount || 0);
+                const shortfall = Number(selectedV.shortfallAmount ?? Math.max(0, unpaid - avail));
+                return (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="p-2.5 rounded-xl bg-roe-dark border border-roe-border">
+                        <p className="text-[9px] font-bold text-roe-textMuted uppercase">Solde Dispo</p>
+                        <p className="text-xs font-black text-emerald-400 font-mono mt-0.5">
+                          {formatCurrency(avail, currency)}
+                        </p>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-roe-dark border border-roe-border">
+                        <p className="text-[9px] font-bold text-roe-textMuted uppercase">Gains à Payer</p>
+                        <p className={`text-xs font-black font-mono mt-0.5 ${unpaid > 0 ? 'text-amber-400' : 'text-roe-textMuted'}`}>
+                          {formatCurrency(unpaid, currency)}
+                        </p>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-roe-dark border border-roe-border">
+                        <p className="text-[9px] font-bold text-roe-textMuted uppercase">Crédits Central</p>
+                        <p className="text-xs font-black text-blue-400 font-mono mt-0.5">
+                          {formatCurrency(credits, currency)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {actionType === 'DEPOSIT' && shortfall > 0 && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 text-[11px] flex items-center justify-between gap-2">
+                        <span>
+                          Manque <b>{formatCurrency(shortfall, currency)}</b> pour couvrir le gain client.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionAmount(shortfall);
+                            setActionDescription('Couverture du gain client');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold whitespace-nowrap"
+                        >
+                          ⚡ Couvrir {formatCurrency(shortfall, currency)}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div>
                 <label className="block text-xs font-bold text-roe-textMuted mb-1.5">
@@ -664,7 +736,7 @@ export default function TransactionsPage() {
                   step="0.01"
                   min="1"
                   required
-                  placeholder="Ex: 5000"
+                  placeholder="Ex: 35000"
                   value={actionAmount}
                   onChange={(e) => setActionAmount(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full bg-roe-dark border border-roe-border rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-roe-gold font-mono"
@@ -675,11 +747,30 @@ export default function TransactionsPage() {
                 <label className="block text-xs font-bold text-roe-textMuted mb-1.5">Motif / Description</label>
                 <input
                   type="text"
-                  placeholder={actionType === 'DEPOSIT' ? 'Rechargement de compte' : 'Règlement de caisse'}
+                  required
+                  placeholder={actionType === 'DEPOSIT' ? 'Couverture du gain client' : 'Règlement de caisse'}
                   value={actionDescription}
                   onChange={(e) => setActionDescription(e.target.value)}
                   className="w-full bg-roe-dark border border-roe-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
                 />
+                {actionType === 'DEPOSIT' && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['Couverture du gain client', 'Rechargement solde vendeur', 'Avance de trésorerie'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setActionDescription(preset)}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                          actionDescription === preset
+                            ? 'bg-roe-gold/20 border-roe-gold text-roe-gold'
+                            : 'bg-roe-dark border-roe-border text-roe-textMuted hover:text-white'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-3">
@@ -754,22 +845,30 @@ export default function TransactionsPage() {
                 <div className="bg-roe-card p-4 rounded-xl border border-roe-border/60 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-roe-textMuted">Vendeur :</span>
-                    <span className="font-bold text-white">{reconcileResult.vendorCode}</span>
+                    <span className="font-bold text-white">{reconcileResult.vendorCode} — {reconcileResult.fullName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-roe-textMuted">Solde Enregistré :</span>
-                    <span className="font-mono font-bold text-roe-gold">{formatCurrency(reconcileResult.currentBalance || 0, currency)}</span>
+                    <span className="text-roe-textMuted">Solde Disponible Enregistré :</span>
+                    <span className="font-mono font-bold text-emerald-400">{formatCurrency(reconcileResult.currentBalance || 0, currency)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-roe-textMuted">Somme des Transactions :</span>
-                    <span className="font-mono font-bold text-white">{formatCurrency(reconcileResult.calculatedBalance || 0, currency)}</span>
+                    <span className="text-roe-textMuted">Somme des Transactions (Ledger) :</span>
+                    <span className="font-mono font-bold text-white">{formatCurrency(reconcileResult.ledgerSum ?? reconcileResult.calculatedBalance ?? 0, currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-roe-textMuted">Gains à Payer (En attente) :</span>
+                    <span className="font-mono font-bold text-amber-400">{formatCurrency(reconcileResult.unpaidPrizesAmount || 0, currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-roe-textMuted">Crédits Reçus du Central :</span>
+                    <span className="font-mono font-bold text-blue-400">{formatCurrency(reconcileResult.centralCreditsAmount || 0, currency)}</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-roe-border/50">
-                    <span className="text-roe-textMuted">Écart (Delta) :</span>
+                    <span className="text-roe-textMuted">Écart Comptable (Delta) :</span>
                     <span className={`font-mono font-black ${
-                      (reconcileResult.difference || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'
+                      (reconcileResult.discrepancy ?? reconcileResult.difference ?? 0) === 0 ? 'text-emerald-400' : 'text-rose-400'
                     }`}>
-                      {formatCurrency(reconcileResult.difference || 0, currency)}
+                      {formatCurrency(reconcileResult.discrepancy ?? reconcileResult.difference ?? 0, currency)}
                     </span>
                   </div>
                 </div>

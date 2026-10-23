@@ -14,6 +14,7 @@ class SocketManager private constructor() {
     private var heartbeatRunnable: Runnable? = null
     private var onForceLogoutListener: ((String) -> Unit)? = null
     private var onReactivatedListener: (() -> Unit)? = null
+    private var onBalanceUpdatedListener: ((Double, Double, String) -> Unit)? = null
 
     companion object {
         private const val TAG = "RoeSocketManager"
@@ -26,6 +27,10 @@ class SocketManager private constructor() {
 
     fun setOnReactivatedListener(listener: () -> Unit) {
         this.onReactivatedListener = listener
+    }
+
+    fun setOnBalanceUpdatedListener(listener: (Double, Double, String) -> Unit) {
+        this.onBalanceUpdatedListener = listener
     }
 
     fun connect(baseUrl: String, vendorId: String, deviceUuid: String) {
@@ -73,6 +78,18 @@ class SocketManager private constructor() {
                     Log.i(TAG, "✅ Notification de réactivation reçue")
                     handler.post {
                         onReactivatedListener?.invoke()
+                    }
+                }
+
+                on("vendor:balance-updated") { args ->
+                    if (args.isNotEmpty() && args[0] is JSONObject) {
+                        val obj = args[0] as JSONObject
+                        val newBal = obj.optDouble("newBalance", 0.0)
+                        val amt = obj.optDouble("amount", 0.0)
+                        val reason = obj.optString("reason", "Mise à jour du solde")
+                        handler.post {
+                            onBalanceUpdatedListener?.invoke(newBal, amt, reason)
+                        }
                     }
                 }
 
