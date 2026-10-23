@@ -547,6 +547,226 @@ object ThermalPrinterService {
     }
 
     /**
+     * Construit les octets ESC/POS d'une fiche UNIFIÉE pour plusieurs tirages sélectionnés
+     * Imprime une seule fiche compacte regroupant tous les tirages avec les mêmes grilles.
+     */
+    fun buildMultiTicketEscPos(
+        tickets: List<SellTicketResponse>,
+        prefs: PreferencesManager,
+        context: Context? = null
+    ): ByteArray {
+        val stream = ByteArrayOutputStream()
+
+        fun write(vararg b: ByteArray) {
+            b.forEach { stream.write(it) }
+        }
+
+        fun writeText(text: String, charset: String = "CP437") {
+            try {
+                stream.write(text.toByteArray(charset(charset)))
+            } catch (_: Exception) {
+                stream.write(text.toByteArray())
+            }
+        }
+
+        val lotteryName = prefs.getLotteryName()
+        val lotteryPhone = prefs.getLotteryPhone()
+        val lotteryBankRef = prefs.getLotteryBankRef()
+        val lotteryHeaderNote = prefs.getLotteryHeaderNote()
+        val lotteryFooterNote = prefs.getLotteryFooterNote()
+        val lotteryMariageGratis = prefs.getLotteryMariageGratis()
+
+        val firstTicket = tickets.first()
+        val dateDisplay = TicketReceiptUtil.formatHaitiDateTimeSeconds(firstTicket.createdAt)
+
+        // 1. Initialisation
+        write(ESC_INIT)
+
+        // 2. Logo Officiel Loterie
+        if (context != null) {
+            try {
+                var logoBitmap: Bitmap? = null
+                val logoUrl = prefs.getLotteryLogoUrl()
+                if (logoUrl.isNotEmpty() && (logoUrl.startsWith("data:image") || logoUrl.length > 50)) {
+                    val clean = if (logoUrl.contains(",")) logoUrl.substringAfter(",") else logoUrl
+                    val bytes = Base64.decode(clean.trim(), Base64.DEFAULT)
+                    logoBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                }
+                if (logoBitmap == null) {
+                    logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+                }
+                if (logoBitmap != null) {
+                    write(ESC_ALIGN_CENTER)
+                    val rasterBytes = bitmapToEscPosRaster(logoBitmap, maxWidth = 320)
+                    if (rasterBytes.isNotEmpty()) {
+                        write(rasterBytes)
+                        writeText("\n")
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 3. En-tête Loterie Centrée
+        write(ESC_ALIGN_CENTER)
+        write(ESC_BOLD_ON, GS_TEXT_DOUBLE)
+        writeText("$lotteryName\n")
+        write(GS_TEXT_NORMAL, ESC_BOLD_OFF)
+
+        if (lotteryPhone.isNotEmpty()) writeText("Tel: $lotteryPhone\n")
+        if (lotteryBankRef.isNotEmpty()) writeText("Bnk: $lotteryBankRef\n")
+        if (lotteryHeaderNote.isNotEmpty()) writeText("$lotteryHeaderNote\n")
+
+        writeText("--------------------------------\n")
+
+        // 4. Titre de la Fiche Multi-Tirages
+        write(ESC_BOLD_ON)
+        writeText("FICHE MULTI-TIRAGES (${tickets.size} Tiraj)\n")
+        write(ESC_BOLD_OFF)
+        writeText("Dat: $dateDisplay\n")
+        writeText("--------------------------------\n")
+
+        // Liste de tous les tirages sélectionnés avec leur numéro de ticket
+        write(ESC_ALIGN_LEFT)
+        write(ESC_BOLD_ON)
+        writeText("TIRAJ YO CHWAZI :\n")
+        write(ESC_BOLD_OFF)
+
+        tickets.forEachIndexed { index, t ->
+            val rawGame = t.gameName ?: "TIRAJ OFISYÈL"
+            val period = t.sessionName?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(rawGame, t.scheduledAt, t.sessionName)
+            val shortName = TicketReceiptUtil.formatShortDrawName(rawGame, null, t.scheduledAt, t.sessionName)
+            write(ESC_BOLD_ON)
+            writeText("${index + 1}. $shortName [$period]\n")
+            write(ESC_BOLD_OFF)
+            writeText("   Fich N°: ${t.ticketNumber}\n")
+        }
+
+        writeText("--------------------------------\n")
+
+        // 5. Grilles jouées (affichées une seule fois)
+        val sampleGrids = firstTicket.playedGrids ?: emptyList()
+        val regularGrids = sampleGrids.filter { it.isGratis != true }
+        val gratisGrids = sampleGrids.filter { it.isGratis == true }
+
+        regularGrids.forEach { g ->
+            val gameLabel = TicketReceiptUtil.formatGameLabel(g.gameType, g.numbers)
+            val numStr = TicketReceiptUtil.formatGridNumbers(g.gameType, g.numbers)
+            val left = "$gameLabel $numStr"
+            val right = "${String.format(java.util.Locale.US, "%.0f", g.betAmount)} HTG"
+            val spaces = (32 - left.length - right.length).coerceAtLeast(1)
+            write(ESC_BOLD_ON)
+            writeText(left + " ".repeat(spaces) + right + "\n")
+            write(ESC_BOLD_OFF)
+        }
+
+        if (gratisGrids.isNotEmpty()) {
+            writeText("\n-- Mariage Gratuit --\n")
+            gratisGrids.forEach { g ->
+                val numStr = TicketReceiptUtil.formatGridNumbers("MARIAGE", g.numbers)
+                val left = "Mariage $numStr"
+                val right = "GRATUIT"
+                val spaces = (32 - left.length - right.length).coerceAtLeast(1)
+                writeText(left + " ".repeat(spaces) + right + "\n")
+            }
+        }
+
+        writeText("--------------------------------\n")
+
+        // 6. Sous-total par tirage et Total Général Multi-Tirages
+        val subtotalPerDraw = regularGrids.sumOf { it.betAmount }
+        val grandTotal = tickets.sumOf { it.totalAmount }
+
+        val leftSub = "Miz pa Tiraj :"
+        val rightSub = "${String.format(java.util.Locale.US, "%.0f", subtotalPerDraw)} HTG"
+        val spacesSub = (32 - leftSub.length - rightSub.length).coerceAtLeast(1)
+        writeText(leftSub + " ".repeat(spacesSub) + rightSub + "\n")
+
+        val leftCount = "Kantite Tiraj :"
+        val rightCount = "x ${tickets.size}"
+        val spacesCount = (32 - leftCount.length - rightCount.length).coerceAtLeast(1)
+        writeText(leftCount + " ".repeat(spacesCount) + rightCount + "\n")
+
+        write(ESC_ALIGN_CENTER)
+        writeText("================================\n")
+        write(ESC_BOLD_ON, GS_TEXT_DOUBLE)
+        val totalText = "TOTAL: ${String.format(java.util.Locale.US, "%.0f", grandTotal)} HTG\n"
+        writeText(totalText)
+        write(GS_TEXT_NORMAL, ESC_BOLD_OFF)
+        writeText("================================\n")
+
+        // 7. Codes-Barres de contrôle
+        tickets.forEachIndexed { index, t ->
+            try {
+                val shortName = TicketReceiptUtil.formatShortDrawName(t.gameName, null, t.scheduledAt, t.sessionName)
+                write(ESC_ALIGN_CENTER)
+                writeText("$shortName:\n")
+                val barcodeBitmap = Barcode128Util.generateBarcodeBitmap(t.ticketNumber, width = 360, height = 50)
+                val barcodeRaster = bitmapToEscPosRaster(barcodeBitmap, maxWidth = 360)
+                if (barcodeRaster.isNotEmpty()) {
+                    write(barcodeRaster)
+                    writeText("\n")
+                }
+                writeText("${t.ticketNumber}\n\n")
+            } catch (_: Exception) {}
+        }
+
+        // 8. Signature globale & mentions
+        val masterChecksum = (firstTicket.secureChecksum ?: firstTicket.ticketNumber).take(22)
+        write(ESC_ALIGN_CENTER)
+        writeText("Siyati: $masterChecksum...\n")
+
+        if (lotteryFooterNote.isNotEmpty()) writeText("$lotteryFooterNote\n")
+        if (lotteryMariageGratis.isNotEmpty()) writeText("$lotteryMariageGratis\n")
+
+        writeText("\nBonswa & Bon chans !\n")
+        write(FEED_AND_CUT)
+
+        return stream.toByteArray()
+    }
+
+    /**
+     * Imprime un lot de tickets (ou un ticket unique) sous forme d'une seule fiche compacte
+     * Évite l'impression en série de multiples reçus successifs.
+     */
+    suspend fun printTicketBatch(
+        context: Context,
+        tickets: List<SellTicketResponse>,
+        onStatus: (success: Boolean, message: String) -> Unit
+    ) {
+        if (tickets.isEmpty()) return
+        if (tickets.size == 1) {
+            printTicket(context, tickets.first(), onStatus)
+            return
+        }
+
+        val prefs = PreferencesManager(context)
+        val mac = getPreferredPrinterMac(context)
+
+        if (!mac.isNullOrEmpty()) {
+            val bytes = buildMultiTicketEscPos(tickets, prefs, context)
+            val res = sendBytesToBluetoothPrinter(context, bytes, mac)
+            if (res.isSuccess) {
+                onStatus(true, "Fiche multi-tirages imprimée avec succès.")
+                return
+            }
+        }
+
+        val paired = getPairedPrinters(context)
+        if (paired.isNotEmpty()) {
+            val first = paired.first()
+            val bytes = buildMultiTicketEscPos(tickets, prefs, context)
+            val res = sendBytesToBluetoothPrinter(context, bytes, first.address)
+            if (res.isSuccess) {
+                setPreferredPrinter(context, first.address, first.name ?: "Imprimante POS")
+                onStatus(true, "Fiche multi-tirages imprimée sur ${first.name ?: "imprimante Bluetooth"}.")
+                return
+            }
+        }
+
+        onStatus(false, "Aucune imprimante Bluetooth connectée. Associez votre imprimante dans les Paramètres.")
+    }
+
+    /**
      * Imprime un ticket de test thermique
      */
     suspend fun printTestReceipt(

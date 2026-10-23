@@ -302,10 +302,8 @@ fun SellTicketScreen(
         if (!results.isNullOrEmpty()) {
             val prefMac = ThermalPrinterService.getPreferredPrinterMac(context)
             if (!prefMac.isNullOrEmpty() || ThermalPrinterService.getPairedPrinters(context).isNotEmpty()) {
-                results.forEach { ticket ->
-                    ThermalPrinterService.printTicket(context, ticket) { success, msg ->
-                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                    }
+                ThermalPrinterService.printTicketBatch(context, results) { success, msg ->
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -1563,7 +1561,7 @@ fun SellTicketScreen(
                 ) {
                     Column {
                         Text(
-                            text = if (soldTicketResults.size == 1) "FICH LA ENPRIME AK SIKSE !" else "${soldTicketResults.size} FICH ENPRIME AK SIKSE !",
+                            text = if (soldTicketResults.size == 1) "FICH LA ENPRIME AK SIKSE !" else "FICH MULTI-TIRAJ ENPRIME AK SIKSE !",
                             color = Color(0xFF2E7D32),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Black
@@ -1593,7 +1591,25 @@ fun SellTicketScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(soldTicketResults) { ticket ->
+                    if (soldTicketResults.size > 1) {
+                        item {
+                            MultiTicketReceiptCard(
+                                tickets = soldTicketResults,
+                                lotteryLogoUrl = lotteryLogoUrl,
+                                lotteryHeaderNote = lotteryHeaderNote,
+                                lotteryName = lotteryName,
+                                lotterySlogan = lotterySlogan,
+                                lotteryBankRef = lotteryBankRef,
+                                lotteryPhone = lotteryPhone,
+                                lotteryFooterNote = lotteryFooterNote,
+                                lotteryMariageGratis = lotteryMariageGratis,
+                                lotteryProvider = lotteryProvider,
+                                deviceUuid = deviceUuid,
+                                defaultGrids = getAllValidGrids()
+                            )
+                        }
+                    } else {
+                        items(soldTicketResults) { ticket ->
                         Surface(
                             color = Color.White,
                             shape = RoundedCornerShape(8.dp),
@@ -1838,6 +1854,7 @@ fun SellTicketScreen(
                             }
                         }
                     }
+                    }
                 }
             },
             dismissButton = {
@@ -1846,10 +1863,8 @@ fun SellTicketScreen(
                         if (isPrintingReceipt) return@OutlinedButton
                         isPrintingReceipt = true
                         scope.launch {
-                            soldTicketResults.forEach { ticket ->
-                                ThermalPrinterService.printTicket(context, ticket) { success, msg ->
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
+                            ThermalPrinterService.printTicketBatch(context, soldTicketResults) { success, msg ->
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             }
                             isPrintingReceipt = false
                         }
@@ -3820,4 +3835,321 @@ fun CombinationEngineDialog(
             }
         }
     )
+}
+
+
+@Composable
+fun MultiTicketReceiptCard(
+    tickets: List<SellTicketResponse>,
+    lotteryLogoUrl: String,
+    lotteryHeaderNote: String,
+    lotteryName: String,
+    lotterySlogan: String,
+    lotteryBankRef: String,
+    lotteryPhone: String,
+    lotteryFooterNote: String,
+    lotteryMariageGratis: String,
+    lotteryProvider: String,
+    deviceUuid: String,
+    defaultGrids: List<BetGrid>
+) {
+    val firstTicket = tickets.first()
+    val ticketDate = TicketReceiptUtil.formatHaitiDateTimeSeconds(firstTicket.createdAt)
+    val grandTotal = tickets.sumOf { it.totalAmount }
+    val gridsToDisplay = firstTicket.playedGrids ?: defaultGrids
+    val regularGrids = gridsToDisplay.filter { it.isGratis != true }
+    val gratisGrids = gridsToDisplay.filter { it.isGratis == true }
+    val subtotalPerDraw = regularGrids.sumOf { it.betAmount }
+
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 1. Logo & En-tête Loterie
+            LotteryLogoView(logoUrl = lotteryLogoUrl)
+            Text(
+                text = lotteryHeaderNote,
+                color = Color(0xFF616161),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = lotteryName.uppercase(),
+                color = Color.Black,
+                fontWeight = FontWeight.Black,
+                fontSize = 15.sp,
+                textAlign = TextAlign.Center
+            )
+            if (lotterySlogan.isNotEmpty()) {
+                Text(
+                    text = lotterySlogan,
+                    color = Color(0xFF424242),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 11.sp
+                )
+            }
+            Text(
+                text = if (lotteryBankRef.isNotEmpty()) "$lotteryBankRef • Tel: $lotteryPhone" else "Tel: $lotteryPhone",
+                color = Color(0xFF616161),
+                fontSize = 10.sp
+            )
+            Text(
+                text = "POS: " + (firstTicket.vendorCode ?: deviceUuid.take(16)),
+                color = Color(0xFF757575),
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "Dat & Lè: " + ticketDate,
+                color = Color(0xFF212121),
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "********************************",
+                color = Color(0xFFBDBDBD),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+
+            // 2. Titre & Liste des tirages
+            Text(
+                text = "FICHE MULTI-TIRAGES",
+                color = TopBarPurple,
+                fontWeight = FontWeight.Black,
+                fontSize = 13.sp,
+                letterSpacing = 0.5.sp
+            )
+            Text(
+                text = tickets.size.toString() + " Tiraj Chwazi",
+                color = Color.DarkGray,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            tickets.forEachIndexed { idx, t ->
+                val schedOrCreated = t.scheduledAt ?: t.createdAt
+                val drawDisplayName = TicketReceiptUtil.formatDrawDisplayName(
+                    t.gameName,
+                    t.drawNumber,
+                    schedOrCreated,
+                    t.sessionName
+                )
+                val drawPeriod = t.sessionName?.uppercase() ?: TicketReceiptUtil.getDrawPeriod(t.gameName, schedOrCreated, t.sessionName)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = (idx + 1).toString() + ". " + drawDisplayName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "Tikè: " + t.ticketNumber,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = Color(0xFF424242)
+                        )
+                    }
+                    DrawPeriodBadge(period = drawPeriod)
+                }
+            }
+
+            Text(
+                text = "********************************",
+                color = Color(0xFFBDBDBD),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+
+            // 3. Grilles jouées (affichées une seule fois)
+            regularGrids.forEach { g ->
+                val gameLabel = TicketReceiptUtil.formatGameLabel(g.gameType, g.numbers)
+                val formattedNumbers = TicketReceiptUtil.formatGridNumbers(g.gameType, g.numbers)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 1.5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "$gameLabel  $formattedNumbers",
+                        color = Color.Black,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = String.format(java.util.Locale.US, "%.0f", g.betAmount) + " HTG",
+                        color = Color.Black,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (gratisGrids.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Mariage Gratuit",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+                gratisGrids.forEach { g ->
+                    val formattedGratis = TicketReceiptUtil.formatGridNumbers("MARIAGE", g.numbers)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 1.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Mariage  $formattedGratis",
+                            color = Color.Black,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "GRATUIT",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "********************************",
+                color = Color(0xFFBDBDBD),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+
+            // 4. Sous-total par tirage et Total Général
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Miz pa tiraj:", color = Color.Gray, fontSize = 11.sp)
+                Text(text = String.format(java.util.Locale.US, "%.0f", subtotalPerDraw) + " HTG", color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Kantite tiraj:", color = Color.Gray, fontSize = 11.sp)
+                Text(text = "x " + tickets.size, color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "TOTAL JENERAL", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                Text(
+                    text = String.format(java.util.Locale.US, "%.0f", grandTotal) + " HTG",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 16.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Text(
+                text = "********************************",
+                color = Color(0xFFBDBDBD),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // 5. Code-barres pour chaque tirage pour contrôle & paiement
+            tickets.forEach { t ->
+                val shortName = TicketReceiptUtil.formatShortDrawName(t.gameName, null, t.scheduledAt, t.sessionName)
+                Text(
+                    text = "$shortName (#" + t.ticketNumber + ")",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color.DarkGray
+                )
+                Barcode128View(
+                    code = t.ticketNumber,
+                    height = 36.dp,
+                    showCodeText = false
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            Text(
+                text = "Siyati : " + (firstTicket.secureChecksum ?: firstTicket.ticketNumber).take(22) + "...",
+                color = Color.Gray,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 6. Mentions légales & Footer
+            Text(
+                text = lotteryFooterNote,
+                color = Color(0xFF424242),
+                fontSize = 9.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+            if (lotteryMariageGratis.isNotEmpty()) {
+                Text(
+                    text = lotteryMariageGratis,
+                    color = Color(0xFF2E7D32),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Text(
+                text = lotteryProvider,
+                color = Color(0xFF757575),
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
 }
