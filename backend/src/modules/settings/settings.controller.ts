@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { UpdateCurrencyDto } from './dto/update-currency.dto';
@@ -49,5 +49,17 @@ export class SettingsController {
   @ApiResponse({ status: 200, description: 'Informations de mise à jour de l\'APK' })
   async checkAppUpdate() {
     return this.settingsService.getAppUpdateInfo();
+  }
+
+  @Post('reset-platform')
+  @ApiBearerAuth()
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: 'Vider la base de données (transactions, tickets, tirages et vendeurs de test) pour une plateforme vierge' })
+  @ApiResponse({ status: 200, description: 'Plateforme remise à zéro avec succès.' })
+  async resetPlatform(@Body() body: { deleteVendors?: boolean }, @Request() req: any) {
+    const userId = req.user?.id || req.user?.userId;
+    const deleteVendors = body?.deleteVendors !== undefined ? Boolean(body.deleteVendors) : true;
+    return this.settingsService.resetPlatformData(userId, deleteVendors);
   }
 }

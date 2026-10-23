@@ -63,6 +63,12 @@ export default function SettingsPage() {
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // Remise à zéro de la base de données (Plateforme Vierge)
+  const [resetDeleteVendors, setResetDeleteVendors] = useState(true);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetResultMessage, setResetResultMessage] = useState<string | null>(null);
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+
   const fetchSettings = async () => {
     try {
       const res = await api.get('/api/v1/settings');
@@ -167,6 +173,28 @@ export default function SettingsPage() {
       setPasswordError(err.message || 'Erreur lors du changement de mot de passe.');
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  const handleResetPlatform = async () => {
+    setResetLoading(true);
+    setResetResultMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const res = await api.post('/api/v1/settings/reset-platform', {
+        deleteVendors: resetDeleteVendors,
+      });
+      setShowResetConfirmModal(false);
+      setResetResultMessage(
+        res?.message ||
+          '✅ Base de données vidée avec succès ! Toutes les transactions et fiches ont été effacées.',
+      );
+      setTimeout(() => setResetResultMessage(null), 10000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erreur lors de la remise à zéro de la base de données.');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -532,6 +560,88 @@ export default function SettingsPage() {
                 </div>
               </div>
             </form>
+
+            {/* Carte 3 : Remise à Zéro de la Base de Données (Plateforme Vierge) */}
+            <div className="bg-roe-surface p-5 sm:p-6 rounded-2xl border border-rose-500/40 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm sm:text-base font-bold text-rose-400 flex items-center gap-2">
+                  <Trash2 size={18} /> Remise à Zéro de la Base de Données (Plateforme Vierge)
+                </h2>
+                <span className="text-[11px] font-bold text-rose-400 bg-rose-500/15 px-2.5 py-1 rounded-lg border border-rose-500/30">
+                  Production
+                </span>
+              </div>
+
+              <p className="text-xs text-roe-textMuted leading-relaxed">
+                Effacez toutes les transactions financières, toutes les fiches vendues/annulées/payées, les anciens tirages, les numéros bloqués et les journaux d'audit afin de livrer une plateforme propre et vierge.
+              </p>
+
+              {resetResultMessage && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="flex-shrink-0" />
+                  <span>{resetResultMessage}</span>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-roe-dark/80 border border-roe-border/60 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={resetDeleteVendors}
+                  onChange={(e) => setResetDeleteVendors(e.target.checked)}
+                  className="w-4 h-4 accent-rose-500 rounded"
+                />
+                <span className="text-xs text-white font-semibold">
+                  Supprimer également tous les comptes Vendeurs & Terminaux de test (Conserver uniquement le Super Admin et les 6 Loteries officielles)
+                </span>
+              </label>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirmModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-lg transition"
+                >
+                  <Trash2 size={14} />
+                  Vider la Base de Données & Effacer les Transactions
+                </button>
+              </div>
+            </div>
+
+            {showResetConfirmModal && (
+              <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-roe-surface border border-rose-500/50 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+                  <div className="flex items-center gap-3 text-rose-400">
+                    <AlertTriangle size={26} />
+                    <h3 className="text-base font-black text-white">
+                      Confirmer la Remise à Zéro ?
+                    </h3>
+                  </div>
+                  <p className="text-xs text-roe-textMuted leading-relaxed">
+                    Cette action va supprimer définitivement toutes les transactions, tous les tickets, l'historique des tirages de test{resetDeleteVendors ? ' ainsi que tous les comptes vendeurs de test' : ' et remettre les soldes vendeurs à 0 HTG'}.
+                    Le compte Super Admin et les 6 loteries officielles seront conservés.
+                  </p>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirmModal(false)}
+                      disabled={resetLoading}
+                      className="px-4 py-2 rounded-xl bg-roe-dark border border-roe-border text-xs font-bold text-white hover:bg-white/5"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetPlatform}
+                      disabled={resetLoading}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-lg"
+                    >
+                      {resetLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      {resetLoading ? 'Nettoyage en cours...' : 'Oui, Vider Maintenant'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* APERÇU THERMIQUE EN TEMPS RÉEL (5 COLONNES) */}

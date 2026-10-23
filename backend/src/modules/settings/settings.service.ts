@@ -1,23 +1,57 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UpdateCurrencyDto } from './dto/update-currency.dto';
 import { UpdateLotterySettingsDto } from './dto/update-lottery-settings.dto';
-import { Currency } from '@prisma/client';
+import { Currency, Role } from '@prisma/client';
 
 @Injectable()
-export class SettingsService {
+export class SettingsService implements OnModuleInit {
   private readonly logger = new Logger(SettingsService.name);
+  private virginCheckDone = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
   ) {}
 
+  async onModuleInit() {
+    await this.ensureVirginHandoverOnce();
+  }
+
+  /**
+   * Garantit une remise à zéro unique de la base de données pour la livraison vierge à l'Admin.
+   */
+  private async ensureVirginHandoverOnce() {
+    if (this.virginCheckDone) return;
+    try {
+      const flag = await this.prisma.systemSetting.findUnique({
+        where: { key: 'VIRGIN_HANDOVER_RESET_V1' },
+      });
+      if (!flag) {
+        this.logger.warn('🧹 Exécution de la remise à zéro initiale pour livraison Plateforme Vierge...');
+        await this.resetPlatformData(undefined, true);
+        await this.prisma.systemSetting.upsert({
+          where: { key: 'VIRGIN_HANDOVER_RESET_V1' },
+          update: { value: new Date().toISOString() },
+          create: {
+            key: 'VIRGIN_HANDOVER_RESET_V1',
+            value: new Date().toISOString(),
+            description: 'Indicateur de remise à zéro initiale pour livraison plateforme vierge',
+          },
+        });
+      }
+      this.virginCheckDone = true;
+    } catch (e: any) {
+      this.logger.error(`Erreur lors de la vérification Virgin Handover: ${e?.message}`);
+    }
+  }
+
   /**
    * Récupère les paramètres de configuration système et la devise active
    */
   async getSettings() {
+    await this.ensureVirginHandoverOnce();
     const settings = await this.prisma.systemSetting.findMany();
     const map = new Map(settings.map((s) => [s.key, s.value]));
 
@@ -159,6 +193,88 @@ export class SettingsService {
     this.logger.log(`Paramètres de loterie mis à jour par l’administrateur ${userId}`);
 
     return this.getSettings();
+  }
+
+  /**
+   * Remise à zéro complète de la base de données pour livraison d'une plateforme vierge en production.
+   * Supprime toutes les transactions, tous les tickets, les tirages de test, les terminaux, les blocages,
+   * les logs d'audit et (par défaut) les comptes vendeurs de test.
+   * Conserve uniquement les administrateurs (SUPER_ADMIN / ADMIN), les 6 loteries officielles et les paramètres système.
+   */
+  async resetPlatformData(userId?: string, deleteVendors: boolean = true) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const deletedTransactions = await tx.transaction.deleteMany({});
+      const deletedTickets = await tx.ticket.deleteMany({});
+      const deletedBlockedNumbers = await tx.blockedNumber.deleteMany({});
+      const deletedCommissions = await tx.commission.deleteMany({});
+      const deletedDevices = await tx.device.deleteMany({});
+      const deletedDraws = await tx.draw.deleteMany({});
+      const deletedAuditLogs = await tx.auditLog.deleteMany({});
+
+      let deletedVendorsCount = 0;
+      if (deleteVendors) {
+        // Supprimer les jetons des utilisateurs vendeurs
+        const vendorUsers = await tx.user.findMany({
+          where: { role: Role.VENDOR },
+          select: { id: true },
+        });
+        const vendorUserIds = vendorUsers.map((u) => u.id);
+
+        if (vendorUserIds.length > 0) {
+          await tx.refreshToken.deleteMany({
+            where: { userId: { in: vendorUserIds } },
+          });
+        }
+
+        const deletedVendors = await tx.vendor.deleteMany({});
+        deletedVendorsCount = deletedVendors.count;
+
+        await tx.user.deleteMany({
+          where: { role: Role.VENDOR },
+        });
+      } else {
+        // Remettre tous les soldes vendeurs à 0 HTG
+        await tx.vendor.updateMany({
+          data: { currentBalance: 0 },
+        });
+      }
+
+      // S'assurer que le montant minimum de mise est bien à 1 HTG sur tous les jeux officiels
+      await tx.game.updateMany({
+        data: { minBetAmount: 1.0 },
+      });
+
+      return {
+        transactionsDeleted: deletedTransactions.count,
+        ticketsDeleted: deletedTickets.count,
+        drawsDeleted: deletedDraws.count,
+        devicesDeleted: deletedDevices.count,
+        blockedNumbersDeleted: deletedBlockedNumbers.count,
+        commissionsDeleted: deletedCommissions.count,
+        auditLogsDeleted: deletedAuditLogs.count,
+        vendorsDeleted: deletedVendorsCount,
+        deleteVendors,
+      };
+    });
+
+    if (userId) {
+      await this.auditService.log({
+        userId,
+        action: 'PLATFORM_RESET_TO_VIRGIN',
+        resource: 'Database:FullReset',
+        newPayload: result,
+      });
+    }
+
+    this.logger.warn(`🧹 Plateforme remise à zéro (vierge) avec succès : ${JSON.stringify(result)}`);
+
+    return {
+      success: true,
+      message: deleteVendors
+        ? 'La base de données a été intégralement vidée (transactions, tickets, tirages, terminaux et vendeurs de test supprimés). La plateforme est 100% vierge.'
+        : 'Toutes les transactions, tickets et tirages ont été effacés et les soldes vendeurs ont été remis à 0 HTG.',
+      details: result,
+    };
   }
 }
 
