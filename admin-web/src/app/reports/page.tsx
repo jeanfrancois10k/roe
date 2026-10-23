@@ -670,7 +670,7 @@ ${winningTickets.length === 0 ? 'Aucun ticket gagnant enregistré.\n------------
                               {formatCurrency(v.wonAmount, currency)}
                             </td>
                             <td className="py-3.5 px-4 text-right font-black font-mono text-emerald-400">
-                              {formatCurrency(v.currentBalance, currency)}
+                              {formatCurrency(Math.abs(Number(v.currentBalance || 0)), currency)}
                             </td>
                             <td className="py-3.5 px-4 text-right font-bold text-roe-gold">
                               {pct}%

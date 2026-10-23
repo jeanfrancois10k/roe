@@ -149,7 +149,7 @@ export class DashboardService {
       selectedVendor: selectedVendor
         ? {
             ...selectedVendor,
-            currentBalance: Number(selectedVendor.currentBalance),
+            currentBalance: Math.abs(Number(selectedVendor.currentBalance)),
             defaultCommissionRate: Number(selectedVendor.defaultCommissionRate),
             creditLimit: Number(selectedVendor.creditLimit),
           }

@@ -107,7 +107,49 @@ export default function DrawsPage() {
       ]);
 
       setGames(Array.isArray(gamesRes) ? gamesRes : []);
-      setDraws(drawsRes?.items || []);
+
+      // Dédoublonnage strict des tirages par (loterie, date, session Midi/Soir)
+      const rawDraws: any[] = drawsRes?.items || [];
+      const drawMap = new Map<string, any>();
+      const duplicateIdsToClean: string[] = [];
+
+      for (const d of rawDraws) {
+        const dt = new Date(d.salesClosingAt);
+        const dateKey = `${dt.getFullYear()}-${dt.getMonth() + 1}-${dt.getDate()}`;
+        const sessionKey = dt.getHours() < 16 ? 'MIDI' : 'SOIR';
+        const groupKey = `${d.gameId || d.game?.id || d.game?.code}_${dateKey}_${sessionKey}`;
+
+        if (!drawMap.has(groupKey)) {
+          drawMap.set(groupKey, d);
+        } else {
+          const existing = drawMap.get(groupKey);
+          // Priorité : PUBLISHED > OPEN > plus grand drawNumber
+          const preferNew =
+            (d.status === 'PUBLISHED' && existing.status !== 'PUBLISHED') ||
+            (d.status === 'OPEN' && existing.status !== 'OPEN' && existing.status !== 'PUBLISHED') ||
+            (d.status === existing.status && (d.drawNumber || 0) > (existing.drawNumber || 0));
+
+          if (preferNew) {
+            if ((existing._count?.tickets || 0) === 0 && existing.status !== 'PUBLISHED') {
+              duplicateIdsToClean.push(existing.id);
+            }
+            drawMap.set(groupKey, d);
+          } else {
+            if ((d._count?.tickets || 0) === 0 && d.status !== 'PUBLISHED') {
+              duplicateIdsToClean.push(d.id);
+            }
+          }
+        }
+      }
+
+      // Suppression silencieuse en base des doublons vides détectés
+      if (duplicateIdsToClean.length > 0) {
+        duplicateIdsToClean.forEach((dupId) => {
+          api.delete(`/api/v1/draws/${dupId}`).catch(() => {});
+        });
+      }
+
+      setDraws(Array.from(drawMap.values()));
       setBlockedNumbers(Array.isArray(blockedRes) ? blockedRes : []);
       if (settingsRes?.defaultCurrency) {
         setCurrency(settingsRes.defaultCurrency);

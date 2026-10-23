@@ -649,7 +649,7 @@ export default function TransactionsPage() {
                   <option value="">Sélectionnez un vendeur...</option>
                   {vendorsList.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.vendorCode} - {v.fullName} (Solde actuel : {formatCurrency(v.currentBalance, currency)})
+                      {v.vendorCode} - {v.fullName} (Solde actuel : {formatCurrency(Math.abs(Number(v.currentBalance || 0)), currency)})
                     </option>
                   ))}
                 </select>

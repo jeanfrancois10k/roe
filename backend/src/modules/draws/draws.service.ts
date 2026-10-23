@@ -168,6 +168,7 @@ export function createHaitiDate(
 @Injectable()
 export class DrawsService implements OnModuleInit, OnModuleDestroy {
   private static defaultLotteriesEnsured = false;
+  private static isAutoProcessing = false;
   private readonly logger = new Logger(DrawsService.name);
   private readonly validationSecret: string;
   private timer: NodeJS.Timeout | null = null;
@@ -309,7 +310,74 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
    * 4. Les ventes de la journée débutent à 05h00 AM (heure d’Haïti).
    * 5. Toutes les heures sont interprétées strictement dans le fuseau America/Port-au-Prince.
    */
+  /**
+   * Nettoie et supprime définitivement les tirages en doublon (même loterie, même jour Haïti, même session Midi/Soir)
+   */
+  async cleanupDuplicateDraws() {
+    try {
+      const recentDraws = await this.prisma.draw.findMany({
+        where: {
+          salesClosingAt: {
+            gte: new Date(Date.now() - 14 * 24 * 3600 * 1000),
+          },
+        },
+        include: {
+          _count: { select: { tickets: true } },
+        },
+        orderBy: { drawNumber: 'desc' },
+      });
+
+      const groups = new Map<string, typeof recentDraws>();
+      for (const d of recentDraws) {
+        const parts = getHaitiDateParts(new Date(d.salesClosingAt));
+        const period = parts.hour < 16 ? 'MIDI' : 'SOIR';
+        const key = `${d.gameId}_${parts.year}-${parts.month + 1}-${parts.day}_${period}`;
+        if (!groups.has(key)) {
+          groups.set(key, []);
+        }
+        groups.get(key)!.push(d);
+      }
+
+      const idsToDelete: string[] = [];
+      for (const [, group] of groups) {
+        if (group.length <= 1) continue;
+
+        group.sort((a, b) => {
+          if (a.status === DrawStatus.PUBLISHED && b.status !== DrawStatus.PUBLISHED) return -1;
+          if (b.status === DrawStatus.PUBLISHED && a.status !== DrawStatus.PUBLISHED) return 1;
+          const aTickets = a._count?.tickets || 0;
+          const bTickets = b._count?.tickets || 0;
+          if (aTickets > 0 && bTickets === 0) return -1;
+          if (bTickets > 0 && aTickets === 0) return 1;
+          if (a.status === DrawStatus.OPEN && b.status !== DrawStatus.OPEN) return -1;
+          if (b.status === DrawStatus.OPEN && a.status !== DrawStatus.OPEN) return 1;
+          return b.drawNumber - a.drawNumber;
+        });
+
+        const [, ...duplicates] = group;
+        for (const dup of duplicates) {
+          if ((dup._count?.tickets || 0) === 0 && dup.status !== DrawStatus.PUBLISHED) {
+            idsToDelete.push(dup.id);
+          }
+        }
+      }
+
+      if (idsToDelete.length > 0) {
+        await this.prisma.draw.deleteMany({
+          where: { id: { in: idsToDelete } },
+        });
+        this.logger.log(`🧹 ${idsToDelete.length} tirage(s) doublon(s) supprimé(s) définitivement.`);
+      }
+    } catch (err: any) {
+      this.logger.warn(`Nettoyage doublons tirages : ${err.message}`);
+    }
+  }
+
   async autoProcessDraws() {
+    if (DrawsService.isAutoProcessing) {
+      return;
+    }
+    DrawsService.isAutoProcessing = true;
     try {
       const now = new Date();
 
@@ -317,6 +385,8 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       if (!DrawsService.defaultLotteriesEnsured) {
         await this.ensureDefaultLotteries().catch(() => {});
       }
+
+      await this.cleanupDuplicateDraws();
 
       // 1. Clôture automatique de tous les tirages arrivés à échéance (salesClosingAt <= now)
       const expiredDraws = await this.prisma.draw.findMany({
@@ -502,22 +572,22 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
           this.logger.warn(`🧹 Dédoublonnage : ${staleDuplicates.length} doublons OPEN fermés pour ${game.name}`);
         }
 
-        // 4. Synchronisation du tirage en base (par date du jour et nom de session)
+        // 4. Synchronisation du tirage en base (par date du jour et session Midi/Soir)
         const targetParts = getHaitiDateParts(targetClose);
         const dayStartHaiti = createHaitiDate(targetParts.year, targetParts.month, targetParts.day, 0, 0, 0);
         const dayEndHaiti = createHaitiDate(targetParts.year, targetParts.month, targetParts.day, 23, 59, 59);
 
-        const existingDraw = await this.prisma.draw.findFirst({
+        const dayDrawsForGame = await this.prisma.draw.findMany({
           where: {
             gameId: game.id,
-            OR: [
-              { sessionName },
-              { sessionName: null },
-            ],
             salesClosingAt: { gte: dayStartHaiti, lte: dayEndHaiti },
           },
-          orderBy: { salesClosingAt: 'desc' },
+          orderBy: { drawNumber: 'desc' },
         });
+        const isTargetMidi = sessionName === 'MIDI';
+        const existingDraw = dayDrawsForGame.find((d) =>
+          isTargetMidi ? this.isMidiDraw(d.salesClosingAt) : this.isSoirDraw(d.salesClosingAt),
+        );
 
         if (existingDraw) {
           const shouldUpdateTimes =
@@ -637,6 +707,8 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       }
     } catch (err: any) {
       this.logger.warn(`[autoProcessDraws] Avertissement base de données : ${err.message}`);
+    } finally {
+      DrawsService.isAutoProcessing = false;
     }
   }
 
@@ -787,12 +859,13 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async findAll(gameId?: string, status?: DrawStatus, page = 1, limit = 20) {
+    await this.cleanupDuplicateDraws();
     const skip = (page - 1) * limit;
     const where: any = {};
     if (gameId) where.gameId = gameId;
     if (status) where.status = status;
 
-    const [total, items] = await Promise.all([
+    const [total, rawItems] = await Promise.all([
       this.prisma.draw.count({ where }),
       this.prisma.draw.findMany({
         where,
@@ -806,7 +879,20 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       }),
     ]);
 
-    return { total, page, limit, items };
+    // Dédoublonnage supplémentaire par (gameId, jour Haïti, session Midi/Soir)
+    const seenSessionKeys = new Set<string>();
+    const items: typeof rawItems = [];
+    for (const d of rawItems) {
+      const parts = getHaitiDateParts(new Date(d.salesClosingAt));
+      const period = parts.hour < 16 ? 'MIDI' : 'SOIR';
+      const key = `${d.gameId}_${parts.year}-${parts.month + 1}-${parts.day}_${period}`;
+      if (!seenSessionKeys.has(key)) {
+        seenSessionKeys.add(key);
+        items.push(d);
+      }
+    }
+
+    return { total: items.length, page, limit, items };
   }
 
   async findById(id: string) {

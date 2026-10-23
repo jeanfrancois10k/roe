@@ -119,39 +119,11 @@ fun DashboardScreen(
                     )
                 }
 
-                // Droite : Ventes, Langue & Déconnexion
+                // Droite : Langue & Déconnexion
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Solde Ventes Totales (Cliquer ouvre Kontwòl)
-                    Surface(
-                        color = RoeCard,
-                        shape = RoundedCornerShape(10.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, RoeBorder),
-                        modifier = Modifier.clickable { onMenuClick("CONTROL") }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            horizontalAlignment = Alignment.End
-                        ) {
-                            Text(
-                                text = if (isHt) "VANT YO" else "VENTES",
-                                color = RoeTextMuted,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = "${String.format("%.2f", Math.abs(balance))} G",
-                                color = RoeGold,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Black,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-
                     // Bouton Changement Rapide de Langue (HT / FR)
                     Surface(
                         color = RoeCard,

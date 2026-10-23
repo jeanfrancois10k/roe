@@ -238,7 +238,7 @@ export default function VendorsPage() {
                       <div className="p-2.5 rounded-xl bg-roe-card/60 border border-roe-border/40">
                         <p className="text-[10px] text-roe-textMuted uppercase font-bold">Solde Actuel</p>
                         <p className="font-mono font-bold text-roe-gold text-sm mt-0.5">
-                          {formatCurrency(v.currentBalance, currency)}
+                          {formatCurrency(Math.abs(Number(v.currentBalance || 0)), currency)}
                         </p>
                       </div>
                       <div className="p-2.5 rounded-xl bg-roe-card/60 border border-roe-border/40">
@@ -373,7 +373,7 @@ export default function VendorsPage() {
                           {/* Solde */}
                           <td className="p-4">
                             <p className="font-mono font-bold text-roe-gold text-sm">
-                              {formatCurrency(v.currentBalance, currency)}
+                              {formatCurrency(Math.abs(Number(v.currentBalance || 0)), currency)}
                             </p>
                             <p className="text-[10px] text-roe-textMuted font-mono">
                               Découvert: {formatCurrency(v.creditLimit, currency)}

@@ -220,7 +220,7 @@ export class VendorsService {
       totalPages: Math.ceil(total / limit),
       items: items.map((v) => ({
         ...v,
-        currentBalance: Number(v.currentBalance),
+        currentBalance: Math.abs(Number(v.currentBalance)),
         creditLimit: Number(v.creditLimit),
         dailySalesLimit: Number(v.dailySalesLimit),
         maxTicketAmount: Number(v.maxTicketAmount),
@@ -281,7 +281,7 @@ export class VendorsService {
 
     return {
       ...vendor,
-      currentBalance: Number(vendor.currentBalance),
+      currentBalance: Math.abs(Number(vendor.currentBalance)),
       creditLimit: Number(vendor.creditLimit),
       dailySalesLimit: Number(vendor.dailySalesLimit),
       maxTicketAmount: Number(vendor.maxTicketAmount),
@@ -823,7 +823,7 @@ export class VendorsService {
       prizesPaidCount,
       netDueToOwner,
       cashInHand,
-      currentBalance: Number(vendor.currentBalance),
+      currentBalance: Math.abs(Number(vendor.currentBalance)),
       currency,
     };
   }

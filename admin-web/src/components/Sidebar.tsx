@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -14,7 +14,13 @@ import {
   X,
   Smartphone,
   BarChart3,
+  KeyRound,
+  Lock,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
+import { api } from '../lib/api';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -31,6 +37,50 @@ interface NavItem {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
   const router = useRouter();
+
+  const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdSuccess, setPwdSuccess] = useState<string | null>(null);
+  const [pwdError, setPwdError] = useState<string | null>(null);
+
+  const handleChangeAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdError(null);
+    setPwdSuccess(null);
+
+    if (!newPassword || newPassword.length < 6) {
+      setPwdError('Le nouveau mot de passe doit comporter au moins 6 caractères.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwdError('La confirmation ne correspond pas au nouveau mot de passe.');
+      return;
+    }
+
+    setPwdLoading(true);
+    try {
+      const res = await api.patch('/api/v1/auth/change-password', {
+        currentPassword: currentPassword || undefined,
+        newPassword,
+      });
+      setPwdSuccess(res?.message || 'Mot de passe Super Admin modifié avec succès !');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setPwdSuccess(null);
+        setIsPwdModalOpen(false);
+      }, 2000);
+    } catch (err: any) {
+      setPwdError(err.message || 'Erreur lors du changement de mot de passe.');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
 
   const navItems: NavItem[] = [
     { name: 'Tableau de bord', href: '/', icon: LayoutDashboard },
@@ -118,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </nav>
 
         {/* Footer / User Session */}
-        <div className="p-4 border-t border-roe-border/60 bg-roe-card/40">
+        <div className="p-4 border-t border-roe-border/60 bg-roe-card/40 space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-roe-gold to-roe-goldDark text-roe-bg font-bold flex items-center justify-center text-xs shadow-md">
@@ -137,8 +187,121 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <LogOut size={18} />
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPwdError(null);
+              setPwdSuccess(null);
+              setIsPwdModalOpen(true);
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-roe-gold/15 hover:bg-roe-gold/25 text-roe-gold border border-roe-gold/40 text-xs font-bold transition-all"
+          >
+            <KeyRound size={14} />
+            <span>Modifier Mot de Passe Admin</span>
+          </button>
         </div>
       </aside>
+
+      {/* Modal de Modification du Mot de Passe Super Admin */}
+      {isPwdModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-roe-surface border border-roe-gold/50 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-roe-border bg-roe-card/60">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-roe-gold/20 text-roe-gold">
+                  <KeyRound size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white">Mot de Passe Super Admin</h3>
+                  <p className="text-[11px] text-roe-textMuted">Sécurité du compte principal</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPwdModalOpen(false)}
+                className="p-1.5 text-roe-textMuted hover:text-white rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangeAdminPassword} className="p-5 space-y-4">
+              {pwdSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs flex items-center gap-2">
+                  <CheckCircle2 size={16} className="shrink-0" />
+                  <span>{pwdSuccess}</span>
+                </div>
+              )}
+
+              {pwdError && (
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs flex items-center gap-2">
+                  <AlertTriangle size={16} className="shrink-0" />
+                  <span>{pwdError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-roe-textMuted mb-1.5">
+                  Mot de passe actuel (optionnel)
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full bg-roe-dark border border-roe-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-roe-gold mb-1.5">
+                  Nouveau mot de passe Super Admin *
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Minimum 6 caractères"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-roe-dark border border-roe-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-white mb-1.5">
+                  Confirmer le nouveau mot de passe *
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Retapez le nouveau mot de passe"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full bg-roe-dark border border-roe-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-roe-border/60">
+                <button
+                  type="button"
+                  onClick={() => setIsPwdModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-roe-textMuted hover:text-white"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={pwdLoading}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-roe-gold to-amber-500 text-roe-bg text-xs font-black shadow-lg hover:scale-[1.02] transition"
+                >
+                  {pwdLoading ? <RefreshCw size={14} className="animate-spin" /> : <Lock size={14} />}
+                  <span>{pwdLoading ? 'Enregistrement...' : 'Enregistrer le Mot de Passe'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 };

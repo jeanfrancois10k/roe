@@ -259,7 +259,7 @@ export class ReportsService {
             vendorId: vId,
             vendorCode: v?.vendorCode || 'N/A',
             vendorName: v?.fullName || 'Vendeur',
-            currentBalance: Number(v?.currentBalance || 0),
+            currentBalance: Math.abs(Number(v?.currentBalance || 0)),
             ticketsCount: 0,
             totalSales: 0,
             winningTicketsCount: 0,

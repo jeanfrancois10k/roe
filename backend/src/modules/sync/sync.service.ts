@@ -194,7 +194,7 @@ export class SyncService {
       },
       processedTickets,
       delta: {
-        vendorBalance: Number(latestVendor?.currentBalance || 0),
+        vendorBalance: Math.abs(Number(latestVendor?.currentBalance || 0)),
         creditLimit: Number(latestVendor?.creditLimit || 0),
         openDraws: openDraws.map((d) => ({
           id: d.id,
@@ -241,7 +241,7 @@ export class SyncService {
     return {
       serverTime: now.toISOString(),
       vendorStatus: vendor?.status,
-      currentBalance: Number(vendor?.currentBalance || 0),
+      currentBalance: Math.abs(Number(vendor?.currentBalance || 0)),
       openDrawsCount: openDraws.length,
       nextClosingDraw: openDraws[0] || null,
     };

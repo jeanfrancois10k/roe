@@ -108,7 +108,7 @@ fun BalanceScreen(
                 )
 
                 Text(
-                    text = "${String.format("%.2f", balance)} HTG",
+                    text = "${String.format("%.2f", Math.abs(balance))} HTG",
                     color = RoeGold,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Black,

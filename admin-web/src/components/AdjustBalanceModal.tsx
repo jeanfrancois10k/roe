@@ -85,7 +85,7 @@ export const AdjustBalanceModal: React.FC<AdjustBalanceModalProps> = ({
           <div className="p-3.5 rounded-xl bg-roe-card border border-roe-border/60 flex items-center justify-between">
             <span className="text-xs text-roe-textMuted font-semibold">Solde Actuel</span>
             <span className="text-lg font-bold text-roe-gold font-mono">
-              {formatCurrency(vendor.currentBalance, currency)}
+              {formatCurrency(Math.abs(Number(vendor.currentBalance || 0)), currency)}
             </span>
           </div>
 
