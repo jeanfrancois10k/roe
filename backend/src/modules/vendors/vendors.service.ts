@@ -17,6 +17,7 @@ import { VendorQueryDto } from './dto/vendor-query.dto';
 import { AssignDeviceDto } from './dto/assign-device.dto';
 import { BalanceAdjustmentDto } from './dto/balance-adjustment.dto';
 import { Role, VendorStatus, DeviceStatus, TransactionType, TicketStatus, TicketPayoutStatus, Prisma } from '@prisma/client';
+import { createHaitiDate, getHaitiDateParts } from '../draws/draws.service';
 
 /**
  * Formatage standard d'un nom d'utilisateur vendeur combinant son nom et son code PIN
@@ -940,9 +941,9 @@ export class VendorsService {
       throw new NotFoundException('Vendeur introuvable');
     }
 
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
-    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
-    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+    const haitiParts = getHaitiDateParts(dateStr ? new Date(dateStr) : new Date());
+    const startOfDay = createHaitiDate(haitiParts.year, haitiParts.month, haitiParts.day, 0, 0, 0);
+    const endOfDay = createHaitiDate(haitiParts.year, haitiParts.month, haitiParts.day, 23, 59, 59);
 
     // 1. Total Ventes du jour (Gross Sales)
     const salesAgg = await this.prisma.ticket.aggregate({
@@ -1037,7 +1038,7 @@ export class VendorsService {
       vendorCode: vendor.vendorCode,
       vendorName: vendor.fullName,
       posAddress: vendor.posAddress,
-      date: startOfDay.toISOString().split('T')[0],
+      date: `${haitiParts.year}-${String(haitiParts.month + 1).padStart(2, '0')}-${String(haitiParts.day).padStart(2, '0')}`,
       totalSales,
       ticketsCount,
       commissionRate,

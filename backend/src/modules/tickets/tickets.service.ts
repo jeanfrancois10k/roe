@@ -278,16 +278,17 @@ export class TicketsService {
       `;
 
       const currentBal = Number(lockedVendor.currentBalance);
-      const netBalanceAfter = currentBal;
+      const netBalanceAfter = Number((currentBal + totalAmount).toFixed(2));
 
       await tx.vendor.update({
         where: { id: vendorId },
         data: {
+          currentBalance: netBalanceAfter,
           lastActivityAt: now,
         },
       });
 
-      // 2. Écriture Ledger : Vente Ticket
+      // 2. Écriture Ledger : Vente Ticket (Augmente le solde d'encaissement de la caisse vendeur)
       await tx.transaction.create({
         data: {
           vendorId,
@@ -295,7 +296,7 @@ export class TicketsService {
           type: TransactionType.SALE,
           amount: totalAmount,
           balanceBefore: currentBal,
-          balanceAfter: currentBal,
+          balanceAfter: netBalanceAfter,
           reference: dto.idempotencyKey,
           description: `Vente Ticket ${ticketNumber} (${game.name})`,
         },
@@ -309,8 +310,8 @@ export class TicketsService {
             operatorId: operatorUserId,
             type: TransactionType.COMMISSION,
             amount: commissionAmount,
-            balanceBefore: currentBal,
-            balanceAfter: currentBal,
+            balanceBefore: netBalanceAfter,
+            balanceAfter: netBalanceAfter,
             reference: `COM-${dto.idempotencyKey}`,
             description: commissionDescription,
           },
@@ -367,6 +368,15 @@ export class TicketsService {
         createdAt: createdTicket.createdAt,
         newBalance: netBalanceAfter,
       };
+
+      if (this.realtimeGateway?.server) {
+        this.realtimeGateway.notifyVendorBalanceUpdated(
+          vendorId,
+          netBalanceAfter,
+          totalAmount,
+          `Vente Ticket ${ticketNumber}`,
+        );
+      }
 
       return {
         success: true,
@@ -426,14 +436,17 @@ export class TicketsService {
       `;
 
       const currentBal = Number(lockedVendor.currentBalance);
-      const balanceAfterCancel = currentBal;
+      const balanceAfterCancel = Number((currentBal - ticketAmount).toFixed(2));
 
       await tx.vendor.update({
         where: { id: ticket.vendorId },
-        data: { lastActivityAt: now },
+        data: {
+          currentBalance: balanceAfterCancel,
+          lastActivityAt: now,
+        },
       });
 
-      // Écriture Ledger : Annulation de la vente
+      // Écriture Ledger : Annulation de la vente (Remboursement joueur, déduit de la caisse vendeur)
       await tx.transaction.create({
         data: {
           vendorId: ticket.vendorId,
@@ -466,6 +479,15 @@ export class TicketsService {
           reason: dto.reason,
         },
       });
+
+      if (this.realtimeGateway?.server) {
+        this.realtimeGateway.notifyVendorBalanceUpdated(
+          ticket.vendorId,
+          balanceAfterCancel,
+          -ticketAmount,
+          `Annulation Vente Ticket ${ticket.ticketNumber}`,
+        );
+      }
 
       return {
         success: true,

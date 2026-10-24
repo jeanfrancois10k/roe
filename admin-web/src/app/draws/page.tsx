@@ -28,6 +28,7 @@ import {
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
 import { api } from '../../lib/api';
+import { formatHaitiDateTime, formatHaitiTime, getHaitiHour } from '../../lib/date';
 import { formatCurrency } from '../../lib/currency';
 
 export default function DrawsPage() {
@@ -871,13 +872,13 @@ export default function DrawsPage() {
                           <div>
                             <p className="font-bold text-white text-sm">{d.game?.name}</p>
                             <p className="text-[10px] text-roe-textMuted font-mono">
-                              Fermeture : {new Date(d.salesClosingAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              Fermeture : {formatHaitiTime(d.salesClosingAt)}
                             </p>
                           </div>
                         </div>
 
                         {(() => {
-                          const isMidi = new Date(d.salesClosingAt).getHours() < 16;
+                          const isMidi = getHaitiHour(d.salesClosingAt) < 16;
                           return (
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border flex items-center gap-1 ${
@@ -1035,15 +1036,12 @@ export default function DrawsPage() {
                             </td>
 
                             <td className="p-4 text-xs font-mono text-roe-textMuted">
-                              {new Date(d.salesClosingAt).toLocaleString([], {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              })}
+                              {formatHaitiDateTime(d.salesClosingAt)}
                             </td>
 
                             <td className="p-4">
                               {(() => {
-                                const isMidi = new Date(d.salesClosingAt).getHours() < 16;
+                                const isMidi = getHaitiHour(d.salesClosingAt) < 16;
                                 return (
                                   <span
                                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border inline-flex items-center gap-1 ${
@@ -1520,7 +1518,7 @@ export default function DrawsPage() {
                 </span>
               </h3>
               {(() => {
-                const isMidi = new Date(selectedDrawForResults.salesClosingAt).getHours() < 16;
+                const isMidi = getHaitiHour(selectedDrawForResults.salesClosingAt) < 16;
                 return (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-roe-gold/15 border border-roe-gold/40 text-roe-gold font-mono">
                     {isMidi ? 'Tirage Midi' : 'Tirage Soir'}

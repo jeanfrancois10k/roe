@@ -28,6 +28,7 @@ import { Header } from '../../components/Header';
 import { StatCard } from '../../components/StatCard';
 import { api } from '../../lib/api';
 import { formatCurrency, getCurrencySymbol } from '../../lib/currency';
+import { formatHaitiDateTime } from '../../lib/date';
 
 interface TransactionItem {
   id: string;
@@ -203,7 +204,7 @@ export default function TransactionsPage() {
     if (transactions.length === 0) return;
     const headers = ['Date', 'Reference', 'Vendeur', 'Type', 'Montant', 'Solde Avant', 'Solde Apres', 'Description', 'Operateur'];
     const rows = transactions.map((t) => [
-      t.createdAt ? t.createdAt.replace('T', ' ').slice(0, 19) : '',
+      t.createdAt ? formatHaitiDateTime(t.createdAt) : '',
       t.reference,
       t.vendor ? `${t.vendor.vendorCode} - ${t.vendor.fullName}` : 'Système',
       t.type,
@@ -511,7 +512,7 @@ export default function TransactionsPage() {
                         <tr key={t.id} className="hover:bg-roe-card/50 transition">
                           {/* Date */}
                           <td className="py-3.5 px-4 text-roe-textMuted font-mono whitespace-nowrap">
-                            {t.createdAt ? t.createdAt.replace('T', ' ').slice(0, 19) : '-'}
+                            {formatHaitiDateTime(t.createdAt)}
                           </td>
 
                           {/* Référence */}

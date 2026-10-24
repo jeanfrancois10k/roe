@@ -24,6 +24,7 @@ import { StatCard } from '../components/StatCard';
 import { api } from '../lib/api';
 import { getAdminSocket } from '../lib/socket';
 import { formatCurrency, getCurrencySymbol } from '../lib/currency';
+import { formatHaitiDateTime, formatHaitiTime } from '../lib/date';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -449,7 +450,7 @@ export default function DashboardPage() {
                             </p>
                             <p className="text-[11px] text-roe-textMuted">{tx.description}</p>
                             <p className="text-[10px] text-roe-textMuted/80 font-mono mt-0.5">
-                              Par: {tx.operator?.username || 'Système'} • {tx.createdAt ? tx.createdAt.replace('T', ' ').slice(0, 16) : ''}
+                              Par: {tx.operator?.username || 'Système'} • {tx.createdAt ? formatHaitiDateTime(tx.createdAt) : ''}
                             </p>
                           </div>
                         </div>
@@ -507,11 +508,8 @@ export default function DashboardPage() {
                         </div>
                         <p className="text-[11px] text-roe-textMuted mt-1">Cible : {log.resource}</p>
                       </div>
-                      <span className="text-[10px] text-roe-textMuted">
-                        {new Date(log.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                      <span className="text-[10px] text-roe-textMuted font-mono">
+                        {formatHaitiTime(log.createdAt)}
                       </span>
                     </div>
                   ))

@@ -27,6 +27,7 @@ import { Header } from '../../components/Header';
 import { StatCard } from '../../components/StatCard';
 import { api } from '../../lib/api';
 import { formatCurrency } from '../../lib/currency';
+import { formatHaitiDateTime } from '../../lib/date';
 
 export default function ReportsPage() {
   const router = useRouter();
@@ -168,7 +169,7 @@ export default function ReportsPage() {
 
   const startDisplay = formatDateDisplay(reportData?.startDate || startDate);
   const endDisplay = formatDateDisplay(reportData?.endDate || endDate || startDate);
-  const nowDisplay = new Date().toLocaleDateString('fr-FR') + ' ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const nowDisplay = formatHaitiDateTime(new Date());
 
   // Filtrage local recherche
   const filteredDraws = byDraw.filter((d: any) =>
