@@ -1102,6 +1102,16 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
+    // Interdiction stricte de publier les résultats d'un tirage en cours de vente
+    if (draw.status === DrawStatus.OPEN) {
+      const now = new Date();
+      if (now < new Date(draw.salesClosingAt)) {
+        throw new BadRequestException(
+          `Impossible de publier les résultats : le tirage "${draw.game?.name || 'Tirage'}" est toujours en cours de vente. Veuillez d'abord clôturer la vente.`,
+        );
+      }
+    }
+
     // Extraction robuste des résultats gagnants (supporte format imbriqué winningResults OU champs directs)
     const winningResults = dto.winningResults || {
       firstPrize: dto.firstPrize || '',
@@ -1157,6 +1167,16 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
 
     if (draw.status === DrawStatus.PUBLISHED) {
       throw new BadRequestException('Ce tirage est déjà officiellement publié.');
+    }
+
+    // Interdiction stricte de publier les résultats d'un tirage en cours de vente
+    if (draw.status === DrawStatus.OPEN) {
+      const now = new Date();
+      if (now < new Date(draw.salesClosingAt)) {
+        throw new BadRequestException(
+          `Impossible de publier les résultats : le tirage "${draw.game?.name || 'Tirage'}" est toujours en cours de vente. Veuillez d'abord clôturer la vente.`,
+        );
+      }
     }
 
     if (!draw.winningResults) {

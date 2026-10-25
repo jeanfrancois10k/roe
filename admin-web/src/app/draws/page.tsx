@@ -481,6 +481,14 @@ export default function DrawsPage() {
       return;
     }
 
+    if (!isOverrideMode && selectedDrawForResults.status === 'OPEN') {
+      const isPastClosing = new Date() >= new Date(selectedDrawForResults.salesClosingAt);
+      if (!isPastClosing) {
+        setActionError(`Impossible de publier : ce tirage est encore en vente. Veuillez d'abord cliquer sur "Clôturer Vente".`);
+        return;
+      }
+    }
+
     setResultActionLoading(true);
     setActionError(null);
 
@@ -943,7 +951,17 @@ export default function DrawsPage() {
                             <span>Clôturer Vente</span>
                           </button>
                         )}
-                        {(isOpen || isClosed) && (
+                        {isOpen && (
+                          <button
+                            disabled
+                            className="px-3 py-1.5 rounded-xl bg-roe-card/80 text-roe-textMuted/40 border border-roe-border/40 text-xs font-semibold flex items-center gap-1 cursor-not-allowed opacity-50"
+                            title="Ce tirage est encore en vente. Veuillez d'abord cliquer sur 'Clôturer Vente'."
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Publier Résultats</span>
+                          </button>
+                        )}
+                        {isClosed && (
                           <button
                             onClick={() => {
                               setIsOverrideMode(false);
@@ -1105,7 +1123,17 @@ export default function DrawsPage() {
                                     <span>Clôturer Vente</span>
                                   </button>
                                 )}
-                                {(isOpen || isClosed) && (
+                                {isOpen && (
+                                  <button
+                                    disabled
+                                    className="px-3.5 py-1.5 rounded-xl bg-roe-card/80 text-roe-textMuted/40 border border-roe-border/40 text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed opacity-50"
+                                    title="Ce tirage est encore en vente. Veuillez d'abord cliquer sur 'Clôturer Vente'."
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>Publier Résultats</span>
+                                  </button>
+                                )}
+                                {isClosed && (
                                   <button
                                     onClick={() => {
                                       setIsOverrideMode(false);
