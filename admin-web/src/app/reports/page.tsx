@@ -187,7 +187,21 @@ export default function ReportsPage() {
     w.drawName?.toLowerCase().includes(searchFilter.toLowerCase())
   );
 
-  // Texte thermique pour copie / impression
+  // Calculs financiers sécurisés (Garantie 0 signe négatif dans les rapports)
+  const rawBalanceCash = Number(global.balanceCash ?? ((global.totalSales || 0) - (global.prizesPaid || 0)));
+  const isCashPositive = rawBalanceCash >= 0;
+  const absBalanceCash = Math.abs(rawBalanceCash);
+
+  const rawBalanceTotale = Number(global.balanceTotale ?? (rawBalanceCash - (global.commission || 0)));
+  const isTotalPositive = rawBalanceTotale >= 0;
+  const absBalanceTotale = Math.abs(rawBalanceTotale);
+
+  const prizesPaidAmount = Number(global.paiementsPertes || global.prizesPaid || 0);
+  const paidCount = Number(global.prizesPaidCount || 0);
+  const periodWonAmount = Number(global.totalWonAmount || 0);
+  const periodWinnersCount = Number(global.winningTicketsCount || global.nombreFichesGagnantes || 0);
+
+  // Texte thermique pour copie / impression (Garantie sans signe moins)
   const thermalSalesReportText = `
 ${lotteryName.toUpperCase()}*****
 
@@ -199,27 +213,27 @@ Banque : ${vendorCodeDisplay}
 Nombre fiches vendues :
 ${global.nombreFichesVendues || global.ticketsCount}
 --------------------------------
-Nombre fiches gagnantes :
-${global.nombreFichesGagnantes || global.winningTicketsCount}
+Nombre fiches payées :
+${paidCount || periodWinnersCount} (${Math.round(prizesPaidAmount)} G)
 ================================
 Vant :
 Total : ${Math.round(global.ventesTotal || global.totalSales)}
 Cash : ${Math.round(global.ventesCash || global.totalSales)}
 Moncash : 0
 --------------------------------
-Paiements pet :
-${Math.round(global.paiementsPertes || global.prizesPaid)}
+Paiements pertes :
+${Math.round(prizesPaidAmount)}
 --------------------------------
 Balance cash
-(ventes - pertes)
-${Math.round(global.balanceCash || (global.totalSales - global.prizesPaid))}
+(ventes - pertes) :
+${Math.round(absBalanceCash)} ${isCashPositive ? '(Bénéfice)' : '(À couvrir)'}
 --------------------------------
 Commission :
 ${Math.round(global.commission || 0)}
 --------------------------------
 Balance totale
-(balance cash - commission)
-${Math.round(global.balanceTotale || (global.totalSales - global.prizesPaid))}
+(balance cash - commission) :
+${Math.round(absBalanceTotale)} ${isTotalPositive ? '(Net Banque)' : '(À régulariser)'}
 ================================
 `.trim();
 
@@ -415,7 +429,7 @@ ${winningTickets.length === 0 ? 'Aucun ticket gagnant enregistré.\n------------
             )}
           </div>
 
-          {/* KPI CARDS (GLOBAL & THERMIQUE) */}
+          {/* KPI CARDS (GLOBAL & THERMIQUE SANS SIGNE MOINS) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               title="Chiffre d'Affaires Brut"
@@ -425,25 +439,39 @@ ${winningTickets.length === 0 ? 'Aucun ticket gagnant enregistré.\n------------
               variant="gold"
             />
             <StatCard
-              title="Fiches Gagnantes"
-              value={`${global.nombreFichesGagnantes || global.winningTicketsCount}`}
-              subtitle={`Pertes : ${formatCurrency(global.paiementsPertes || global.prizesPaid, currency)}`}
+              title="Pertes & Gains Payés"
+              value={formatCurrency(prizesPaidAmount, currency)}
+              subtitle={
+                paidCount > 0
+                  ? `${paidCount} fiches payées en caisse • ${periodWinnersCount} gagnants tirages (${formatCurrency(periodWonAmount, currency)})`
+                  : `${periodWinnersCount} fiches gagnantes (${formatCurrency(periodWonAmount, currency)})`
+              }
               icon={Trophy}
               variant="purple"
             />
             <StatCard
-              title="Balance Cash (Ventes - Pertes)"
-              value={formatCurrency(global.balanceCash || (global.totalSales - global.prizesPaid), currency)}
-              subtitle="Cash net en caisse"
+              title={isCashPositive ? "Balance Cash (Bénéfice)" : "Balance Cash (À Couvrir)"}
+              value={formatCurrency(absBalanceCash, currency)}
+              subtitle={
+                isCashPositive
+                  ? "Excédent net disponible en caisse"
+                  : "Pertes payées supérieures aux ventes (Couvert par la centrale)"
+              }
+              trend={isCashPositive ? "Cash Positif" : "Déficit Caisse Couvert"}
               icon={Coins}
-              variant="amber"
+              variant={isCashPositive ? "amber" : "rose"}
             />
             <StatCard
-              title="Balance Totale (- Commission)"
-              value={formatCurrency(global.balanceTotale || (global.totalSales - global.prizesPaid), currency)}
-              subtitle={`Commission : ${formatCurrency(global.commission || 0, currency)}`}
+              title={isTotalPositive ? "Balance Totale (Net Banque)" : "Balance Totale (Dû Vendeurs)"}
+              value={formatCurrency(absBalanceTotale, currency)}
+              subtitle={
+                isTotalPositive
+                  ? `Commission vendeurs : ${formatCurrency(global.commission || 0, currency)}`
+                  : `Avance requise (Commission: ${formatCurrency(global.commission || 0, currency)})`
+              }
+              trend={isTotalPositive ? "En faveur Banque" : "À Régulariser"}
               icon={Receipt}
-              variant="emerald"
+              variant={isTotalPositive ? "emerald" : "amber"}
             />
           </div>
 
