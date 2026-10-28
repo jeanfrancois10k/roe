@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const [ticketProviderInfo, setTicketProviderInfo] = useState('ROE-TECH');
   const [ticketValidityDays, setTicketValidityDays] = useState(90);
   const [mariageGratuitNote, setMariageGratuitNote] = useState('MARYAJ GRATIS 1500 GDES');
+  const [mariageGratuitPayout, setMariageGratuitPayout] = useState(1500);
 
   // Devise
   const [activeCurrency, setActiveCurrency] = useState('HTG');
@@ -86,6 +87,7 @@ export default function SettingsPage() {
           setTicketProviderInfo(res.lottery.ticketProviderInfo || 'ROE-TECH');
           setTicketValidityDays(res.lottery.ticketValidityDays || 90);
           setMariageGratuitNote(res.lottery.mariageGratuitNote || 'MARYAJ GRATIS 1500 GDES');
+          setMariageGratuitPayout(res.lottery.mariageGratuitPayout !== undefined ? Number(res.lottery.mariageGratuitPayout) : 1500);
         }
       }
     } catch (err: any) {
@@ -123,6 +125,7 @@ export default function SettingsPage() {
         ticketProviderInfo,
         ticketValidityDays: Number(ticketValidityDays),
         mariageGratuitNote,
+        mariageGratuitPayout: Number(mariageGratuitPayout),
       });
 
       setSuccessMessage('✅ Paramètres de la Loterie enregistrés avec succès ! Tous les tickets POS appliqueront ces informations immédiatement.');
@@ -520,17 +523,42 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-roe-textMuted mb-1.5">
-                    Mention Spéciale Mariage Gratuit
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: MARYAJ GRATIS 1500 GDES"
-                    value={mariageGratuitNote}
-                    onChange={(e) => setMariageGratuitNote(e.target.value)}
-                    className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-roe-textMuted mb-1.5 flex items-center justify-between">
+                      <span>Montant Gain Mariage Gratuit ({activeCurrency})</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">Attribué au Gagnant</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="50"
+                      placeholder="1500"
+                      value={mariageGratuitPayout}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setMariageGratuitPayout(val);
+                        if (mariageGratuitNote.startsWith('MARYAJ GRATIS')) {
+                          setMariageGratuitNote(`MARYAJ GRATIS ${val} GDES`);
+                        }
+                      }}
+                      className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-white focus:outline-none focus:border-roe-gold"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Montant automatique crédité si un mariage gratuit généré est gagnant lors d'un tirage.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-roe-textMuted mb-1.5">
+                      Mention Spéciale sur Ticket
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: MARYAJ GRATIS 1500 GDES"
+                      value={mariageGratuitNote}
+                      onChange={(e) => setMariageGratuitNote(e.target.value)}
+                      className="w-full bg-roe-dark border border-roe-border/70 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-roe-gold"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Mention imprimée en bas de chaque fiche remise au client.</p>
+                  </div>
                 </div>
 
                 <div>

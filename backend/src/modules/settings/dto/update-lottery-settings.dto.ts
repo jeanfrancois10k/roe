@@ -57,4 +57,10 @@ export class UpdateLotterySettingsDto {
   @IsOptional()
   @IsString()
   mariageGratuitNote?: string;
+
+  @ApiPropertyOptional({ example: 1500, description: 'Montant du gain attribué pour un Mariage Gratuit gagnant (HTG)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  mariageGratuitPayout?: number;
 }

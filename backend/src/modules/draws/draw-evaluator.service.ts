@@ -33,7 +33,7 @@ export class DrawEvaluatorService {
       secondPrize: rules.multipliers?.secondPrize ?? rules.borlette?.secondPrizeMultiplier ?? 20,
       thirdPrize: rules.multipliers?.thirdPrize ?? rules.borlette?.thirdPrizeMultiplier ?? 10,
       mariage: rules.multipliers?.mariage ?? rules.mariage?.multiplier ?? 1000,
-      mariageGratis: rules.multipliers?.mariageGratis ?? rules.mariage?.mariageGratis ?? 1000,
+      mariageGratis: rules.mariageGratisPayout ?? rules.multipliers?.mariageGratis ?? rules.mariage?.mariageGratis ?? 1500,
       lot3: rules.multipliers?.lot3 ?? rules.lot3?.multiplier ?? 500,
       lot4: rules.multipliers?.lot4 ?? rules.lot4?.multiplier ?? 5000,
       lot5: rules.multipliers?.lot5 ?? rules.lot5?.multiplier ?? 25000,
@@ -68,9 +68,9 @@ export class DrawEvaluatorService {
       const gameType = gridAny.gameType ? String(gridAny.gameType).trim().toUpperCase() : null;
       const isGratis = gridAny.isGratis === true || option === 'GRATIS' || (gameType === 'MARIAGE' && betAmount === 0);
 
-      // Détection des paires Maryaj (soit 2 numéros, soit 1 chaîne avec séparateur ex: "12x34" ou 4 chiffres si gameType MARIAGE)
+      // Détection des paires Maryaj (soit 2 numéros si pas BORLETTE, soit 1 chaîne avec séparateur ex: "12x34" ou 4 chiffres si gameType MARIAGE)
       let maryajPair: [string, string] | null = null;
-      if (cleanNumbers.length === 2) {
+      if (cleanNumbers.length === 2 && gameType !== 'BORLETTE' && gameType !== 'BOLET') {
         maryajPair = [cleanNumbers[0].padStart(2, '0'), cleanNumbers[1].padStart(2, '0')];
       } else if (cleanNumbers.length === 1) {
         const parts = cleanNumbers[0].split(/[x\-\*\s\/]+/).filter(Boolean);
@@ -81,22 +81,47 @@ export class DrawEvaluatorService {
         }
       }
 
-      // 1. Borlette simple (1 numéro de 1 ou 2 chiffres, ex: ["12"] ou ["7"])
-      if (cleanNumbers.length === 1 && cleanNumbers[0].length <= 2 && !maryajPair) {
-        const playedNum = cleanNumbers[0].padStart(2, '0');
+      // 1. Borlette traditionnelle (1 ou plusieurs numéros de 1 ou 2 chiffres, ex: ["50"] ou ["50", "05"])
+      // Règle Haïtienne Dekabè / Dekole : Si un numéro joué apparaît dans plusieurs lots du tirage (ex: 2e et 3e lot),
+      // le joueur gagne pour CHAQUE lot où il apparaît (ex: 20x + 10x = 30x).
+      const isBorlette = (gameType === 'BORLETTE' || gameType === 'BOLET') ||
+                         (cleanNumbers.length === 1 && cleanNumbers[0].length <= 2 && !maryajPair);
 
-        if (playedNum === firstLot2) {
-          const mult = multipliers.firstPrize ?? 50;
-          gridWon = betAmount * mult;
-          description = `1er Lot Gagnant (${firstLot2}) - ${mult}x`;
-        } else if (playedNum === secondLot2) {
-          const mult = multipliers.secondPrize ?? 20;
-          gridWon = betAmount * mult;
-          description = `2e Lot Gagnant (${secondLot2}) - ${mult}x`;
-        } else if (playedNum === thirdLot2) {
-          const mult = multipliers.thirdPrize ?? 10;
-          gridWon = betAmount * mult;
-          description = `3e Lot Gagnant (${thirdLot2}) - ${mult}x`;
+      if (isBorlette && !maryajPair) {
+        const playedNumbers = cleanNumbers.filter((n) => n.length <= 2).map((n) => n.padStart(2, '0'));
+        let totalMultForGrid = 0;
+        const allMatchesDesc: string[] = [];
+
+        for (const playedNum of playedNumbers) {
+          const matches: Array<{ lotName: string; lotNum: string; mult: number }> = [];
+
+          if (playedNum === firstLot2) {
+            matches.push({ lotName: '1er Lot', lotNum: firstLot2, mult: multipliers.firstPrize ?? 50 });
+          }
+          if (playedNum === secondLot2) {
+            matches.push({ lotName: '2e Lot', lotNum: secondLot2, mult: multipliers.secondPrize ?? 20 });
+          }
+          if (playedNum === thirdLot2) {
+            matches.push({ lotName: '3e Lot', lotNum: thirdLot2, mult: multipliers.thirdPrize ?? 10 });
+          }
+
+          if (matches.length > 0) {
+            const totalNumMult = matches.reduce((sum, m) => sum + m.mult, 0);
+            totalMultForGrid += totalNumMult;
+
+            if (matches.length === 1) {
+              allMatchesDesc.push(`${matches[0].lotName} Gagnant (${matches[0].lotNum}) - ${matches[0].mult}x`);
+            } else {
+              // Dekabè : numéro répété dans plusieurs lots
+              const partsDesc = matches.map((m) => `${m.lotName} (${m.lotNum}) ${m.mult}x`).join(' + ');
+              allMatchesDesc.push(`${partsDesc} [Dekabè] - ${totalNumMult}x`);
+            }
+          }
+        }
+
+        if (totalMultForGrid > 0) {
+          gridWon = betAmount * totalMultForGrid;
+          description = allMatchesDesc.join(' | ');
         }
       }
       // 2. Lòt 3 / Pick 3 (1 numéro de 3 chiffres, ex: ["512"])
@@ -115,6 +140,7 @@ export class DrawEvaluatorService {
         if (numA !== numB) {
           let isMaryajWin = false;
           let optionLabel = 'Tout';
+          let winMultiplierCount = 1;
 
           const isOp1 = (numA === firstLot2 && numB === secondLot2) || (numA === secondLot2 && numB === firstLot2);
           const isOp2 = (numA === firstLot2 && numB === thirdLot2) || (numA === thirdLot2 && numB === firstLot2);
@@ -130,20 +156,32 @@ export class DrawEvaluatorService {
             isMaryajWin = isOp3;
             optionLabel = 'Op 3 (2e-3e)';
           } else {
-            // Option TOUT ou GRATIS
-            isMaryajWin = isOp1 || isOp2 || isOp3;
-            optionLabel = isOp1 ? 'Op 1' : isOp2 ? 'Op 2' : 'Op 3';
+            // Option TOUT ou GRATIS : support du gain combiné si les numéros se répètent dans le tirage
+            const matchedOps: string[] = [];
+            if (isOp1) matchedOps.push('Op 1');
+            if (isOp2) matchedOps.push('Op 2');
+            if (isOp3) matchedOps.push('Op 3');
+
+            isMaryajWin = matchedOps.length > 0;
+            winMultiplierCount = matchedOps.length > 0 ? matchedOps.length : 1;
+            optionLabel = matchedOps.join(' + ');
           }
 
           if (isMaryajWin) {
             if (isGratis) {
-              const gratisWon = multipliers.mariageGratis ?? 1000;
+              const baseGratis = multipliers.mariageGratis ?? 1500;
+              const gratisWon = baseGratis * winMultiplierCount;
               gridWon = gratisWon;
-              description = `Mariage Gratis Gagnant (${numA} × ${numB}) - ${gratisWon} G`;
+              description = winMultiplierCount > 1
+                ? `Mariage Gratis Gagnant (${numA} × ${numB}) [${optionLabel} Dekabè] - ${gratisWon} G`
+                : `Mariage Gratis Gagnant (${numA} × ${numB}) - ${gratisWon} G`;
             } else {
-              const mult = multipliers.mariage ?? 1000;
+              const baseMult = multipliers.mariage ?? 1000;
+              const mult = baseMult * winMultiplierCount;
               gridWon = betAmount * mult;
-              description = `Mariage Gagnant (${numA} × ${numB}) [${optionLabel}] - ${mult}x`;
+              description = winMultiplierCount > 1
+                ? `Mariage Gagnant (${numA} × ${numB}) [${optionLabel} Dekabè] - ${mult}x`
+                : `Mariage Gagnant (${numA} × ${numB}) [${optionLabel}] - ${mult}x`;
             }
           }
         }

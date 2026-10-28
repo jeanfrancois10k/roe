@@ -1211,6 +1211,15 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
+    const gratisPayoutSetting = await this.prisma.systemSetting.findUnique({
+      where: { key: 'MARIAGE_GRATUIT_PAYOUT' },
+    });
+    const customGratisPayout = gratisPayoutSetting?.value ? Number(gratisPayoutSetting.value) : 1500;
+    const effectiveRules = {
+      ...(typeof draw.game.gameRules === 'object' && draw.game.gameRules !== null ? draw.game.gameRules : {}),
+      mariageGratisPayout: customGratisPayout,
+    };
+
     let totalWinners = 0;
     let totalWonAmount = 0;
 
@@ -1219,7 +1228,7 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
       const evalResult = this.evaluator.evaluateTicket(
         grids,
         draw.winningResults as unknown as WinningResultsDto,
-        draw.game.gameRules,
+        effectiveRules,
       );
 
       if (evalResult.isWinner) {
@@ -1350,12 +1359,21 @@ export class DrawsService implements OnModuleInit, OnModuleDestroy {
     let newWinnersCount = 0;
     let newWonTotal = 0;
 
+    const gratisPayoutSetting = await this.prisma.systemSetting.findUnique({
+      where: { key: 'MARIAGE_GRATUIT_PAYOUT' },
+    });
+    const customGratisPayout = gratisPayoutSetting?.value ? Number(gratisPayoutSetting.value) : 1500;
+    const effectiveRules = {
+      ...(typeof draw.game.gameRules === 'object' && draw.game.gameRules !== null ? draw.game.gameRules : {}),
+      mariageGratisPayout: customGratisPayout,
+    };
+
     for (const ticket of tickets) {
       const grids = ticket.playedGrids as any[];
       const evalResult = this.evaluator.evaluateTicket(
         grids,
         dto.winningResults,
-        draw.game.gameRules,
+        effectiveRules,
       );
 
       if (evalResult.isWinner) {

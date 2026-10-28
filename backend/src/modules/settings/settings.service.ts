@@ -79,6 +79,7 @@ export class SettingsService implements OnModuleInit {
       ticketProviderInfo: map.get('TICKET_PROVIDER_INFO') || 'ROE-TECH',
       ticketValidityDays: Number(map.get('TICKET_VALIDITY_DAYS') || '90'),
       mariageGratuitNote: map.get('MARIAGE_GRATUIT_NOTE') || 'MARYAJ GRATIS 1500 GDES',
+      mariageGratuitPayout: Number(map.get('MARIAGE_GRATUIT_PAYOUT') || '1500'),
     };
 
     return {
@@ -171,6 +172,7 @@ export class SettingsService implements OnModuleInit {
       TICKET_PROVIDER_INFO: dto.ticketProviderInfo,
       TICKET_VALIDITY_DAYS: dto.ticketValidityDays !== undefined ? String(dto.ticketValidityDays) : undefined,
       MARIAGE_GRATUIT_NOTE: dto.mariageGratuitNote,
+      MARIAGE_GRATUIT_PAYOUT: dto.mariageGratuitPayout !== undefined ? String(dto.mariageGratuitPayout) : undefined,
     };
 
     for (const [key, value] of Object.entries(keysMap)) {
