@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { createHaitiDate, getHaitiDateParts } from '../draws/draws.service';
 import { AuditService } from '../audit/audit.service';
 import { CommissionsService } from '../commissions/commissions.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -206,11 +207,13 @@ export class TicketsService {
       );
     }
 
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const haitiNow = getHaitiDateParts(now);
+    const startOfToday = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 0, 0, 0);
+    const endOfToday = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 23, 59, 59);
     const todaySalesAgg = await this.prisma.ticket.aggregate({
       where: {
         vendorId,
-        createdAt: { gte: startOfToday },
+        createdAt: { gte: startOfToday, lte: endOfToday },
         status: TicketStatus.CONFIRMED,
       },
       _sum: { totalAmount: true },

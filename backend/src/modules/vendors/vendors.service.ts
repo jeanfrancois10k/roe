@@ -325,15 +325,17 @@ export class VendorsService {
       throw new NotFoundException('Vendeur introuvable');
     }
 
-    // Calcul métriques du jour
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    // Calcul métriques du jour synchronisées sur l'heure d'Haïti
+    const haitiNow = getHaitiDateParts(new Date());
+    const startOfToday = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 0, 0, 0);
+    const endOfToday = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 23, 59, 59);
+    const startOfMonth = createHaitiDate(haitiNow.year, haitiNow.month, 1, 0, 0, 0);
 
     const [todaySales, monthSales, totalTickets, unpaidWinnersAgg, paidWinnersAgg, centralCreditsAgg] = await Promise.all([
       this.prisma.ticket.aggregate({
         where: {
           vendorId: id,
-          createdAt: { gte: startOfToday },
+          createdAt: { gte: startOfToday, lte: endOfToday },
           status: 'CONFIRMED',
         },
         _sum: { totalAmount: true },
@@ -343,7 +345,7 @@ export class VendorsService {
         where: {
           vendorId: id,
           createdAt: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            gte: startOfMonth,
           },
           status: 'CONFIRMED',
         },

@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { createHaitiDate, getHaitiDateParts } from '../draws/draws.service';
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAdminStats(vendorId?: string) {
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const haitiNow = getHaitiDateParts(new Date());
+    const startOfToday = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 0, 0, 0);
+    const endOfToday = createHaitiDate(haitiNow.year, haitiNow.month, haitiNow.day, 23, 59, 59);
+    const startOfMonth = createHaitiDate(haitiNow.year, haitiNow.month, 1, 0, 0, 0);
 
     const ticketFilter = vendorId ? { vendorId } : {};
     const transactionFilter = vendorId ? { vendorId } : {};
@@ -39,7 +41,7 @@ export class DashboardService {
       this.prisma.device.count({ where: { isOnline: true } }),
       this.prisma.device.count(),
       this.prisma.ticket.aggregate({
-        where: { createdAt: { gte: startOfToday }, status: 'CONFIRMED', ...ticketFilter },
+        where: { createdAt: { gte: startOfToday, lte: endOfToday }, status: 'CONFIRMED', ...ticketFilter },
         _sum: { totalAmount: true },
         _count: { id: true },
       }),
