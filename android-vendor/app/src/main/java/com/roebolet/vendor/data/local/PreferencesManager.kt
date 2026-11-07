@@ -80,7 +80,7 @@ class PreferencesManager(context: Context) {
     }
 
     fun getServerUrl(): String =
-        prefs.getString(KEY_SERVER_URL, "https://roe-chi.vercel.app/") ?: "https://roe-chi.vercel.app/"
+        prefs.getString(KEY_SERVER_URL, "https://roe-qq9t.vercel.app/") ?: "https://roe-qq9t.vercel.app/"
 
     fun setServerUrl(url: String) {
         prefs.edit().putString(KEY_SERVER_URL, url).apply()

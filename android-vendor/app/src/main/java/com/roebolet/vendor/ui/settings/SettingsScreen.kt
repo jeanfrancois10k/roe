@@ -246,8 +246,8 @@ fun SettingsScreen(
                 ) {
                     Button(
                         onClick = {
-                            serverUrlInput = "https://roe-chi.vercel.app/"
-                            onSaveServerUrl("https://roe-chi.vercel.app/")
+                            serverUrlInput = "https://roe-qq9t.vercel.app/"
+                            onSaveServerUrl("https://roe-qq9t.vercel.app/")
                             Toast.makeText(context, if (isHt) "Adrès la retounen sou sèvè pwodiksyon an" else "URL réinitialisée sur la production officielle", Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = RoeCard),

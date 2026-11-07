@@ -1,8 +1,10 @@
-const API_BASE_URL =
+const rawBaseUrl =
   process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
     ? 'https://roe-qq9t.vercel.app'
     : 'http://localhost:4000');
+
+const API_BASE_URL = rawBaseUrl.trim().replace(/\/+$/, '').replace(/\/api\/v1$/, '');
 
 export async function apiRequest<T = any>(
   endpoint: string,
