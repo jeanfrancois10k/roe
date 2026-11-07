@@ -4,7 +4,11 @@ let socket: Socket | null = null;
 
 export function getAdminSocket(): Socket {
   if (!socket) {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const API_BASE_URL =
+      process.env.NEXT_PUBLIC_API_URL ||
+      (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+        ? 'https://roe-qq9t.vercel.app'
+        : 'http://localhost:4000');
     // Si sur Vercel (URL contenant vercel.app), désactiver WebSocket persistant
     // car Vercel Serverless Functions ne supporte pas les connexions WebSocket stateful bidirectionnelles
     const isVercelServerless = API_BASE_URL.includes('vercel.app');
